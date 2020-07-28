@@ -1,4 +1,5 @@
 import * as cdk from '@aws-cdk/core';
+import {RemovalPolicy} from '@aws-cdk/core';
 import * as ssm from '@aws-cdk/aws-ssm';
 import * as ddb from '@aws-cdk/aws-dynamodb';
 import * as sqs from '@aws-cdk/aws-sqs';
@@ -16,7 +17,7 @@ import * as sns from '@aws-cdk/aws-sns';
 import * as sub from '@aws-cdk/aws-sns-subscriptions';
 
 const bucket_para = [{
-  src_bucket: "joeshi",
+  src_bucket: "aws-data-replication-hub-test",
   src_prefix: "",
   des_bucket: "aws-data-replication-hub-test",
   des_prefix: ""
@@ -72,7 +73,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     // 2. Setup DynamoDB
     const ddbFileList = new ddb.Table(this, 'S3MigrationTable', {
       partitionKey: { name: 'Key', type: ddb.AttributeType.STRING },
-      billingMode: ddb.BillingMode.PAY_PER_REQUEST
+      billingMode: ddb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.DESTROY
     })
 
     ddbFileList.addGlobalSecondaryIndex({
@@ -170,14 +172,26 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     }));
 
     let bucketName = '';
-    bucket_para.forEach( bucket => {
-      if (bucketName !== bucket.src_bucket) {
-        bucketName = bucket.src_bucket;
-        const s3existBucket = s3.Bucket.fromBucketName(this, `Src${bucketName}`, bucketName)
-        s3existBucket.grantRead(handler);
-        s3existBucket.grantRead(handlerJobSender);
-      }
-    })
+    // @ts-ignore
+    if (JobType === 'PUT') {
+      bucket_para.forEach( bucket => {
+        if (bucketName !== bucket.src_bucket) {
+          bucketName = bucket.src_bucket;
+          const s3existBucket = s3.Bucket.fromBucketName(this, `Src${bucketName}`, bucketName)
+          s3existBucket.grantRead(handler);
+          s3existBucket.grantRead(handlerJobSender);
+        }
+      })
+    } else if (JobType === 'GET') {
+      bucket_para.forEach( bucket => {
+        if (bucketName !== bucket.des_bucket) {
+          bucketName = bucket.des_bucket;
+          const s3existBucket = s3.Bucket.fromBucketName(this, `Src${bucketName}`, bucketName)
+          s3existBucket.grantReadWrite(handler);
+          s3existBucket.grantReadWrite(handlerJobSender);
+        }
+      })
+    }
 
     // Allow Lambda read ssm parameters
     ssmBucketParam.grantRead(handlerJobSender);
