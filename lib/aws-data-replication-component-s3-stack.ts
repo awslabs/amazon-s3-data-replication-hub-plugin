@@ -66,7 +66,10 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     super(scope, id, props);
 
     // 1. Setup SSM parameter of credentials, bucket parameters, ignore_list
-    const ssmCredentialsParam = ssm.StringParameter.fromStringParameterName(this, 'SSMParameterCredentials', ssm_parameter_credentials);
+    const ssmCredentialsParam = ssm.StringParameter.fromSecureStringParameterAttributes(this, 'SSMParameterCredentials', {
+      parameterName: ssm_parameter_credentials,
+      version: 1
+    });
 
     const ssmBucketParam = new ssm.StringParameter(this, 'SSMParameterBucket', {
       stringValue: JSON.stringify(bucket_para, null, 2)
