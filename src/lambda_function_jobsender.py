@@ -17,12 +17,10 @@ StorageClass = os.environ['StorageClass']
 ssm_parameter_credentials = os.environ['ssm_parameter_credentials']
 checkip_url = os.environ['checkip_url']
 sqs_queue_name = os.environ['sqs_queue']
-ssm_parameter_ignore_list = os.environ['ssm_parameter_ignore_list']
 ssm_parameter_bucket = os.environ['ssm_parameter_bucket']
 JobType = os.environ['JobType']
 MaxRetry = int(os.environ['MaxRetry'])  # 最大请求重试次数
 JobsenderCompareVersionId = os.environ['JobsenderCompareVersionId'].upper() == 'TRUE'
-IncludeMetadata = os.environ['IncludeMetadata'].upper() == 'TRUE'  # Whether to copy metadata info of objects from source bucket
 
 # Set environment
 s3_config = Config(max_pool_connections=50, retries={'max_attempts': MaxRetry})  # 最大连接数
@@ -74,12 +72,6 @@ def lambda_handler(event, context):
 
     # Get ignore file list
     ignore_list = []
-    try:
-        logger.info('Try to get ignore list from ssm parameter')
-        ignore_list = ssm.get_parameter(Name=ssm_parameter_ignore_list)['Parameter']['Value'].splitlines()
-        logger.info(f'Get ignore list: {str(ignore_list)}')
-    except Exception as e:
-        logger.info(f'No ignore list in ssm parameter - {str(e)}')
 
     # Check SQS is empty or not
     if check_sqs_empty(sqs, sqs_queue):
@@ -117,7 +109,6 @@ def lambda_handler(event, context):
                 des_prefix=des_prefix,
                 ignore_list=ignore_list,
                 JobsenderCompareVersionId=JobsenderCompareVersionId,
-                include_metadata=IncludeMetadata,
             )
 
             # Upload jobs to sqs
