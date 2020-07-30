@@ -15,6 +15,9 @@ import * as cw from '@aws-cdk/aws-cloudwatch';
 import * as actions from '@aws-cdk/aws-cloudwatch-actions';
 import * as sns from '@aws-cdk/aws-sns';
 import * as sub from '@aws-cdk/aws-sns-subscriptions';
+import * as cr from '@aws-cdk/custom-resources';
+import {AwsCustomResourcePolicy, PhysicalResourceId} from "@aws-cdk/custom-resources";
+import * as iam from '@aws-cdk/aws-iam';
 
 const bucket_para = [{
   src_bucket: "aws-data-replication-hub-test",
@@ -64,7 +67,10 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     super(scope, id, props);
 
     // 1. Setup SSM parameter of credentials, bucket parameters, ignore_list
-    const ssmCredentialsParam = ssm.StringParameter.fromStringParameterName(this, 'SSMParameterCredentials', ssm_parameter_credentials);
+    const ssmCredentialsParam = ssm.StringParameter.fromSecureStringParameterAttributes(this, 'SSMParameterCredentials', {
+      parameterName: ssm_parameter_credentials,
+      version: 1
+    });
 
     const ssmBucketParam = new ssm.StringParameter(this, 'SSMParameterBucket', {
       stringValue: JSON.stringify(bucket_para, null, 2)
@@ -322,7 +328,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }),
       new cw.GraphWidget({
         title: 'ERROR/WARNING Logs',
-        left: [ logMetricWarning, logMetricTimeout ]
+        left: [ logMetricError ],
+        right: [ logMetricWarning, logMetricTimeout ]
       }),
       new cw.GraphWidget({
         title: 'SQS-Jobs',
@@ -354,6 +361,27 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const alarmTopic = new sns.Topic(this, 'SQS queue-DLQ has dead letter');
     alarmTopic.addSubscription(new sub.EmailSubscription(alarm_email));
     alarmDLQ.addAlarmAction(new actions.SnsAction(alarmTopic));
+
+    // Custom resource to trigger JobSender Lambda once
+    const jobSenderTrigger = new cr.AwsCustomResource(this, 'JobSenderTrigger', {
+      policy: AwsCustomResourcePolicy.fromStatements([new iam.PolicyStatement({
+        actions: ['lambda:InvokeFunction'],
+        effect: iam.Effect.ALLOW,
+        resources: [handlerJobSender.functionArn]
+      })]),
+      timeout: cdk.Duration.minutes(15),
+      logRetention: logs.RetentionDays.ONE_DAY,
+      onCreate: {
+        service: 'Lambda',
+        action: 'invoke',
+        parameters: {
+          FunctionName: handlerJobSender.functionName,
+          InvocationType: 'Event'
+        },
+        physicalResourceId: PhysicalResourceId.of('JobSenderTriggerPhysicalId')
+      }
+    })
+    jobSenderTrigger.node.addDependency(handler, handlerJobSender, sqsQueue)
 
     new cdk.CfnOutput(this, 'Dashboard', {
       value: 'CloudWatch Dashboard name is S3Migration'

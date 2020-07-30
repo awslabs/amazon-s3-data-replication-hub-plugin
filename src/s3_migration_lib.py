@@ -1,6 +1,5 @@
 # PROJECT LONGBOW - LIB FOR TRANSMISSION BETWEEN AMAZON S3
 
-import datetime
 import logging
 import hashlib
 import concurrent.futures
@@ -16,12 +15,26 @@ import json
 import os
 import sys
 import time
+from copy import deepcopy
+from datetime import datetime
 from fnmatch import fnmatchcase
 from pathlib import PurePosixPath, Path
 
 logger = logging.getLogger()
 Max_md5_retry = 2
 
+# For multipart uplaod, the max number of parts is 10000
+MAX_PARTS = 10000
+
+# METADATA_ARGS: List of supported system metadata and custom metadata keys.
+METADATA_ARGS = ['Metadata',
+                 'ContentDisposition', 
+                 'ContentLanguage', 
+                 'ContentType', 
+                 'ContentEncoding', 
+                 'CacheControl', 
+                 'Expires', 
+                 'WebsiteRedirectLocation']
 
 # Configure logging
 def set_log(LoggingLevel, this_file_name):
@@ -34,7 +47,7 @@ def set_log(LoggingLevel, this_file_name):
     log_path = Path(__file__).parent.parent / 'amazon-s3-migration-log'
     if not Path.exists(log_path):
         Path.mkdir(log_path)
-    start_time = datetime.datetime.now().isoformat().replace(':', '-')[:19]
+    start_time = datetime.now().isoformat().replace(':', '-')[:19]
     _log_file_name = str(log_path / f'{this_file_name}-{start_time}.log')
     print('Log file:', _log_file_name)
     fileHandler = logging.FileHandler(filename=_log_file_name)
@@ -244,8 +257,8 @@ def get_versionid_from_ddb(*, des_bucket, table):
 
 
 # Jobsender compare source and destination bucket list
-def delta_job_list(*, src_file_list, des_file_list, src_bucket, src_prefix, des_bucket, des_prefix, ignore_list,
-                   JobsenderCompareVersionId):
+def delta_job_list(*, s3_client, src_file_list, des_file_list, src_bucket, src_prefix, des_bucket, des_prefix, ignore_list,
+                   JobsenderCompareVersionId, include_metadata=True):
     # Delta list，只对比key&size，version不做对比，只用来发Job
     logger.info(f'Compare source s3://{src_bucket}/{src_prefix} and destination s3://{des_bucket}/{des_prefix}')
     start_time = int(time.time())
@@ -271,6 +284,22 @@ def delta_job_list(*, src_file_list, des_file_list, src_bucket, src_prefix, des_
             continue  # 在List中，下一个源文件
         # 不在List中，把源文件加入job list
         else:
+            # If copy of metadata is required, need to use head_object() api to get the extra info
+            # Note metadata info was ignored during comparation.
+            if include_metadata:
+                # get metadata from source.
+                head = s3_client.head_object(
+                            Bucket=src_bucket,
+                            Key=src["Key"]
+                        )       
+                extra_args = {metadata : head.get(metadata) for metadata in METADATA_ARGS if head.get(metadata)}
+                # Convert Expires value from format of datetime to timestamp.
+                if extra_args.get('Expires'):
+                    extra_args['Expires'] = str(extra_args['Expires'].timestamp())
+                logger.info(f'Got Extra Args {extra_args} for key {src["Key"]}')
+            else:
+                extra_args = {}
+                
             Des_key = str(PurePosixPath(des_prefix) / src["Key"])
             if src["Key"][-1] == '/':  # 源Key是个目录的情况，需要额外加 /
                 Des_key += '/'
@@ -281,7 +310,8 @@ def delta_job_list(*, src_file_list, des_file_list, src_bucket, src_prefix, des_
                     "Des_bucket": des_bucket,
                     "Des_key": Des_key,
                     "Size": src["Size"],
-                    "versionId": src['versionId']
+                    "versionId": src['versionId'],
+                    "extra_args": extra_args,
                 }
             )
     spent_time = int(time.time()) - start_time
@@ -324,8 +354,8 @@ def job_upload_sqs_ddb(*, sqs, sqs_queue, job_list):
 def split(Size, ChunkSize):
     partnumber = 1
     indexList = [0]
-    if int(Size / ChunkSize) + 1 > 10000:
-        ChunkSize = int(Size / 10000) + 1024  # 对于大于10000分片的大文件，自动调整Chunksize
+    if int(Size / ChunkSize) + 1 > MAX_PARTS:
+        ChunkSize = int(Size / MAX_PARTS) + 1024  # 对于大于10000分片的大文件，自动调整Chunksize
         logger.info(f'Size excess 10000 parts limit. Auto change ChunkSize to {ChunkSize}')
     while ChunkSize * partnumber < Size:  # 如果刚好是"="，则无需再分下一part，所以这里不能用"<="
         indexList.append(ChunkSize * partnumber)
@@ -818,6 +848,13 @@ def step_function(*, job, table, s3_src_client, s3_des_client, instance_id,
     Des_key = job['Des_key']
     versionId = job['versionId']
     upload_etag_full = ""
+    # Convert Expires value from format of timestamp back to datetime.
+    if job['extra_args'].get('Expires'):
+        extra_args = deepcopy(job['extra_args'])
+        extra_args['Expires'] = datetime.fromtimestamp(float(extra_args['Expires']))
+    else:
+        extra_args = job['extra_args']
+
     logger.info(f'Start multipart: {Src_bucket}/{Src_key}, Size: {Size}, versionId: {versionId}')
 
     # Get dest s3 unfinish multipart upload of this file
@@ -852,7 +889,8 @@ def step_function(*, job, table, s3_src_client, s3_des_client, instance_id,
                 response_new_upload = s3_des_client.create_multipart_upload(
                     Bucket=Des_bucket,
                     Key=Des_key,
-                    StorageClass=StorageClass
+                    StorageClass=StorageClass,
+                    **extra_args
                 )
                 # If update versionID enabled, update s3 versionID
                 # 但可能会出现中断重传的时候，拿到了另一个新version，从而导致文件半老半新，所以需要在最后完成时候校验一次versionId
@@ -1049,13 +1087,16 @@ def ddb_start(*, table, percent, job, instance_id, new_upload):
     Des_bucket = job['Des_bucket']
     Des_key = job['Des_key']
     versionId = job['versionId']
+    extra_args = job['extra_args']
     logger.info(f'Write log to DDB start job - {Src_bucket}/{Src_key}')
+    logger.info(f'Extra Args : - {extra_args}')
     cur_time = time.time()
     table_key = str(PurePosixPath(Src_bucket) / Src_key)
     if Src_key[-1] == '/':  # 针对空目录对象
         table_key += '/'
     UpdateExpression = "ADD instanceID :id, tryTimes :t, startTime_f :s_format " \
-                       "SET lastTimeProgress=:p, Size=:size, desBucket=:b, desKey=:k"
+                       "SET lastTimeProgress=:p, Size=:size, desBucket=:b, desKey=:k," \
+                        "extra_args=:ex"
     ExpressionAttributeValues = {
         ":t": 1,
         ":id": {instance_id},
@@ -1063,7 +1104,8 @@ def ddb_start(*, table, percent, job, instance_id, new_upload):
         ":size": Size,
         ":p": percent,
         ":b": Des_bucket,
-        ":k": Des_key
+        ":k": Des_key,
+        ":ex": extra_args,
     }
     if new_upload:
         logger.info(f'Update DDB <firstTime> - {Src_bucket}/{Src_key}')
@@ -1127,6 +1169,14 @@ def step_fn_small_file(*, job, table, s3_src_client, s3_des_client, instance_id,
     Des_bucket = job['Des_bucket']
     Des_key = job['Des_key']
     versionId = job['versionId']
+    
+    # Convert Expires value from format of timestamp back to datetime.
+    if job['extra_args'].get('Expires'):
+        extra_args = deepcopy(job['extra_args'])
+        extra_args['Expires'] = datetime.fromtimestamp(float(extra_args['Expires']))
+    else:
+        extra_args = job['extra_args']
+
     # If update versionID enabled, update s3 versionID
     if UpdateVersionId:
         versionId = head_s3_version(
@@ -1171,7 +1221,8 @@ def step_fn_small_file(*, job, table, s3_src_client, s3_des_client, instance_id,
                 Bucket=Des_bucket,
                 Key=Des_key,
                 ContentMD5=ContentMD5,
-                StorageClass=StorageClass
+                StorageClass=StorageClass,
+                **extra_args
             )
             # 请求已经带上md5，如果s3校验是错的就Exception
             upload_etag_full = response_put_object['ETag']

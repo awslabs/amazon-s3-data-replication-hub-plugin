@@ -100,6 +100,7 @@ def lambda_handler(event, context):
             )
             # Generate job list
             job_list, ignore_records = delta_job_list(
+                s3_client=s3_src_client,
                 src_file_list=src_file_list,
                 des_file_list=des_file_list,
                 src_bucket=src_bucket,
@@ -107,7 +108,7 @@ def lambda_handler(event, context):
                 des_bucket=des_bucket,
                 des_prefix=des_prefix,
                 ignore_list=ignore_list,
-                JobsenderCompareVersionId=JobsenderCompareVersionId
+                JobsenderCompareVersionId=JobsenderCompareVersionId,
             )
 
             # Upload jobs to sqs
