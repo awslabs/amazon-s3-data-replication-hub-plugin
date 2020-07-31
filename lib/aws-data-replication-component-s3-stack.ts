@@ -122,7 +122,16 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     })
 
-    checkip.root.addMethod('GET')
+    checkip.root.addMethod('GET', undefined, {
+      methodResponses: [
+        {
+          statusCode: '200',
+          responseModels: {
+            'application/json': api.Model.EMPTY_MODEL
+          }
+        }
+      ]
+    } )
 
     // 5. Setup Lambda functions
 
