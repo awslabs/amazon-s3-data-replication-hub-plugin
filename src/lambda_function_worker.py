@@ -20,10 +20,10 @@ from s3_migration_lib import step_function, step_fn_small_file
 table_queue_name = os.environ['table_queue_name']
 StorageClass = os.environ['StorageClass']
 try:
-    Des_bucket_default = os.environ['Des_bucket_default']
-    Des_prefix_default = os.environ['Des_prefix_default']
+    Des_bucket_default = os.environ['DEST_BUCKET']
+    Des_prefix_default = os.environ['DEST_BUCKET_PREFIX']
 except Exception as e:
-    print('No Env Des_bucket_default/Des_prefix_default ', e)
+    print('No Env DEST_BUCKET/DEST_BUCKET_PREFIX ', e)
     Des_bucket_default, Des_prefix_default = "", ""
 ssm_parameter_credentials = os.environ['ssm_parameter_credentials']
 checkip_url = os.environ['checkip_url']

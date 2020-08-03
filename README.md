@@ -6,8 +6,6 @@ This project is for S3 replication component. Each of the replication component 
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
-
-
 ## Build Source Code Package
 
 The Lambda Code is under the `src` folder. This project is set up like a standard Python 
@@ -45,12 +43,31 @@ Once the virtualenv is activated, you can install the required dependencies.
 $ pip install -r requirements.txt
 ```
 
+## Deploy The Application
 
-## Useful commands
+Compile TypeScript into JavaScript.  
 
- * `npm run build`   compile typescript to js
- * `npm run watch`   watch for changes and compile
- * `npm run test`    perform the jest unit tests
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
+```
+npm run build
+```
+
+Deploy the Application. You need to provide at least `srcBucketName`, `destBucketName` and `alarmEmail`. 
+
+```
+cdk deploy --parameters srcBucketName=<source-bucket-name> \
+--parameters destBucketName=<dest-bucket-name> \
+--parameters alarmEmail=xxxxx@example.com
+``` 
+
+The following are the all allowed parameters:
+
+* **srcBucketName:** Source bucket name. 
+* **srcBucketPrefix:** Source bucket object prefix. The application will only copy keys with the certain prefix.
+* **destBucketName:** Destination bucket name.
+* **destBucketPrefix:** Destination bucket prefix. The application will upload to certian prefix.
+* **jobType:** Choose `GET` if source bucket is not in current account. Otherwise, choose `PUT`. Default `PUT`.
+* **credentialsParameterStore**: The Parameter Store used to keep AWS credentials for other regions. Default `drh-credentials`.
+* **alarmEmail**: Alarm email. Errors will be sent to this email.
+
+After you have deployed the application. the replication process will start immediately. Remember to confirm subscription
+in your email in order to receive error notifications.
