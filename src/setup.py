@@ -9,24 +9,8 @@ setuptools.setup(
     author="huangzb@amazon.com",
 
     package_dir={"": "./"},
-    packages=setuptools.find_packages(where="cdk"),
 
     install_requires=[
-        "aws-cdk.core>=1.30",
-        "aws-cdk.aws-dynamodb>=1.30",
-        "aws-cdk.aws-lambda>=1.30",
-        "aws-cdk.aws-s3>=1.30",
-        "aws-cdk.aws-ec2>=1.30",
-        "aws-cdk.aws-cloudwatch>=1.30",
-        "aws-cdk.aws-cloudwatch-actions>=1.30",
-        "aws-cdk.aws-logs>=1.30",
-        "aws-cdk.aws-sqs>=1.30",
-        "aws-cdk.aws-sns>=1.30",
-        "aws-cdk.aws-sns-subscriptions>=1.30",
-        "aws-cdk.aws-iam>=1.30",
-        "aws-cdk.aws_lambda_event_sources>=1.30",
-        "aws-cdk.aws_s3_notifications>=1.30",
-        "aws-cdk.aws-events-targets>=1.30",
         "boto3"
     ],
 

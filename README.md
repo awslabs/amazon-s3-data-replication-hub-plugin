@@ -1,53 +1,72 @@
-# AWS Data Replication Hub - S3 Component
+# AWS Data Replication Hub - S3 Plugin
 
-AWS Data Replication Hub is a solution for replicating data from different sources into AWS.
+_This AWS Date Replication Hub - S3 Plugin is based on 
+[amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) contributed by
+[huangzbaws@](https://github.com/huangzbaws)._
 
-This project is for S3 replication component. Each of the replication component can run idependently. 
+AWS Data Replication Hub is a solution for replicating data from different sources into AWS. This project is for 
+S3 replication plugin. Each of the replication plugin can run independently. 
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+The following are the planned features of this plugin.
 
-## Build Source Code Package
+- [x] Replicating Amazon S3 from AWS CN Partition to AWS Standard Partition.
+- [x] Replicating Amazon S3 from AWS Standard Partition to AWS CN Partition.
+- [ ] Support Aliyun OSS to Amazon S3, including both CN Partition and Standard Partition.
+- [x] Replicating object metadata.
+- [x] Versioning support.
+- [x] Large size file support.
+- [x] Progress tracking and monitoring.
+- [x] Support provision in both CN Partition and Standard Partition.
+- [x] Deployment via AWS CDK.
 
-The Lambda Code is under the `src` folder. This project is set up like a standard Python 
-project.  The initialization process also creates a virtualenv within this project, 
-stored under the .env directory.  To create the virtualenv it assumes that there 
-is a `python3` (or `python` for Windows) executable in your path with access to 
-the `venv` package. If for any reason the automatic creation of the virtualenv 
-fails, you can create the virtualenv manually.
+
+## Architect
+
+![S3 Plugin Architect](s3-plugin-architect.png)
+
+The *JobSender* Lambda function lists all the objects in source and destination buckets and determines what should be
+replicated. It will update DynamoDB table to keep track of every object status. Besides, a message will be created in SQS.
+The *JobWorker* Lambda function is configured to consume the message in SQS and copy data from source bucket to destination 
+bucket. A *time-based CloudWatch rule* will trigger the *JobSender* every hour.
+
+The application use `AccessKeyID` and `SecretAccessKey` to read or write S3 bucket in other AWS partition. And a *Parameter Store*
+is being used to store the credentials in a secure manner. 
+
+If an object or a part of an object failed to transfer, the application will try a few times. If it still failed after
+a few retries, the message will be put in `SQS Dead-Letter-Queue`. A CloudWatch alarm will be triggered if there is message
+in this QLQ, and a subsequent email notification will be sent via SNS.
+
+This application support transfer large size file. It will divide it into small parts and leverage the 
+[multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
+
+
+## Deployment
+
+### Prepare AWS Credentials
+
+The program use `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read/write S3 Buckets in other AWS 
+partition. For example, if the application will be deployed in Standard partition. Then the `AK/SK` should be 
+generated from CN partition, and being stored in a Parameter Store in Standard partition.
+
+Please create a **Parameter Store** in **AWS Systems Manager**, named it `drh-credentials`, select **SecureString** 
+as its type, and put the following in the **Value**.
 
 ```
-cd src
+{
+  "aws_access_key_id": "xxxxxxx",
+  "aws_secret_access_key": "xxxxxxxxx",
+  "region": "us-west-2"
+}
 ```
 
-To manually create a virtualenv on MacOS and Linux:
-```
-$ python3 -m venv .env
-```
+Please make sure the permission associated with AK/SK should have the privilege to read/write the desired S3 bucket. 
 
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
+### Deploy via AWS CDK
+
+Under the project root folder, compile TypeScript into JavaScript. Make sure you have **npm** and **AWS CDK CLI** installed.
 
 ```
-$ source .env/bin/activate
-```
-
-If you are a Windows platform, you would activate the virtualenv like this:
-
-```
-% .env\Scripts\activate.bat
-```
-
-Once the virtualenv is activated, you can install the required dependencies.
-
-```
-$ pip install -r requirements.txt
-```
-
-## Deploy The Application
-
-Compile TypeScript into JavaScript.  
-
-```
+npm install
 npm run build
 ```
 
@@ -59,15 +78,22 @@ cdk deploy --parameters srcBucketName=<source-bucket-name> \
 --parameters alarmEmail=xxxxx@example.com
 ``` 
 
-The following are the all allowed parameters:
-
-* **srcBucketName:** Source bucket name. 
-* **srcBucketPrefix:** Source bucket object prefix. The application will only copy keys with the certain prefix.
-* **destBucketName:** Destination bucket name.
-* **destBucketPrefix:** Destination bucket prefix. The application will upload to certian prefix.
-* **jobType:** Choose `GET` if source bucket is not in current account. Otherwise, choose `PUT`. Default `PUT`.
-* **credentialsParameterStore**: The Parameter Store used to keep AWS credentials for other regions. Default `drh-credentials`.
-* **alarmEmail**: Alarm email. Errors will be sent to this email.
-
 After you have deployed the application. the replication process will start immediately. Remember to confirm subscription
 in your email in order to receive error notifications.
+
+### Parameters
+
+The following are the all allowed parameters:
+
+| Parameter                 | Default          | Description                                                                               |
+|---------------------------|------------------|-------------------------------------------------------------------------------------------|
+| srcBucketName             | <requires input> | Source bucket name.                                                                       |
+| srcBucketPrefix           | ''               | Source bucket object prefix. The application will only copy keys with the certain prefix. |
+| destBucketName            | <requires input> | Destination bucket name.                                                                  |
+| destBucketPrefix          | ''               | Destination bucket prefix. The application will upload to certain prefix.                 |
+| jobType                   | PUT              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.             |
+| credentialsParameterStore | drh-credentials  | The Parameter Store used to keep AWS credentials for other regions.                       |
+| alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                           |
+
+
+
