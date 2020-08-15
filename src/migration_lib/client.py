@@ -27,9 +27,9 @@ S3_METADATA_ARGS = ['Metadata',
 
 
 class JobInfo():
-    """ a representation of object to be migrated with minimum info. 
+    """ a representation of an object to be migrated with minimum info. 
     
-    There is no need to storage the bucket info, as those are stored in lambda env.
+    There is no need to include the bucket info, as it's already stored in lambda env.
     """
 
     def __init__(self, key, size, version, storage_class='STANDARD'):
@@ -48,7 +48,7 @@ class DownloadClient():
         self._prefix = prefix
 
     def get_object(self, key, start, chunk_size, version=None):
-        """The method is used to get object data flow in chunks from cloud storage.
+        """The method is used to get object data in chunks from cloud storage.
 
         :param key: unique object key
 
@@ -56,7 +56,7 @@ class DownloadClient():
 
         :param chunk_size: number of bytes to read
 
-        :param version: if a version is passed, only to download the particular version.
+        :param version: if a value of version is passed, this will only download that particular version.
 
         :returns: a tuple (body, body_md5)
 
@@ -400,7 +400,7 @@ class UploadClient():
         raise NotImplementedError('upload_object() must be implemented')
 
     def clean_unfinished_unload(self, uploaded_list):
-        """The method is used to clean all the uploaded parts that is not completed for multipart load.
+        """The method is used to clean all the uploaded parts but not yet merged for multipart load.
 
        This method must be implemented by subclasses.
         """
@@ -659,7 +659,7 @@ class S3UploadClient(UploadClient):
     def upload_part(self, key, body, body_md5, part_number, upload_id=None):
         # TODO update upload_part
         logger.info(
-            f'S3> Uploading Part {key} - part number - {part_number}')
+            f'S3> Uploading part for {key} with part number {part_number}')
         # logger.info(f'--->Uploading {len(getBody)} Bytes {Des_bucket}/{Des_key} - {partnumber}/{total}')
         self._client.upload_part(
             Body=body,

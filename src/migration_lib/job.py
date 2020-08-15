@@ -92,10 +92,10 @@ class JobFinder():
         spent_time = int(time.time()) - start_time
         if include_version:
             logger.info(
-                f'JobFinder> Finish compare key/size/versionId in {spent_time} Seconds (include_version is enable)')
+                f'JobFinder> Finish compare key/size/versionId in {spent_time} Seconds (include_version is enabled)')
         else:
             logger.info(
-                f'JobFinder> Finish compare key/size in {spent_time} Seconds (include_version is disable)')
+                f'JobFinder> Finish compare key/size in {spent_time} Seconds (include_version is disabled)')
 
         logger.info(f'JobFinder> Get Job List {len(job_list)}')
         return job_list
@@ -105,7 +105,9 @@ class JobFinder():
 
 
 class JobMigrator():
-    """ This class perform a role of find a list of delta objects by comparing the source and destination bucket 
+    """ This class is used to migrate an object from the source to the destination. 
+
+    If the object size is too big, it will automatically use multiple part upload.
 
     Example Usage:
         migrator = JobMigrator(s3c_oss_client, des_s3_client, config, job, table_name)
@@ -210,7 +212,7 @@ class JobMigrator():
         return index_list, chunk_size
 
     def _start_multipart_upload(self, **extra_args):
-        """ First check if an upload ID exists for the key. 
+        """ Firstly, check if an upload ID already exists for the key. 
 
             * if yes:
                 Get the list of parts uploaded and return the list of parts and uploadID
@@ -227,7 +229,7 @@ class JobMigrator():
         # if exists
         if uploaded_list:
             if self._config.clean_unfinished_upload:
-                logger.info("Migrator> Clean Unfinished Job")
+                logger.info("Migrator> Clean unfinished uploads")
                 self._des_client.clean_unfinished_unload(uploaded_list)
 
             else:
