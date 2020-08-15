@@ -7,33 +7,30 @@ import ssl
 import urllib.request
 import urllib.error
 from operator import itemgetter
-from s3_migration_lib import get_des_file_list, get_src_file_list, job_upload_sqs_ddb, delta_job_list, check_sqs_empty
 from botocore.config import Config
 import boto3
 
-# 环境变量
+from migration_lib.client import S3DownloadClient, AliOSSDownloadClient
+from migration_lib.service import SQSService, DBService
+from migration_lib.job import JobFinder
+from migration_lib.config import JobConfig
+
+# Env
 table_queue_name = os.environ['table_queue_name']
-StorageClass = os.environ['StorageClass']
 ssm_parameter_credentials = os.environ['ssm_parameter_credentials']
-checkip_url = os.environ['checkip_url']
 sqs_queue_name = os.environ['sqs_queue']
 src_bucket_name = os.environ['SRC_BUCKET_NAME']
 src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
 dest_bucket_name = os.environ['DEST_BUCKET_NAME']
 dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
-JobType = os.environ['JobType']
-MaxRetry = int(os.environ['MaxRetry'])  # 最大请求重试次数
-JobsenderCompareVersionId = os.environ['JobsenderCompareVersionId'].upper() == 'TRUE'
+job_type = os.environ['JobType']
+source_type = os.environ['SOURCE_TYPE']
+max_retries = int(os.environ['MaxRetry'])
+# include_version = os.environ['JobsenderCompareVersionId'].upper() == 'TRUE'
+include_version = False  # not ready yet.
 
-# Set environment
-s3_config = Config(max_pool_connections=50, retries={'max_attempts': MaxRetry})  # 最大连接数
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(table_queue_name)
-sqs = boto3.client('sqs')
-sqs_queue = sqs.get_queue_url(QueueName=sqs_queue_name)['QueueUrl']
 
 # Get credentials of the other account
 ssm = boto3.client('ssm')
@@ -42,88 +39,70 @@ credentials = json.loads(ssm.get_parameter(
     Name=ssm_parameter_credentials,
     WithDecryption=True
 )['Parameter']['Value'])
-credentials_session = boto3.session.Session(
-    aws_access_key_id=credentials["aws_access_key_id"],
-    aws_secret_access_key=credentials["aws_secret_access_key"],
-    region_name=credentials["region"]
-)
 
-# Default Jobtype is PUT
-s3_src_client = boto3.client('s3', config=s3_config)
-s3_des_client = credentials_session.client('s3', config=s3_config)
-if JobType.upper() == "GET":
-    s3_src_client, s3_des_client = s3_des_client, s3_src_client
 
-try:
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    response = urllib.request.urlopen(
-        urllib.request.Request(checkip_url), timeout=3, context=context
-    ).read()
-    instance_id = "lambda-" + response.decode('utf-8')
-except urllib.error.URLError as e:
-    logger.warning(f'Fail to connect to checkip api: {checkip_url} - {str(e)}')
-    instance_id = 'lambda-ip-timeout'
+# Default Jobtype is GET, Only S3 supports PUT type.
+src_credentials, des_credentials = credentials, {}
+if job_type.upper() == 'PUT':
+    src_bucket_name, src_bucket_prefix, dest_bucket_name, dest_bucket_prefix = dest_bucket_name, \
+        dest_bucket_prefix, src_bucket_name, src_bucket_prefix
+    src_credentials, des_credentials = des_credentials, src_credentials
 
+# TODO Add an env var as source type. Valid options are ['S3', 'AliOSS', ...]
+# source_type = 'S3'
+if source_type == 'AliOSS':
+    src_client = AliOSSDownloadClient(
+        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
+
+else:
+    # Default to S3
+    src_client = S3DownloadClient(
+        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
+
+des_client = S3DownloadClient(
+    bucket_name=dest_bucket_name, prefix=dest_bucket_prefix, **des_credentials)
+
+# Default Jobtype is GET, Only S3 supports PUT type.
+# if job_type.upper() == 'PUT':
+#     src_client, des_client = des_client, src_client
 
 # handler
 def lambda_handler(event, context):
 
-    # Get ignore file list
-    ignore_list = []
+    sqs = SQSService(queue_name=sqs_queue_name)
 
-    # Check SQS is empty or not
-    if check_sqs_empty(sqs, sqs_queue):
-        logger.info('Job sqs queue is empty, now process comparing s3 bucket...')
-        src_bucket = src_bucket_name
-        src_prefix = src_bucket_prefix
-        des_bucket = dest_bucket_name
-        des_prefix = dest_bucket_prefix
+    sqs_empty = sqs.is_empty()
 
-        # Get List on S3
-        logger.info('Get source bucket')
-        src_file_list = get_src_file_list(
-            s3_client=s3_src_client,
-            bucket=src_bucket,
-            S3Prefix=src_prefix,
-            JobsenderCompareVersionId=JobsenderCompareVersionId
-        )
-        logger.info('Get destination bucket')
-        des_file_list = get_des_file_list(
-            s3_client=s3_des_client,
-            bucket=des_bucket,
-            S3Prefix=des_prefix,
-            table=table,
-            JobsenderCompareVersionId=JobsenderCompareVersionId
-        )
-        # Generate job list
-        job_list, ignore_records = delta_job_list(
-            s3_client=s3_src_client,
-            src_file_list=src_file_list,
-            des_file_list=des_file_list,
-            src_bucket=src_bucket,
-            src_prefix=src_prefix,
-            des_bucket=des_bucket,
-            des_prefix=des_prefix,
-            ignore_list=ignore_list,
-            JobsenderCompareVersionId=JobsenderCompareVersionId,
-        )
+    # If job queue is not empty, no need to compare again.
+    if sqs_empty:
+        logger.info(
+            'Job sqs queue is empty, now process comparing s3 bucket...')
 
+        db = DBService(table_queue_name)
+        job_finder = JobFinder(src_client, des_client, db)
+
+        job_list = job_finder.find_jobs(include_version)
+
+        if job_list:
+            sqs.send_jobs(job_list)
+
+        # TODO update this.
         # Upload jobs to sqs
-        if len(job_list) != 0:
-            job_upload_sqs_ddb(
-                sqs=sqs,
-                sqs_queue=sqs_queue,
-                job_list=job_list
-            )
-            max_object = max(job_list, key=itemgetter('Size'))
-            MaxChunkSize = int(max_object['Size'] / 10000) + 1024
-            if MaxChunkSize < 5 * 1024 * 1024:
-                MaxChunkSize = 5 * 1024 * 1024
-            logger.warning(f'Max object size is {max_object["Size"]}. Require AWS Lambda memory > '
-                           f'MaxChunksize({MaxChunkSize}) x MaxThread(default: 1) x MaxParallelFile(default: 50)')
-        else:
-            logger.info('Source list are all in Destination, no job to send.')
+        # if len(job_list) != 0:
+        #     job_upload_sqs_ddb(
+        #         sqs=sqs,
+        #         sqs_queue=sqs_queue,
+        #         job_list=job_list
+        #     )
+        #     max_object = max(job_list, key=itemgetter('Size'))
+        #     MaxChunkSize = int(max_object['Size'] / 10000) + 1024
+        #     if MaxChunkSize < 5 * 1024 * 1024:
+        #         MaxChunkSize = 5 * 1024 * 1024
+        #     logger.warning(f'Max object size is {max_object["Size"]}. Require AWS Lambda memory > '
+        #                    f'MaxChunksize({MaxChunkSize}) x MaxThread(default: 1) x MaxParallelFile(default: 50)')
+        # else:
+        #     logger.info('Source list are all in Destination, no job to send.')
 
     else:
-        logger.error('Job sqs queue is not empty or fail to get_queue_attributes. Stop process.')
-    # print('Completed and logged to file:', os.path.abspath(log_file_name))
+        logger.error(
+            'Job sqs queue is not empty or fail to get_queue_attributes. Stop process.')
