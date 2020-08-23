@@ -40,12 +40,9 @@ credentials = json.loads(ssm.get_parameter(
     WithDecryption=True
 )['Parameter']['Value'])
 
-
 # Default Jobtype is GET, Only S3 supports PUT type.
-src_credentials, des_credentials = credentials, {}
-if job_type.upper() == 'PUT':
-    src_bucket_name, src_bucket_prefix, dest_bucket_name, dest_bucket_prefix = dest_bucket_name, \
-        dest_bucket_prefix, src_bucket_name, src_bucket_prefix
+src_credentials, des_credentials =  {}, credentials
+if job_type.upper() == 'GET':
     src_credentials, des_credentials = des_credentials, src_credentials
 
 # TODO Add an env var as source type. Valid options are ['S3', 'AliOSS', ...]
@@ -61,10 +58,6 @@ else:
 
 des_client = S3DownloadClient(
     bucket_name=dest_bucket_name, prefix=dest_bucket_prefix, **des_credentials)
-
-# Default Jobtype is GET, Only S3 supports PUT type.
-# if job_type.upper() == 'PUT':
-#     src_client, des_client = des_client, src_client
 
 # handler
 def lambda_handler(event, context):

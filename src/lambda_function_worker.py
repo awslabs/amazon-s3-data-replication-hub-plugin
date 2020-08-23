@@ -66,10 +66,8 @@ credentials = json.loads(ssm.get_parameter(
 )['Parameter']['Value'])
 
 # Default Jobtype is GET, Only S3 supports PUT type.
-src_credentials, des_credentials = credentials, {}
-if job_type.upper() == 'PUT':
-    src_bucket_name, src_bucket_prefix, dest_bucket_name, dest_bucket_prefix = dest_bucket_name, \
-        dest_bucket_prefix, src_bucket_name, src_bucket_prefix
+src_credentials, des_credentials =  {}, credentials
+if job_type.upper() == 'GET':
     src_credentials, des_credentials = des_credentials, src_credentials
 
 # TODO Add an env var as source type. Valid options are ['S3', 'AliOSS', ...]
