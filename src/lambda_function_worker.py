@@ -20,32 +20,21 @@ from migration_lib.client import S3DownloadClient, AliOSSDownloadClient, S3Uploa
 from migration_lib.config import JobConfig
 
 # Env
-table_queue_name = os.environ['table_queue_name']
-default_storage_class = os.environ['StorageClass']
-
-# TODO: update lambda env
-# try:
-#     Des_bucket_default = os.environ['DEST_BUCKET']
-#     Des_prefix_default = os.environ['DEST_BUCKET_PREFIX']
-# except Exception as e:
-#     print('No Env DEST_BUCKET/DEST_BUCKET_PREFIX ', e)
-#     Des_bucket_default, Des_prefix_default = "", ""
-
+table_queue_name = os.environ['TABLE_QUEUE_NAME']
+default_storage_class = os.environ['STORAGE_CLASS']
 src_bucket_name = os.environ['SRC_BUCKET_NAME']
 src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
 dest_bucket_name = os.environ['DEST_BUCKET_NAME']
 dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
-ssm_parameter_credentials = os.environ['ssm_parameter_credentials']
-checkip_url = os.environ['checkip_url']
-job_type = os.environ['JobType']
+ssm_parameter_credentials = os.environ['SSM_PARAMETER_CREDENTIALS']
+checkip_url = os.environ['CHECK_IP_URL']
+job_type = os.environ['JOB_TYPE']
 source_type = os.environ['SOURCE_TYPE']
-max_retries = int(os.environ['MaxRetry'])
-max_threads = int(os.environ['MaxThread'])
-max_parallel_file = int(os.environ['MaxParallelFile'])  # Not used in lambda
-job_timeout = int(os.environ['JobTimeout'])
-# UpdateVersionId = os.environ['UpdateVersionId'].upper() == 'TRUE'  # get lastest version id from s3 before get object
-# GetObjectWithVersionId = os.environ['GetObjectWithVersionId'].upper() == 'TRUE'  # get object with version id
-include_version = False  # not ready yet.
+max_retries = int(os.environ['MAX_RETRY'])
+max_threads = int(os.environ['MAX_THREAD'])
+max_parallel_file = int(os.environ['MAX_PARALLEL_FILE'])  # Not used in lambda
+job_timeout = int(os.environ['JOB_TIMEOUT'])
+include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
 
 # Below are moved into migration_lib.config
 # ResumableThreshold = 5 * 1024 * 1024  # Accelerate to ignore small file

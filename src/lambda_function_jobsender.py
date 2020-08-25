@@ -16,18 +16,17 @@ from migration_lib.job import JobFinder
 from migration_lib.config import JobConfig
 
 # Env
-table_queue_name = os.environ['table_queue_name']
-ssm_parameter_credentials = os.environ['ssm_parameter_credentials']
-sqs_queue_name = os.environ['sqs_queue']
+table_queue_name = os.environ['TABLE_QUEUE_NAME']
+ssm_parameter_credentials = os.environ['SSM_PARAMETER_CREDENTIALS']
+sqs_queue_name = os.environ['SQS_QUEUE_NAME']
 src_bucket_name = os.environ['SRC_BUCKET_NAME']
 src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
 dest_bucket_name = os.environ['DEST_BUCKET_NAME']
 dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
-job_type = os.environ['JobType']
+job_type = os.environ['JOB_TYPE']
 source_type = os.environ['SOURCE_TYPE']
-max_retries = int(os.environ['MaxRetry'])
-# include_version = os.environ['JobsenderCompareVersionId'].upper() == 'TRUE'
-include_version = False  # not ready yet.
+max_retries = int(os.environ['MAX_RETRY'])
+include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
