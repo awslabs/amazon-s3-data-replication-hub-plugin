@@ -18,23 +18,26 @@ import * as cr from '@aws-cdk/custom-resources';
 import * as iam from '@aws-cdk/aws-iam';
 
 const StorageClass = 'STANDARD'
-
 const MaxRetry = '20'  // Max retry for requests
 const MaxThread = '50'  // Max threads per file
 const MaxParallelFile = '1'  // Recommend to be 1 in AWS Lambda
 const JobTimeout = '870'  // Timeout for each job, should be less than AWS Lambda timeout
-const JobsenderCompareVersionId = 'False'  // Jobsender should compare versioinId of source B3 bucket and versionId in DDB
-const UpdateVersionId = 'False'  // get lastest version id from s3 before before get object
-const GetObjectWithVersionId = 'False'  // get object together with the specified version id
-
+const IncludeVersion = 'False'  // Whethere versionId should be considered during delta comparation and object migration
 /***
  * BEFORE DEPLOY CDK, please setup a "drh-credentials" secure parameter in ssm parameter store MANUALLY!
  * This is the access_key which is not in the same account as ec2.
  * For example, if ec2 running in Global, this is China Account access_key. Example as below:
  * {
- *  "aws_access_key_id": "your_aws_access_key_id",
- *  "aws_secret_access_key": "your_aws_secret_access_key",
+ *  "aws_access_key_id": "<Your AccessKeyID>",
+ *  "aws_secret_access_key": ""<Your AccessKeySecret>",
  *  "region": "cn-northwest-1"
+ * }
+ * 
+ * If source is Aliyun OSS. Example of credentials as below:
+ * {
+ *  "oss_access_key_id": "<Your AccessKeyID>",
+ *  "oss_access_key_secret": "<Your AccessKeySecret>",
+ *  "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
  * }
  */
 
@@ -49,6 +52,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       type: 'String',
       default: 'PUT',
       allowedValues: ['PUT', 'GET']
+    })
+
+    const sourceType = new cdk.CfnParameter(this, 'sourceType', {
+      description: 'Choose migration source, for example, S3 or AliOSS.',
+      type: 'String',
+      default: 'S3',
+      allowedValues: ['S3', 'AliOSS', 'Qiniu']
     })
 
     const srcBucketName = new cdk.CfnParameter(this, 'srcBucketName', {
@@ -138,7 +148,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     // 2. Setup DynamoDB
     const ddbFileList = new ddb.Table(this, 'S3MigrationTable', {
-      partitionKey: { name: 'Key', type: ddb.AttributeType.STRING },
+      partitionKey: { name: 'objectKey', type: ddb.AttributeType.STRING },
       billingMode: ddb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY
     })
@@ -197,48 +207,67 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     const handler = new lambda.Function(this, 'S3MigrationWorker', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../src'), { 
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
+          command: [
+            'bash', '-c', `python setup.py sdist && 
+            pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
+            cp lambda_function_* /asset-output/`,
+          ],
+        },
+      }),
       handler: 'lambda_function_worker.lambda_handler',
       memorySize: 1024,
       timeout: cdk.Duration.minutes(15),
       tracing: lambda.Tracing.ACTIVE,
       environment: {
-        table_queue_name: ddbFileList.tableName,
-        DEST_BUCKET: destBucketName.valueAsString,
+        TABLE_QUEUE_NAME: ddbFileList.tableName,
+        SRC_BUCKET_NAME: srcBucketName.valueAsString,
+        SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
+        DEST_BUCKET_NAME: destBucketName.valueAsString,
         DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-        StorageClass: StorageClass,
-        checkip_url: checkip.url,
-        ssm_parameter_credentials: credentialsParameterStore.valueAsString,
-        JobType: jobType.valueAsString,
-        MaxRetry: MaxRetry,
-        MaxThread: MaxThread,
-        MaxParallelFile: MaxParallelFile,
-        JobTimeout: JobTimeout,
-        UpdateVersionId: UpdateVersionId,
-        GetObjectWithVersionId: GetObjectWithVersionId
+        STORAGE_CLASS: StorageClass,
+        CHECK_IP_URL: checkip.url,
+        SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
+        JOB_TYPE: jobType.valueAsString,
+        SOURCE_TYPE: sourceType.valueAsString,
+        MAX_RETRY: MaxRetry,
+        MAX_THREAD: MaxThread,
+        MAX_PARALLEL_FILE: MaxParallelFile,
+        JOB_TIMEOUT: JobTimeout,
+        INCLUDE_VERSION: IncludeVersion
       }
     })
 
     const handlerJobSender = new lambda.Function(this, 'S3MigrationJobSender', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../src'), { 
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
+          command: [
+            'bash', '-c', `python setup.py sdist && 
+            pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
+            cp lambda_function_* /asset-output/`,
+          ],
+        },
+      }),
       handler: "lambda_function_jobsender.lambda_handler",
       memorySize: 1024,
       timeout: cdk.Duration.minutes(15),
       tracing: lambda.Tracing.ACTIVE,
       environment: {
-        table_queue_name: ddbFileList.tableName,
-        StorageClass: StorageClass,
-        checkip_url: checkip.url,
-        sqs_queue: sqsQueue.queueName,
-        ssm_parameter_credentials: credentialsParameterStore.valueAsString,
+        TABLE_QUEUE_NAME: ddbFileList.tableName,
+        SQS_QUEUE_NAME: sqsQueue.queueName,
+        SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
         SRC_BUCKET_NAME: srcBucketName.valueAsString,
         SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
         DEST_BUCKET_NAME: destBucketName.valueAsString,
         DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-        JobType: jobType.valueAsString,
-        MaxRetry: MaxRetry,
-        JobsenderCompareVersionId: JobsenderCompareVersionId
+        JOB_TYPE: jobType.valueAsString,
+        SOURCE_TYPE: sourceType.valueAsString,
+        MAX_RETRY: MaxRetry,
+        INCLUDE_VERSION: IncludeVersion
       }
     })
 
@@ -257,7 +286,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       const s3InCurrentAccount = s3.Bucket.fromBucketName(this, `SourceBucketName`, srcBucketName.valueAsString);
       s3InCurrentAccount.grantRead(handler);
       s3InCurrentAccount.grantRead(handlerJobSender);
-    } else if ( jobType.valueAsString === 'GET' ){
+    } else {
       const s3InCurrentAccount = s3.Bucket.fromBucketName(this, `DestBucketName`, destBucketName.valueAsString);
       s3InCurrentAccount.grantReadWrite(handler);
       s3InCurrentAccount.grantReadWrite(handlerJobSender);

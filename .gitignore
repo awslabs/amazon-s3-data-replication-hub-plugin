@@ -10,3 +10,16 @@ cdk.out
 # Parcel build directories
 .cache
 .build
+
+# Python build
+build
+dist
+*.egg-info
+__pycache__
+.venv
+
+
+# General
+.DS_Store
+.vscode
+

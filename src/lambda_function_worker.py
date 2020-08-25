@@ -1,5 +1,4 @@
-# PROJECT LONGBOW
-# AWS LAMBDA WORKER NODE FOR TRANSMISSION BETWEEN AMAZON S3
+# AWS LAMBDA WORKER NODE FOR TRANSMISSION
 
 import json
 import logging
@@ -14,58 +13,64 @@ from pathlib import PurePosixPath
 import boto3
 from botocore.config import Config
 
-from s3_migration_lib import step_function, step_fn_small_file
 
-# 环境变量
-table_queue_name = os.environ['table_queue_name']
-StorageClass = os.environ['StorageClass']
-try:
-    Des_bucket_default = os.environ['DEST_BUCKET']
-    Des_prefix_default = os.environ['DEST_BUCKET_PREFIX']
-except Exception as e:
-    print('No Env DEST_BUCKET/DEST_BUCKET_PREFIX ', e)
-    Des_bucket_default, Des_prefix_default = "", ""
-ssm_parameter_credentials = os.environ['ssm_parameter_credentials']
-checkip_url = os.environ['checkip_url']
-JobType = os.environ['JobType']
-MaxRetry = int(os.environ['MaxRetry'])  # 最大请求重试次数
-MaxThread = int(os.environ['MaxThread'])  # 最大线程数
-MaxParallelFile = int(os.environ['MaxParallelFile'])  # Lambda 中暂时没用到
-JobTimeout = int(os.environ['JobTimeout'])
-UpdateVersionId = os.environ['UpdateVersionId'].upper() == 'TRUE'  # get lastest version id from s3 before get object
-GetObjectWithVersionId = os.environ['GetObjectWithVersionId'].upper() == 'TRUE'  # get object with version id
+from migration_lib.job import JobMigrator, JobFinder
+from migration_lib.service import SQSService, DBService
+from migration_lib.client import S3DownloadClient, AliOSSDownloadClient, S3UploadClient, JobInfo
+from migration_lib.config import JobConfig
 
-# 内部参数
-ResumableThreshold = 5 * 1024 * 1024  # Accelerate to ignore small file
-CleanUnfinishedUpload = False  # For debug
-ChunkSize = 5 * 1024 * 1024  # For debug, will be auto-change
-ifVerifyMD5Twice = False  # For debug
-s3_config = Config(max_pool_connections=200,
-                   retries={'max_attempts': MaxRetry})  # 最大连接数
+# Env
+table_queue_name = os.environ['TABLE_QUEUE_NAME']
+default_storage_class = os.environ['STORAGE_CLASS']
+src_bucket_name = os.environ['SRC_BUCKET_NAME']
+src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
+dest_bucket_name = os.environ['DEST_BUCKET_NAME']
+dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
+ssm_parameter_credentials = os.environ['SSM_PARAMETER_CREDENTIALS']
+checkip_url = os.environ['CHECK_IP_URL']
+job_type = os.environ['JOB_TYPE']
+source_type = os.environ['SOURCE_TYPE']
+max_retries = int(os.environ['MAX_RETRY'])
+max_threads = int(os.environ['MAX_THREAD'])
+max_parallel_file = int(os.environ['MAX_PARALLEL_FILE'])  # Not used in lambda
+job_timeout = int(os.environ['JOB_TIMEOUT'])
+include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
 
-# Set environment
+# Below are moved into migration_lib.config
+# ResumableThreshold = 5 * 1024 * 1024  # Accelerate to ignore small file
+# CleanUnfinishedUpload = False  # For debug
+# ChunkSize = 5 * 1024 * 1024  # For debug, will be auto-change
+# ifVerifyMD5Twice = False  # For debug
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(table_queue_name)
 
-# 取另一个Account的credentials
+# Get connection credentials
 ssm = boto3.client('ssm')
 logger.info(f'Get ssm_parameter_credentials: {ssm_parameter_credentials}')
 credentials = json.loads(ssm.get_parameter(
     Name=ssm_parameter_credentials,
     WithDecryption=True
 )['Parameter']['Value'])
-credentials_session = boto3.session.Session(
-    aws_access_key_id=credentials["aws_access_key_id"],
-    aws_secret_access_key=credentials["aws_secret_access_key"],
-    region_name=credentials["region"]
-)
-s3_src_client = boto3.client('s3', config=s3_config)
-s3_des_client = credentials_session.client('s3', config=s3_config)
-if JobType.upper() == "GET":
-    s3_src_client, s3_des_client = s3_des_client, s3_src_client
+
+# Default Jobtype is GET, Only S3 supports PUT type.
+src_credentials, des_credentials =  {}, credentials
+if job_type.upper() == 'GET':
+    src_credentials, des_credentials = des_credentials, src_credentials
+
+# TODO Add an env var as source type. Valid options are ['S3', 'AliOSS', ...]
+# source_type = 'S3'
+if source_type == 'AliOSS':
+    src_client = AliOSSDownloadClient(
+        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
+else:
+    # Default to S3
+    src_client = S3DownloadClient(
+            bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
+
+des_client = S3UploadClient(
+            bucket_name=dest_bucket_name, prefix=dest_bucket_prefix, **des_credentials)
 
 try:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS)
@@ -95,82 +100,43 @@ def lambda_handler(event, context):
         job = json.loads(trigger_body)
         logger.info(json.dumps(job, default=str))
 
-        # 跳过初次配置时候， S3 自动写SQS的访问测试记录
+        # First message is a test message only, no need to process.
         if 'Event' in job:
             if job['Event'] == 's3:TestEvent':
                 logger.info('Skip s3:TestEvent')
                 continue
 
-        # 判断是S3来的消息，而不是jodsender来的就转换一下
-        if 'Records' in job:  # S3来的消息带着'Records'
-            for One_record in job['Records']:
-                if 's3' in One_record:
-                    Src_bucket = One_record['s3']['bucket']['name']
-                    Src_key = One_record['s3']['object']['key']
-                    Src_key = urllib.parse.unquote_plus(Src_key)  # 加号转回空格
-                    Size = One_record['s3']['object']['size']
-                    if "versionId" in One_record['s3']['object']:
-                        versionId = One_record['s3']['object']['versionId']
-                    else:
-                        versionId = 'null'
-                    Des_bucket, Des_prefix = Des_bucket_default, Des_prefix_default
-                    Des_key = str(PurePosixPath(Des_prefix) / Src_key)
-                    if Src_key[-1] == '/':  # 针对空目录对象
-                        Des_key += '/'
-                    job = {
-                        'Src_bucket': Src_bucket,
-                        'Src_key': Src_key,
-                        'Size': Size,
-                        'Des_bucket': Des_bucket,
-                        'Des_key': Des_key,
-                        'versionId': versionId
-                    }
-        if 'Des_bucket' not in job:  # 消息结构不对
+        # TODO Check if message is from S3? why?
+        # if 'Records' in job:  # S3 message contains 'Records'
+        #     for One_record in job['Records']:
+        #         if 's3' in One_record:
+        #             Src_bucket = One_record['s3']['bucket']['name']
+        #             Src_key = One_record['s3']['object']['key']
+        #             Src_key = urllib.parse.unquote_plus(Src_key)  # 加号转回空格
+        #             Size = One_record['s3']['object']['size']
+        #             ...
+
+        if 'key' not in job:  # Invaid message.
             logger.warning(f'Wrong sqs job: {json.dumps(job, default=str)}')
             logger.warning('Try to handle next message')
             raise WrongRecordFormat
-        if 'versionId' not in job:
-            job['versionId'] = 'null'
 
-        # TODO: 如果是一次多条Job并且出现一半失败的问题未处理，所以目前只设置SQS Batch=1
-        if job['Size'] > ResumableThreshold:
-            upload_etag_full = step_function(
-                                job=job,
-                                table=table,
-                                s3_src_client=s3_src_client,
-                                s3_des_client=s3_des_client,
-                                instance_id=instance_id,
-                                StorageClass=StorageClass,
-                                ChunkSize=ChunkSize,
-                                MaxRetry=MaxRetry,
-                                MaxThread=MaxThread,
-                                JobTimeout=JobTimeout,
-                                ifVerifyMD5Twice=ifVerifyMD5Twice,
-                                CleanUnfinishedUpload=CleanUnfinishedUpload,
-                                UpdateVersionId=UpdateVersionId,
-                                GetObjectWithVersionId=GetObjectWithVersionId
-                            )
-        else:
-            upload_etag_full = step_fn_small_file(
-                                job=job,
-                                table=table,
-                                s3_src_client=s3_src_client,
-                                s3_des_client=s3_des_client,
-                                instance_id=instance_id,
-                                StorageClass=StorageClass,
-                                MaxRetry=MaxRetry,
-                                UpdateVersionId=UpdateVersionId,
-                                GetObjectWithVersionId=GetObjectWithVersionId
-                            )
-        if upload_etag_full != "TIMEOUT" and upload_etag_full != "ERR":
-            # 如果是超时或ERR的就不删SQS消息，是正常结束就删
-            # 大文件会在退出线程时设 MaxRetry 为 TIMEOUT，小文件则会返回 MaxRetry
-            # 小文件出现该问题可以认为没必要再让下一个worker再试了，不是因为文件下载太大导致，而是权限设置导致
-            # 直接删除SQS，并且DDB并不会记录结束状态
-            # 如果希望小文件也继续让SQS消息恢复，并让下一个worker再试，则在上面判断加upload_etag_full != "MaxRetry"
-            continue
-        else:
-            raise TimeoutOrMaxRetry
+        job['storage_class'] = default_storage_class
+
+        jobinfo = JobInfo(**job)
+        config = JobConfig(include_version=include_version,
+                           job_timeout=job_timeout)
+        db = DBService(table_queue_name)
+        migrator = JobMigrator(src_client, des_client,
+                               config, db, jobinfo, instance_id)
+
+        migrator.start_migration()
+
+        # TODO update with more exceptional handling.
+        # if upload_etag_full != "TIMEOUT" and upload_etag_full != "ERR":
+        #     ...
+        # else:
+        #     raise TimeoutOrMaxRetry
 
     return {
         'statusCode': 200,
