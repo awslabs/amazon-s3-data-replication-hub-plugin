@@ -64,6 +64,17 @@ if job_type.upper() == 'GET':
 if source_type == 'AliOSS':
     src_client = AliOSSDownloadClient(
         bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
+elif source_type == 'Qiniu':
+    if 'endpoint_url' not in src_credentials:
+        # if endpoint url is not provided, use region_name to create the endpoint url.
+        if 'region_name' not in src_credentials:
+            logger.warning(f'Cannot find Qiniu Region in SSM parameter {ssm_parameter_credentials}, default to cn-south-1')
+            src_credentials['region_name'] = 'cn-south-1'
+        endpoint_url = 'https://s3-{}.qiniucs.com'.format(src_credentials['region_name'])
+        src_credentials['endpoint_url'] = endpoint_url
+    
+    src_client = S3DownloadClient(
+        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
 else:
     # Default to S3
     src_client = S3DownloadClient(
