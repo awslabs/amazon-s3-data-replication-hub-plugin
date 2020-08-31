@@ -116,6 +116,14 @@ class S3DownloadClient(DownloadClient):
             "aws_secret_access_key": "<Your AccessKeySecret>",
             "region": "cn-northwest-1"
         }
+
+        This client also supports Qiniu Kodo, for Qiniu Kodo, the credentials must contain the qiniu endpoint url, for example:
+
+        credentials = {
+            "aws_access_key_id": "<Your AccessKeyID>",
+            "aws_secret_access_key": "<Your AccessKeySecret>",
+            "endpoint_url": "https://s3-ap-southeast-1.qiniucs.com"
+        }
     """
 
     def __init__(self, bucket_name, prefix="",  **credentials):
@@ -124,19 +132,8 @@ class S3DownloadClient(DownloadClient):
         # TODO change to a parameter.
         s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
                            retries={'max_attempts': MAX_ATTEMPTS})
-
         try:
-            if credentials:
-                # TODO check if crdentials are vailds, raise InvalidCredentialsError
-                credentials_session = boto3.session.Session(
-                    aws_access_key_id=credentials["aws_access_key_id"],
-                    aws_secret_access_key=credentials["aws_secret_access_key"],
-                    region_name=credentials["region"]
-                )
-                self._client = credentials_session.client(
-                    's3', config=s3_config)
-            else:
-                self._client = boto3.client('s3', config=s3_config)
+            self._client = boto3.client('s3', config=s3_config, **credentials)
         except Exception as e:
             logger.error(f'Fail to create a client session: {str(e)}')
 
