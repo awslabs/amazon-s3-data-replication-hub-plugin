@@ -42,7 +42,9 @@ This application support transfer large size file. It will divide it into small 
 
 ## Deployment
 
-### Prepare AWS Credentials
+### Prepare Extra Credentials
+
+- for **AWS S3 to S3**
 
 The program use `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read/write S3 Buckets in other AWS 
 partition. For example, if the application will be deployed in Standard partition. Then the `AK/SK` should be 
@@ -53,13 +55,37 @@ as its type, and put the following in the **Value**.
 
 ```
 {
-  "aws_access_key_id": "xxxxxxx",
-  "aws_secret_access_key": "xxxxxxxxx",
-  "region": "us-west-2"
+  "aws_access_key_id": "<Your AWS AccessKeyID>",
+  "aws_secret_access_key": "<Your AWS AccessKeySecret>",
+  "region_name": "us-west-2"
 }
 ```
 
 Please make sure the permission associated with AK/SK should have the privilege to read/write the desired S3 bucket. 
+
+- for **Qiniu Kodo to AWS S3**
+
+As Qiniu Kodo also supports AWS S3 native SDK, if source cloud storage is Qiniu Kodo, please create a same `drh-credentials` parameter with Qiniu AK/SK and region name.
+
+```
+{
+  "aws_access_key_id": "<Your Qiniu AccessKeyID>",,
+  "aws_secret_access_key": "<Your Qiniu AccessKeySecret>",
+  "region_name": "ap-southeast-1"
+}
+```
+
+- for **Aliyun OSS to AWS S3**
+
+If source cloud storage is Aliyun OSS, please create a similar `drh-credentials` parameter with aliyun AK/SK and endpoint url. An example as below:
+
+```
+{
+  "oss_access_key_id": "<Your Aliyun AccessKeyID>",
+  "oss_access_key_secret": "<Your Aliyun AccessKeySecret>",
+  "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
+}
+```
 
 ### Deploy via AWS CDK
 
@@ -91,7 +117,8 @@ The following are the all allowed parameters:
 | srcBucketPrefix           | ''               | Source bucket object prefix. The application will only copy keys with the certain prefix. |
 | destBucketName            | <requires input> | Destination bucket name.                                                                  |
 | destBucketPrefix          | ''               | Destination bucket prefix. The application will upload to certain prefix.                 |
-| jobType                   | PUT              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.             |
+| jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.             |
+| sourceType                | S3               | Choose type of source storage, for example Qiniu, S3 or AliOSS                            |
 | credentialsParameterStore | drh-credentials  | The Parameter Store used to keep AWS credentials for other regions.                       |
 | alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                           |
 

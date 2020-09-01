@@ -50,7 +50,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const jobType = new cdk.CfnParameter(this, 'jobType', {
       description: 'Choose GET if source bucket is not in current account. Otherwise, choose PUT.',
       type: 'String',
-      default: 'PUT',
+      default: 'GET',
       allowedValues: ['PUT', 'GET']
     })
 
