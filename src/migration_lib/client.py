@@ -109,12 +109,12 @@ class S3DownloadClient(DownloadClient):
             print(obj)
 
     Note: 
-        credentials is optional, 
+        credentials is optional. If it should be provided, below is an example:
 
         credentials = {
             "aws_access_key_id": "<Your AccessKeyID>",
             "aws_secret_access_key": "<Your AccessKeySecret>",
-            "region": "cn-northwest-1"
+            "region_name": "cn-northwest-1"
         }
 
         This client also supports Qiniu Kodo, for Qiniu Kodo, the credentials must contain the qiniu endpoint url, for example:
