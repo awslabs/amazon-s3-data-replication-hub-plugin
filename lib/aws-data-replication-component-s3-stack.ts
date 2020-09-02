@@ -56,7 +56,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const jobType = new cdk.CfnParameter(this, 'jobType', {
       description: 'Choose GET if source bucket is not in current account. Otherwise, choose PUT.',
       type: 'String',
-      default: 'PUT',
+      default: 'GET',
       allowedValues: ['PUT', 'GET']
     })
 
@@ -334,18 +334,18 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       });
 
       ssmCredentialsParam.grantRead(taskDefinition.taskRole)
-      ddbFileList.grantReadWriteData(taskDefinition.taskRole);
+      ddbFileList.grantReadData(taskDefinition.taskRole);
       sqsQueue.grantSendMessages(taskDefinition.taskRole);
       s3InCurrentAccount.grantReadWrite(taskDefinition.taskRole);
 
       // Get existing ecs cluster.
-      const vpc = ec2.Vpc.fromVpcAttributes(this, 'vpc', { 
+      const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', { 
         vpcId: ecsVpcId.valueAsString,
         availabilityZones: this.availabilityZones
       })
-      const securityGroup = ec2.SecurityGroup.fromSecurityGroupId(this, 'sg', ecsSecurityGroupId.valueAsString)
+      const securityGroup = ec2.SecurityGroup.fromSecurityGroupId(this, 'ECSSecurityGroup', ecsSecurityGroupId.valueAsString)
 
-      const cluster = ecs.Cluster.fromClusterAttributes(this, 'ecs', {
+      const cluster = ecs.Cluster.fromClusterAttributes(this, 'ECSCluster', {
         clusterName: ecsClusterName.valueAsString,
         vpc: vpc,
         securityGroups: [securityGroup]
@@ -384,7 +384,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       })
 
       ssmCredentialsParam.grantRead(handlerJobSender);
-      ddbFileList.grantReadWriteData(handlerJobSender);
+      ddbFileList.grantReadData(handlerJobSender);
       sqsQueue.grantSendMessages(handlerJobSender);
       s3InCurrentAccount.grantReadWrite(handlerJobSender);
 
