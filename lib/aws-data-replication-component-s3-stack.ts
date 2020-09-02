@@ -254,8 +254,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const s3InCurrentAccount = s3.Bucket.fromBucketName(this, `BucketName`, bucketName);
 
     // 6. Setup Worker Lambda functions
-    const handler = new lambda.Function(this, 'S3MigrationWorker', {
-      runtime: lambda.Runtime.PYTHON_3_8,
+    const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
       code: lambda.Code.fromAsset(path.join(__dirname, '../src'), {
         bundling: {
           image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
@@ -266,6 +265,14 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           ],
         },
       }),
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
+      description: 'Migration Lambda layer',
+    });
+    
+    const handler = new lambda.Function(this, 'S3MigrationWorker', {
+      runtime: lambda.Runtime.PYTHON_3_8,
+      code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+      layers: [layer],
       handler: 'lambda_function_worker.lambda_handler',
       memorySize: 1024,
       timeout: cdk.Duration.minutes(15),
@@ -307,7 +314,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     if (runType == 'ecs') {
       const taskDefinition = new ecs.Ec2TaskDefinition(this, 'JobSenderTaskDef');
       taskDefinition.addContainer('DefaultContainer', {
-        image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src'), {repositoryName: 's3-migration-jobsender'}),
+        image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src')),
         memoryLimitMiB: 1024,
         environment: {
           AWS_DEFAULT_REGION: this.region,
@@ -355,16 +362,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     else {
       const handlerJobSender = new lambda.Function(this, 'S3MigrationJobSender', {
         runtime: lambda.Runtime.PYTHON_3_8,
-        code: lambda.Code.fromAsset(path.join(__dirname, '../src'), {
-          bundling: {
-            image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
-            command: [
-              'bash', '-c', `python setup.py sdist && 
-                pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
-                cp lambda_function_* /asset-output/`,
-            ],
-          },
-        }),
+        code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+        layers: [layer],
         handler: "lambda_function_jobsender.lambda_handler",
         memorySize: 1024,
         timeout: cdk.Duration.minutes(15),
