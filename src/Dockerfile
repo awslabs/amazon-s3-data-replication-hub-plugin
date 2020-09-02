@@ -1,0 +1,18 @@
+FROM python:3.8.5-slim
+WORKDIR /app
+
+ENV LOG_LEVEL INFO
+ENV SSM_PARAMETER_CREDENTIALS drh-credentials
+ENV TABLE_QUEUE_NAME table
+ENV SQS_QUEUE_NAME queue
+ENV SRC_BUCKET_NAME source
+ENV SRC_BUCKET_PREFIX prefix
+ENV DEST_BUCKET_NAME bucket
+ENV DEST_BUCKET_PREFIX prefix
+ENV JOB_TYPE GET
+ENV SOURCE_TYPE S3
+ENV AWS_DEFAULT_REGION us-east-1
+
+COPY . .
+RUN pip install -r requirements.txt
+CMD ["python", "job_sender.py"]
