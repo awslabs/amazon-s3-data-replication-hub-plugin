@@ -332,10 +332,10 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       s3InCurrentAccount.grantReadWrite(taskDefinition.taskRole);
 
       // Get existing ecs cluster.
-      // const clusterName = 'replication-cluster'
-      // const vpcId = 'vpc-0ea1ff42d5b1e326c'
-      // const sgId = 'sg-00eb792ca7347db0d'
-      const vpc = ec2.Vpc.fromLookup(this, 'vpc', { vpcId: ecsVpcId.valueAsString })
+      const vpc = ec2.Vpc.fromVpcAttributes(this, 'vpc', { 
+        vpcId: ecsVpcId.valueAsString,
+        availabilityZones: this.availabilityZones
+      })
       const securityGroup = ec2.SecurityGroup.fromSecurityGroupId(this, 'sg', ecsSecurityGroupId.valueAsString)
 
       const cluster = ecs.Cluster.fromClusterAttributes(this, 'ecs', {
