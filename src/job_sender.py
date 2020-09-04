@@ -4,7 +4,7 @@ import boto3
 import json
 import migration_lib
 
-from migration_lib.job import JobMigrator, JobFinder
+from migration_lib.job import JobMigrator, JobSender
 from migration_lib.service import SQSService, DBService
 from migration_lib.client import S3DownloadClient, AliOSSDownloadClient
 
@@ -62,12 +62,9 @@ def find_and_send_jobs(src_client, des_client, queue_name, table_name, include_v
         logger.info(
             'Job sqs queue is empty, now process comparing s3 bucket...')
         db = DBService(table_name)
-        job_finder = JobFinder(src_client, des_client, db)
+        job_sender = JobSender(src_client, des_client, db, sqs)
 
-        job_list = job_finder.find_jobs(include_version)
-
-        if job_list:
-            sqs.send_jobs(job_list)
+        job_sender.send_jobs(include_version)
     else:
         logger.error(
             'Job sqs queue is not empty or fail to get_queue_attributes. Stop process.')

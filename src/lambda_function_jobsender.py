@@ -12,7 +12,7 @@ import boto3
 
 from migration_lib.client import S3DownloadClient, AliOSSDownloadClient
 from migration_lib.service import SQSService, DBService
-from migration_lib.job import JobFinder
+from migration_lib.job import JobSender
 from migration_lib.config import JobConfig
 
 # Env
@@ -40,7 +40,7 @@ credentials = json.loads(ssm.get_parameter(
 )['Parameter']['Value'])
 
 # Default Jobtype is GET, Only S3 supports PUT type.
-src_credentials, des_credentials =  {}, credentials
+src_credentials, des_credentials = {}, credentials
 if job_type.upper() == 'GET':
     src_credentials, des_credentials = des_credentials, src_credentials
 
@@ -53,11 +53,13 @@ elif source_type == 'Qiniu':
     if 'endpoint_url' not in src_credentials:
         # if endpoint url is not provided, use region_name to create the endpoint url.
         if 'region_name' not in src_credentials:
-            logger.warning(f'Cannot find Qiniu Region in SSM parameter {ssm_parameter_credentials}, default to cn-south-1')
+            logger.warning(
+                f'Cannot find Qiniu Region in SSM parameter {ssm_parameter_credentials}, default to cn-south-1')
             src_credentials['region_name'] = 'cn-south-1'
-        endpoint_url = 'https://s3-{}.qiniucs.com'.format(src_credentials['region_name'])
+        endpoint_url = 'https://s3-{}.qiniucs.com'.format(
+            src_credentials['region_name'])
         src_credentials['endpoint_url'] = endpoint_url
-    
+
     src_client = S3DownloadClient(
         bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
 else:
@@ -72,7 +74,6 @@ des_client = S3DownloadClient(
 def lambda_handler(event, context):
 
     sqs = SQSService(queue_name=sqs_queue_name)
-
     sqs_empty = sqs.is_empty()
 
     # If job queue is not empty, no need to compare again.
@@ -81,30 +82,8 @@ def lambda_handler(event, context):
             'Job sqs queue is empty, now process comparing s3 bucket...')
 
         db = DBService(table_queue_name)
-        job_finder = JobFinder(src_client, des_client, db)
-
-        job_list = job_finder.find_jobs(include_version)
-
-        if job_list:
-            sqs.send_jobs(job_list)
-
-        # TODO update this.
-        # Upload jobs to sqs
-        # if len(job_list) != 0:
-        #     job_upload_sqs_ddb(
-        #         sqs=sqs,
-        #         sqs_queue=sqs_queue,
-        #         job_list=job_list
-        #     )
-        #     max_object = max(job_list, key=itemgetter('Size'))
-        #     MaxChunkSize = int(max_object['Size'] / 10000) + 1024
-        #     if MaxChunkSize < 5 * 1024 * 1024:
-        #         MaxChunkSize = 5 * 1024 * 1024
-        #     logger.warning(f'Max object size is {max_object["Size"]}. Require AWS Lambda memory > '
-        #                    f'MaxChunksize({MaxChunkSize}) x MaxThread(default: 1) x MaxParallelFile(default: 50)')
-        # else:
-        #     logger.info('Source list are all in Destination, no job to send.')
-
+        job_sender = JobSender(src_client, des_client, db, sqs)
+        job_sender.send_jobs(include_version)
     else:
         logger.error(
             'Job sqs queue is not empty or fail to get_queue_attributes. Stop process.')

@@ -14,8 +14,8 @@ import boto3
 from botocore.config import Config
 
 
-from migration_lib.job import JobMigrator, JobFinder
-from migration_lib.service import SQSService, DBService
+from migration_lib.job import JobMigrator
+from migration_lib.service import DBService
 from migration_lib.client import S3DownloadClient, AliOSSDownloadClient, S3UploadClient, JobInfo
 from migration_lib.config import JobConfig
 
@@ -36,15 +36,9 @@ max_parallel_file = int(os.environ['MAX_PARALLEL_FILE'])  # Not used in lambda
 job_timeout = int(os.environ['JOB_TIMEOUT'])
 include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
 
-# Below are moved into migration_lib.config
-# ResumableThreshold = 5 * 1024 * 1024  # Accelerate to ignore small file
-# CleanUnfinishedUpload = False  # For debug
-# ChunkSize = 5 * 1024 * 1024  # For debug, will be auto-change
-# ifVerifyMD5Twice = False  # For debug
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
 
 # Get connection credentials
 ssm = boto3.client('ssm')

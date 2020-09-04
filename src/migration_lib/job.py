@@ -6,7 +6,7 @@ import json
 
 from migration_lib.client import DownloadClient, UploadClient, JobInfo
 from migration_lib.config import JobConfig, MAX_PARTS
-from migration_lib.service import DBService
+from migration_lib.service import DBService, SQSService
 from migration_lib.processor import job_processor
 
 from pathlib import PurePosixPath, Path
@@ -14,94 +14,111 @@ from pathlib import PurePosixPath, Path
 logger = logging.getLogger(__name__)
 
 
-class JobFinder():
-    """ This class perform a role of find a list of delta objects by comparing the source and destination bucket 
+class JobSender():
+    """ This class perform a role of find a list of delta objects by comparing the source and destination bucket,
+    then send the list to SQS
 
     Example Usage:
-        job_finder = JobFinder(src_oss_client, des_s3_client)
-        job_list = job_finder.find_jobs()
-        print(job_list)  
+        job_sender = JobSender(src_oss_client, des_s3_client)
+        job_finder.send_jobs()
 
     """
 
-    def __init__(self, src_client: DownloadClient, des_client: DownloadClient, db: DBService):
+    def __init__(self, src_client: DownloadClient, des_client: DownloadClient, db: DBService, sqs: SQSService):
         super().__init__()
         self._src_client = src_client
         self._des_client = des_client
         self._db = db
+        self._sqs = sqs
 
-    def _get_source_list(self, include_version):
+    def _get_source_set(self, src_list_gen, include_version):
         # logger.info(
-        #     f'JobFinder> list source bucket: {self._src_client.bucket_name}')
-        src_list = self._src_client.list_objects(include_version)
+        #     f'JobSender> list source bucket: {self._src_client.bucket_name}')
+        try:
+            src_list = next(src_list_gen)
+            if include_version:
+                src_file_set = set([(obj.key, obj.size, obj.version)
+                                    for obj in src_list])
+            else:
+                src_file_set = set([(obj.key, obj.size)
+                                    for obj in src_list])
+            return src_file_set
+        except StopIteration:
+            return None
 
-        # Convert object into a tuple (key, size, version)
-        result = []
-        for obj in src_list:
-            result.append((obj.key, obj.size, obj.version))
-        return result
-
-    def _get_target_list(self, include_version):
+    def _get_target_set(self, des_list_gen, include_version):
         # logger.info(
-        #     f'JobFinder> list destination bucket: {self._des_client.bucket_name}')
+        #     f'JobSender> list destination bucket: {self._des_client.bucket_name}')
         # There is no need to check the version from destination bucket.
         # always listed without version.
-        des_list = self._des_client.list_objects(include_version=False)
         if include_version:
             # TODO: Get versions from DynamoDB and update the des_list with version info.
             # TODO: Check performance issue here.
             pass
-
-        # Convert object into a tuple (key, size, version)
-        result = []
-        for obj in des_list:
-            result.append((obj.key, obj.size, obj.version))
+        start = time.time()
+        result = set()
+        for des_list in des_list_gen:
+            for obj in des_list:
+                result.add((obj.key, obj.size))
+        end = time.time()
+        logger.info(
+            f'JobSender> Time elapsed in getting full destination list is {end-start} seconds')
         return result
 
-    def _get_delta_list(self, include_version=False):
-        src_file_list = self._get_source_list(include_version)
-        logger.info(f'JobFinder> Source list: {src_file_list}')
-        des_file_list = self._get_target_list(include_version)
-        logger.info(f'JobFinder> Destination list: {des_file_list}')
+    def _get_delta_and_send(self, include_version=False):
+        src_list_gen = self._src_client.list_objects(
+            include_version=include_version)
+        des_list_gen = self._des_client.list_objects(include_version=False)
+
+        des_file_set = self._get_target_set(des_list_gen, include_version)
+        # logger.info(f'JobSender> Destination list: {des_file_set}')
+
         # Get Delta list.
         logger.info(
-            f'JobFinder> Start comparing...')
+            f'JobSender> Start comparing...')
         start_time = int(time.time())
-        job_list = []
 
-        for src in src_file_list:
-            # if exists in destination, do nothing.
-            if src in des_file_list:
-                continue
-            # else append that into the output list.
-            else:
-                Des_key = str(PurePosixPath(
-                    self._des_client.prefix) / src[0])
+        while True:
+            src_file_set = self._get_source_set(src_list_gen, include_version)
+            # no more file in src.
+            if not src_file_set:
+                break
 
-                # TODO Check do we need this?
-                if src[0][-1] == '/':  # for dir
-                    Des_key += '/'
+            # Use Set difference() to get the delta
+            delta = src_file_set - des_file_set
 
-                job_list.append(
-                    {
-                        "key": src[0],
-                        "size": src[1],
-                        "version": src[2],
-                    }
-                )
+            # if has delta
+            if delta:
+                job_list = []
+                logger.info(
+                    f'JobSender> Get a delta list of {len(delta)}, start sending...')
+                for src in delta:
+                    Des_key = str(PurePosixPath(
+                        self._des_client.prefix) / src[0])
+
+                    # TODO Check do we need this?
+                    if src[0][-1] == '/':  # for dir
+                        Des_key += '/'
+
+                    version = src[2] if include_version else 'null'
+                    job_list.append(
+                        {
+                            "key": src[0],
+                            "size": src[1],
+                            "version": version,
+                        }
+                    )
+                self._sqs.send_jobs(job_list)
         spent_time = int(time.time()) - start_time
         if include_version:
             logger.info(
-                f'JobFinder> Finish compare key/size/versionId in {spent_time} Seconds (include_version is enabled)')
+                f'JobSender> Job completed in {spent_time} seconds (include_version is enabled)')
         else:
             logger.info(
-                f'JobFinder> Finish compare key/size in {spent_time} Seconds (include_version is disabled)')
+                f'JobSender> Job completed in {spent_time} seconds (include_version is disabled)')
 
-        logger.info(f'JobFinder> Get Job List {len(job_list)}')
-        return job_list
-
-    def find_jobs(self, include_version=False):
-        return self._get_delta_list(include_version)
+    def send_jobs(self, include_version=False):
+        self._get_delta_and_send(include_version)
 
 
 class JobMigrator():
