@@ -28,15 +28,21 @@ S3_METADATA_ARGS = ['Metadata',
 
 class JobInfo():
     """ a representation of an object to be migrated with minimum info. 
-    
+
     There is no need to include the bucket info, as it's already stored in lambda env.
     """
 
-    def __init__(self, key, size, version, storage_class='STANDARD'):
+    def __init__(self, key, size, version=None, storage_class='STANDARD'):
         self.key = key
         self.size = size
         self.version = version
         self.storage_class = storage_class
+
+    def __str__(self):
+        return '({}, {}, {})'.format(self.key, self.size, self.version)
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class DownloadClient():
@@ -176,10 +182,12 @@ class S3DownloadClient(DownloadClient):
         return body, body_md5
 
     def _list_objects_without_version(self, latest_changes_only=False):
-        logger.info(f'S3> list objects in bucket {self._bucket_name} from S3 without version info')
+        logger.info(
+            f'S3> list objects in bucket {self._bucket_name} from S3 without version info')
         # TODO implement latest_changes_only.
         job_list = []
 
+        # Use list_objects_v2() to get the list.
         continuation_token = None
         while True:
             list_kwargs = {'Bucket': self._bucket_name,
@@ -189,28 +197,27 @@ class S3DownloadClient(DownloadClient):
                 list_kwargs['ContinuationToken'] = continuation_token
             response = self._client.list_objects_v2(**list_kwargs)
             # logger.info(response.get('Contents', []))
-
             contents = response.get('Contents', [])
-            job_list.extend(
-                [JobInfo(x['Key'], x['Size'], 'null') for x in contents])
-            # yield from response.get('Contents', [])
+
+            job_list = [JobInfo(x['Key'], x['Size']) for x in contents]
+            # logger.info(
+            #     f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
             if not response.get('IsTruncated'):  # At the end of the list
                 break
+            yield job_list
             continuation_token = response.get('NextContinuationToken')
-
-        logger.info(
-            f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
-
-        return job_list
+        yield job_list
 
     def _list_objects_versions(self, latest_changes_only=False):
         """List objects from S3 bucket"""
-        logger.info('S3> List objects in bucket {self._bucket_name} with version info')
+        logger.info(
+            'S3> List objects in bucket {self._bucket_name} with version info')
 
         # TODO implement latest_changes_only.
         job_list = []
 
+        # Use list_object_versions() to get the list.
         key_marker = None
         while True:
             list_kwargs = {'Bucket': self._bucket_name,
@@ -222,18 +229,17 @@ class S3DownloadClient(DownloadClient):
             # logger.info(response.get('Contents', []))
 
             contents = response.get('Versions', [])
-            job_list.extend(
-                [JobInfo(x['Key'], x['Size'], x['VersionId']) for x in contents if x['IsLatest']])
-            # yield?
+            job_list = [JobInfo(x['Key'], x['Size'], x['VersionId'])
+                        for x in contents if x['IsLatest']]
+            # logger.info(
+            #     f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
             if not response.get('IsTruncated'):  # At the end of the list
                 break
+            yield job_list
+
             key_marker = response.get('NextKeyMarker')
-
-        logger.info(
-            f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
-
-        return job_list
+        yield job_list
 
     def list_objects(self, include_version=False, latest_changes_only=False):
         if include_version:
@@ -272,7 +278,6 @@ class AliOSSDownloadClient(DownloadClient):
 
     def __init__(self, bucket_name, prefix="", **credentials):
         super().__init__(bucket_name, prefix, **credentials)
-
         endpoint = credentials['oss_endpoint']
         access_key_id = credentials['oss_access_key_id']
         access_key_secret = credentials['oss_access_key_secret']
@@ -304,7 +309,8 @@ class AliOSSDownloadClient(DownloadClient):
         return body, body_md5
 
     def _list_objects_without_version(self, latest_changes_only=False):
-        logger.info('OSS> list objects from OSS in bucket {self._bucket_name} without version info')
+        logger.info(
+            'OSS> list objects from OSS in bucket {self._bucket_name} without version info')
         # TODO implement latest_changes_only.
         job_list = []
 
@@ -316,20 +322,20 @@ class AliOSSDownloadClient(DownloadClient):
                 list_kwargs['marker'] = marker
             result = self._client.list_objects(**list_kwargs)
 
-            job_list.extend(
-                [JobInfo(x.key, x.size, 'null') for x in result.object_list])
-            # yield?
+            job_list = [JobInfo(x.key, x.size, 'null')
+                        for x in result.object_list]
+            # logger.info(
+            #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
             if not result.is_truncated:  # At the end of the list
                 break
+            yield job_list
             marker = result.next_marker
-        
-        logger.info(
-            f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
-        return job_list
+        yield job_list
 
     def _list_objects_versions(self, latest_changes_only=False):
-        logger.info('OSS> List objects in bucket {self._bucket_name} with version info')
+        logger.info(
+            'OSS> List objects in bucket {self._bucket_name} with version info')
         # TODO implement latest_changes_only.
         job_list = []
 
@@ -341,27 +347,17 @@ class AliOSSDownloadClient(DownloadClient):
                 list_kwargs['key_marker'] = key_marker
             result = self._client.list_object_versions(**list_kwargs)
 
-            # logger.info(result.versions)
-            # for obj in result.versions:
-            #     # ObjectVersionInfo
-            #     logger.info(obj.key)
-            #     logger.info(obj.size)
-            #     logger.info(obj.last_modified)
-            #     logger.info(obj.etag)
-            #     logger.info(obj.storage_class)
-            #     logger.info(obj.versionid)
+            job_list = [JobInfo(x.key, x.size, x.versionid)
+                        for x in result.versions if x.is_latest]
 
-            job_list.extend(
-                [JobInfo(x.key, x.size, x.versionid) for x in result.versions if x.is_latest])
-            # yield?
-
+            # logger.info(
+            #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
             if not result.is_truncated:  # At the end of the list
                 break
+            yield job_list
             key_marker = result.next_key_marker
-        
-        logger.info(
-            f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
-        return job_list
+
+        yield job_list
 
     def list_objects(self, include_version=False, latest_changes_only=False):
         """ List of objects from Aliyun OSS. """
