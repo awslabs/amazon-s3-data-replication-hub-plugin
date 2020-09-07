@@ -46,10 +46,10 @@ def create_client(bucket_name, prefix, credentials, client_type='S3'):
             src_credentials['endpoint_url'] = endpoint_url
 
         client = S3DownloadClient(
-            bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
+            bucket_name=bucket_name, prefix=prefix, **credentials)
     else:
         client = S3DownloadClient(
-            bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
+            bucket_name=bucket_name, prefix=prefix, **credentials)
     return client
 
 

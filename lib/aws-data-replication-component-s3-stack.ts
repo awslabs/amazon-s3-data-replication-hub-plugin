@@ -18,8 +18,6 @@ import * as cr from '@aws-cdk/custom-resources';
 import * as iam from '@aws-cdk/aws-iam';
 import * as ecs from '@aws-cdk/aws-ecs';
 import * as ec2 from '@aws-cdk/aws-ec2';
-import { Aws } from '@aws-cdk/core';
-// import * as Fn from '@aws-cdk/core.Fn';
 
 const StorageClass = 'STANDARD'
 const MaxRetry = '20'  // Max retry for requests
@@ -101,12 +99,11 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       type: 'String'
     })
 
-    const ecsSecurityGroupId = new cdk.CfnParameter(this, 'ecsSecurityGroupId', {
-      description: 'ecs Cluster Security Group ID (Required if runType is ecs)',
+    const ecsPublicSubnets = new cdk.CfnParameter(this, 'ecsPublicSubnets', {
+      description: 'ecs Cluster Public Subnet IDs delimited by comma',
       default: '',
       type: 'String'
     })
-
 
     // The region credential (not the same account as Lambda) setting in SSM Parameter Store
     const credentialsParameterStore = new cdk.CfnParameter(this, 'credentialsParameterStore', {
@@ -129,7 +126,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         },
         {
           Label: { default: 'ECS Cluster' },
-          Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSecurityGroupId.logicalId]
+          Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsPublicSubnets.logicalId]
         },
         {
           Label: { default: 'Credentials' },
@@ -169,14 +166,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           Default: 'ECS Cluster Name'
         },
         [ecsVpcId.logicalId]: {
-          Default: 'ECS Cluster VPC ID'
+          Default: 'VPC ID to run ECS task'
         },
-        [ecsSecurityGroupId.logicalId]: {
-          Default: 'ECS Cluster Security Group ID'
+        [ecsPublicSubnets.logicalId]: {
+          Default: 'Public Subnet IDs to run ECS task'
         },
       }
     }
-
 
     // 1. Get SSM parameter of credentials
     const ssmCredentialsParam = ssm.StringParameter.fromStringParameterAttributes(this, 'SSMParameterCredentials', {
@@ -268,7 +264,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
       description: 'Migration Lambda layer',
     });
-    
+
     const handler = new lambda.Function(this, 'S3MigrationWorker', {
       runtime: lambda.Runtime.PYTHON_3_8,
       code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
@@ -310,12 +306,15 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     })
 
     // 8. Setup JobSender
-    // if runType == ecs, will use ecs to jobfinder , otherwise use lambda
+    // if runType == ecs, use ecs to jobfinder , otherwise use lambda
     if (runType == 'ecs') {
-      const taskDefinition = new ecs.Ec2TaskDefinition(this, 'JobSenderTaskDef');
+      const taskDefinition = new ecs.FargateTaskDefinition(this, 'JobSenderTaskDef', {
+        cpu: 1024 * 4,
+        memoryLimitMiB: 1024 * 8,
+      });
       taskDefinition.addContainer('DefaultContainer', {
         image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src')),
-        memoryLimitMiB: 1024,
+        memoryLimitMiB: 1024 * 8,
         environment: {
           AWS_DEFAULT_REGION: this.region,
           TABLE_QUEUE_NAME: ddbFileList.tableName,
@@ -339,16 +338,19 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       s3InCurrentAccount.grantReadWrite(taskDefinition.taskRole);
 
       // Get existing ecs cluster.
-      const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', { 
+      const subnets: string[] = ecsPublicSubnets.valueAsString.split(',')
+
+      const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
         vpcId: ecsVpcId.valueAsString,
-        availabilityZones: this.availabilityZones
+        availabilityZones: this.availabilityZones,
+        publicSubnetIds: [subnets[0], subnets[1]]
+
       })
-      const securityGroup = ec2.SecurityGroup.fromSecurityGroupId(this, 'ECSSecurityGroup', ecsSecurityGroupId.valueAsString)
 
       const cluster = ecs.Cluster.fromClusterAttributes(this, 'ECSCluster', {
         clusterName: ecsClusterName.valueAsString,
         vpc: vpc,
-        securityGroups: [securityGroup]
+        securityGroups: []
       })
 
       // Add target to cloudwatch rule.
@@ -356,6 +358,9 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         cluster,
         taskDefinition,
         taskCount: 1,
+        subnetSelection: {
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
       }));
 
     }
