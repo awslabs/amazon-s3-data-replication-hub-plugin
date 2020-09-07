@@ -147,19 +147,26 @@ class JobMigrator():
         logger.info(
             f"Migrator> Migrating small file {self._job.key}")
 
-        # Get object from client, upload Object to destination.
-        body, body_md5 = self._src_client.get_object(self._job.key, 0, -1)
-        content_md5 = base64.b64encode(
-            body_md5.digest()).decode('utf-8')
+        upload_etag_full = ''
+        err = ''
+        try:
+            # Get object from client, upload Object to destination.
+            body, body_md5 = self._src_client.get_object(self._job.key, 0, -1)
+            content_md5 = base64.b64encode(
+                body_md5.digest()).decode('utf-8')
 
-        upload_etag_full = self._des_client.upload_object(
-            self._job.key, body, content_md5, self._job.storage_class, **extra_args)
+            upload_etag_full = self._des_client.upload_object(
+                self._job.key, body, content_md5, self._job.storage_class, **extra_args)
 
-        logger.info(
-            f'Migrator> Complete migration of small file {upload_etag_full}')
+            logger.info(
+                f'Migrator> Complete migration of small file {upload_etag_full}')
 
-        status = 'DONE'
-        return upload_etag_full, status
+        except Exception as e:
+            logger.error(
+                f'Migrator> Unexpected error during migration of small file - {str(e)}')
+            err = str(e)
+
+        return upload_etag_full, err
 
     def _migration_big_file(self, **extra_args):
         logger.info(
@@ -168,21 +175,19 @@ class JobMigrator():
         upload_id, part_list = self._start_multipart_upload(**extra_args)
         # logger.info(f'Resume upload id: {upload_id}')
 
-        self._parallel_upload(upload_id, part_list)
+        upload_etag_full = self._parallel_upload(upload_id, part_list)
 
-        upload_etag_full = self._complete_upload(upload_id)
+        if upload_etag_full in ["TIMEOUT", "ERR", "QUIT"]:
+            return '', 'Failed in Parallel Upload - {}'.format(upload_etag_full)
+
+        complete_etag, err = self._complete_upload(upload_id)
 
         if self._config.verify_md5_twice and upload_etag_full != "QUIT":
             # TODO implement verify_md5_twice
             # ... if doesn't match, resumit
             pass
 
-        # TODO update this.
-        if upload_etag_full not in ["TIMEOUT", "ERR", "QUIT"]:
-            status = "DONE"
-        else:
-            status, upload_etag_full = upload_etag_full, 'null'
-        return upload_etag_full, status
+        return complete_etag, err
 
     def start_migration(self):
         logger.info("Migrator> Start a migration Job")
@@ -299,19 +304,28 @@ class JobMigrator():
         if upload_etag_full == "TIMEOUT" or upload_etag_full == "QUIT":
             # TODO update this
             logger.warning(
-                f'Quit job upload_etag_full == {upload_etag_full} - {self._job.key}')
+                f'Migrator> Quit job upload_etag_full == {upload_etag_full} - {self._job.key}')
 
-        elif upload_etag_full == "ERR":
-            # TODO clean existing upload? why?
-            logger.error(f'upload_etag_full ERR - {str(self._job.key)}')
+        return upload_etag_full
 
     def _complete_upload(self, upload_id):
         logger.info(f"Migrator> Complete Upload...{upload_id}")
+        complete_etag = ''
+        try:
+            complete_etag = self._des_client.complete_multipart_upload(
+                self._job.key, upload_id)
+            # if not complete_etag:
+            #     logger.error(f'complete_etag ERR - {self._job.key}')
 
-        complete_etag = self._des_client.complete_multipart_upload(
-            self._job.key, upload_id)
-        if not complete_etag:
-            # TODO implement retry
-            logger.error(f'complete_etag ERR - {self._job.key}')
+        except Exception as e:
+            logger.error(f'Migrator> Fail to complete upload for {self._job.key}')
 
-        return complete_etag
+            # if unable to merge the upload. Clean all the parts. 
+            # The job will be restarted in the next run.
+            logger.error(f'Migrator> Clean uploaded parts for upload id: {upload_id}')
+            upload_list = [{'Key': self._job.key, 'UploadId': upload_id}]
+            self._des_client.clean_unfinished_unload(upload_list)
+            return complete_etag, str(e)
+        
+        return complete_etag, ''
+

@@ -473,7 +473,7 @@ class S3UploadClient(UploadClient):
         credentials = {
             "aws_access_key_id": "<Your AccessKeyID>",
             "aws_secret_access_key": "<Your AccessKeySecret>",
-            "region": "cn-northwest-1"
+            "region_name": "cn-northwest-1"
         }
     """
 
@@ -482,21 +482,11 @@ class S3UploadClient(UploadClient):
 
         # TODO change to a parameter.
         s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
-                           retries={'max_attempts': MAX_ATTEMPTS})  #
+                           retries={'max_attempts': MAX_ATTEMPTS})
         try:
-            if credentials:
-                credentials_session = boto3.session.Session(
-                    aws_access_key_id=credentials["aws_access_key_id"],
-                    aws_secret_access_key=credentials["aws_secret_access_key"],
-                    region_name=credentials["region"]
-                )
-                self._client = credentials_session.client(
-                    's3', config=s3_config)
-            else:
-                self._client = boto3.client('s3', config=s3_config)
+            self._client = boto3.client('s3', config=s3_config, **credentials)
         except Exception as e:
-            logger.error(
-                f'S3> Fail to create a client session: {str(e)}')
+            logger.error(f'Fail to create a client session: {str(e)}')
 
     def _put_object(self, key, body, content_md5, storage_class,  **extra_args):
         logger.info(

@@ -59,13 +59,13 @@ class DBService():
 
         except Exception as e:
             logger.error(
-                f'Fail to put log to DDB at start job - {src_bucket}/{job.key} - {str(e)}')
+                f'DynamoDB> Fail to put log to DDB at start job - {src_bucket}/{job.key} - {str(e)}')
 
-    def log_job_end(self, src_bucket, key, etag, status):
+    def log_job_end(self, src_bucket, key, etag, err):
         """ Update an item(record) with a updated Status and completed time """
         logger.info(
             f'DynamoDB> Update job record for {src_bucket} - {key}')
-        
+
         cur_time = time.time()
         table_key = str(PurePosixPath(src_bucket) / key)
 
@@ -74,21 +74,21 @@ class DBService():
             table_key += '/'
 
         try:
+            status = 'DONE'
+            if err:
+                status = 'ERROR'
+
             response = self._table.update_item(
                 ExpressionAttributeValues={
                     # ':et': time.asctime(time.localtime(cur_time)),
                     ':et': int(cur_time),
                     ':js': status,
-                    ':etag' : etag,
+                    ':etag': etag,
+                    ':err': err,
                 },
                 Key={'objectKey':  table_key, },
-                UpdateExpression='SET endTime = :et, totalSpentTime=:et-startTime, jobStatus = :js, etag = :etag',
+                UpdateExpression='SET endTime = :et, totalSpentTime=:et-startTime, jobStatus = :js, etag = :etag, err = :err',
             )
-
-            # TODO lastTimeProgress
-            # if status == "DONE":
-            #     UpdateExpression += ", lastTimeProgress=:p"
-            #     ExpressionAttributeValues[":p"] = 100
 
             logger.info(f'DynamoDB> Write DB response: {response}')
 
