@@ -53,16 +53,18 @@ class DownloadClient():
         self._bucket_name = bucket_name
         self._prefix = prefix
 
-    def get_object(self, key, start, chunk_size, version=None):
+    def get_object(self, key, size, start=0, chunk_size=0, version=None):
         """The method is used to get object data in chunks from cloud storage.
 
         :param key: unique object key
 
-        :param start: start byte
+        :param size: object size in bytes
 
-        :param chunk_size: number of bytes to read
+        :param start: start byte, default to 0 (beginning of the object)
 
-        :param version: if a value of version is passed, this will only download that particular version.
+        :param chunk_size: number of bytes to read, if chunk_size is 0, the full file will be downloaded
+
+        :param version: if a value of version is passed, only that particular version will be downloaded
 
         :returns: a tuple (body, body_md5)
 
@@ -143,14 +145,14 @@ class S3DownloadClient(DownloadClient):
         except Exception as e:
             logger.error(f'Fail to create a client session: {str(e)}')
 
-    def get_object(self, key, start, chunk_size, version=None):
+    def get_object(self, key, size, start=0, chunk_size=0, version=None):
         logger.info("S3> Get Object from S3")
 
         if not version:
             version = 'null'
 
         try:
-            if chunk_size > 0:
+            if chunk_size:
                 logger.info(
                     f'S3> Downloading {key} with {chunk_size} bytes start from {start}')
                 response_get_object = self._client.get_object(
@@ -285,13 +287,19 @@ class AliOSSDownloadClient(DownloadClient):
 
         self._client = oss2.Bucket(auth, endpoint, bucket_name)
 
-    def get_object(self, key, start, chunk_size, version=None):
+    def get_object(self, key, size, start=0, chunk_size=0, version=None):
         logger.info("OSS> Get Object from Aliyun OSS")
 
-        if chunk_size > 0:
+        if chunk_size:
+            end = start + chunk_size
+            # For OSS, if range end is greater than size, the full file will be downloaded for the last chunk.
+            if end > size:
+                end = size
+
             logger.info(
-                f'OSS> Downloading {key} with {chunk_size} bytes start from {start}')
-            byte_range = (start, start + chunk_size - 1)
+                f'OSS> Downloading {key} with {end-start} bytes start from {start}')
+
+            byte_range = (start, end-1)
             result = self._client.get_object(key=key,
                                              byte_range=byte_range
                                              )

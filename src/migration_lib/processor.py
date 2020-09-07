@@ -56,10 +56,10 @@ def job_processor(upload_id, index_list, partnumber_list, job, src_client: Downl
                 try:
                     if include_version:
                         getBody, chunkdata_md5 = src_client.get_object(
-                            src_key, partStartIndex, chunk_size, versionId)
+                            src_key, src_size, partStartIndex, chunk_size, versionId)
                     else:
                         getBody, chunkdata_md5 = src_client.get_object(
-                            src_key, partStartIndex, chunk_size)
+                            src_key, src_size, partStartIndex, chunk_size)
                     md5list[partnumber - 1] = chunkdata_md5
                     break  # Download completed, not need to retry.
 
@@ -118,6 +118,7 @@ def job_processor(upload_id, index_list, partnumber_list, job, src_client: Downl
 
     src_bucket = src_client.bucket_name
     src_key = job['Key']
+    src_size = job['Size']
     des_bucket = des_client.bucket_name
     des_key = job['Key']
     versionId = job['Version']

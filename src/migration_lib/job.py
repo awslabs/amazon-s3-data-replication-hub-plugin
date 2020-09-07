@@ -151,7 +151,7 @@ class JobMigrator():
         err = ''
         try:
             # Get object from client, upload Object to destination.
-            body, body_md5 = self._src_client.get_object(self._job.key, 0, -1)
+            body, body_md5 = self._src_client.get_object(self._job.key, self._job.size)
             content_md5 = base64.b64encode(
                 body_md5.digest()).decode('utf-8')
 
