@@ -1,0 +1,31 @@
+export DIST_OUTPUT_BUCKET=aws-pipeline-347283850106-us-west-2
+export SOLUTION_NAME=Aws-data-replication-component-s3
+export VERSION=1.0.0
+
+export TEMPLATE_OUTPUT_BUCKET=
+
+
+./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
+
+../viperlight/bin/viperlight scan
+
+
+./build-release-notes.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
+
+
+echo ${DIST_OUTPUT_BUCKET%-*}
+
+
+curl https://aws-solutions-build-assets.s3-us-west-2.amazonaws.com/viperlight-scanner/viperlight.zip -o viperlight.zip
+unzip -q viperlight.zip -d ../viperlight
+rm ./viperlight.zip
+../viperlight/bin/viperlight scan
+
+
+rm -rf cdk.out
+
+npm run build
+
+cdk synth > mytemplate.yml
+
+cfn_nag_scan --input-path mytemplate.yml

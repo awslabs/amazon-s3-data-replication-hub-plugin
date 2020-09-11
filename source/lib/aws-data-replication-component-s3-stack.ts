@@ -27,20 +27,6 @@ const JobTimeout = '870'  // Timeout for each job, should be less than AWS Lambd
 const IncludeVersion = 'False'  // Whethere versionId should be considered during delta comparation and object migration
 /***
  * BEFORE DEPLOY CDK, please setup a "drh-credentials" secure parameter in ssm parameter store MANUALLY!
- * This is the access_key which is not in the same account as ec2.
- * For example, if ec2 running in Global, this is China Account access_key. Example as below:
- * {
- *  "aws_access_key_id": "<Your AccessKeyID>",
- *  "aws_secret_access_key": ""<Your AccessKeySecret>",
- *  "region_name": "cn-northwest-1"
- * }
- * 
- * If source is Aliyun OSS. Example of credentials as below:
- * {
- *  "oss_access_key_id": "<Your AccessKeyID>",
- *  "oss_access_key_secret": "<Your AccessKeySecret>",
- *  "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
- * }
  */
 
 export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
@@ -250,17 +236,23 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const s3InCurrentAccount = s3.Bucket.fromBucketName(this, `BucketName`, bucketName);
 
     // 6. Setup Worker Lambda functions
+    // const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
+    //   code: lambda.Code.fromAsset(path.join(__dirname, '../src'), {
+    //     bundling: {
+    //       image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
+    //       command: [
+    //         'bash', '-c', `python setup.py sdist && 
+    //         pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
+    //         cp lambda_function_* /asset-output/`,
+    //       ],
+    //     },
+    //   }),
+    //   compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
+    //   description: 'Migration Lambda layer',
+    // });
+
     const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
-      code: lambda.Code.fromAsset(path.join(__dirname, '../src'), {
-        bundling: {
-          image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
-          command: [
-            'bash', '-c', `python setup.py sdist && 
-            pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
-            cp lambda_function_* /asset-output/`,
-          ],
-        },
-      }),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
       compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
       description: 'Migration Lambda layer',
     });

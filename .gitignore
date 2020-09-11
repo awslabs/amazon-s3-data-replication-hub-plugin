@@ -2,6 +2,7 @@
 !jest.config.js
 *.d.ts
 node_modules
+package-lock.json
 
 # CDK asset staging directory
 .cdk.staging
@@ -18,8 +19,12 @@ dist
 __pycache__
 .venv
 
-
 # General
 .DS_Store
 .vscode
 
+# Deployment
+staging
+global-s3-assets
+regional-s3-assets
+viperlight
