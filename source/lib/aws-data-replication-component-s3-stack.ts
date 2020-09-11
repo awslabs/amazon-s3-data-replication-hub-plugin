@@ -236,26 +236,26 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const s3InCurrentAccount = s3.Bucket.fromBucketName(this, `BucketName`, bucketName);
 
     // 6. Setup Worker Lambda functions
-    // const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
-    //   code: lambda.Code.fromAsset(path.join(__dirname, '../src'), {
-    //     bundling: {
-    //       image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
-    //       command: [
-    //         'bash', '-c', `python setup.py sdist && 
-    //         pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
-    //         cp lambda_function_* /asset-output/`,
-    //       ],
-    //     },
-    //   }),
-    //   compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
-    //   description: 'Migration Lambda layer',
-    // });
-
     const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
-      code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../src'), {
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
+          command: [
+            'bash', '-c', `python setup.py sdist && 
+            pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
+            cp lambda_function_* /asset-output/`,
+          ],
+        },
+      }),
       compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
       description: 'Migration Lambda layer',
     });
+
+    // const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
+    //   code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+    //   compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
+    //   description: 'Migration Lambda layer',
+    // });
 
     const handler = new lambda.Function(this, 'S3MigrationWorker', {
       runtime: lambda.Runtime.PYTHON_3_8,
