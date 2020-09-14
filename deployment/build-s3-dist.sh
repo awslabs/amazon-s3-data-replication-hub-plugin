@@ -47,10 +47,10 @@ echo "--------------------------------------------------------------------------
 echo "[Init] Test Env"
 echo "------------------------------------------------------------------------------"
 
-echo $AWS_DEFAULT_REGION
-tmp=${DIST_OUTPUT_BUCKET%-$AWS_DEFAULT_REGION}
-AWS_ACCOUNT_ID=${tmp##*-}
-echo $AWS_ACCOUNT_ID
+echo AWS_DEFAULT_REGION $AWS_DEFAULT_REGION
+echo DIST_OUTPUT_BUCKET $1
+echo SOLUTION_NAME $2
+echo VERSION $3
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
@@ -120,13 +120,13 @@ for f in $template_dist_dir/*.template.json; do
 done
 
 # Run the helper to clean-up the templates and remove unnecessary CDK elements
-# echo "Run the helper to clean-up the templates and remove unnecessary CDK elements"
-# echo "node $template_dir/cdk-solution-helper/index"
-# node $template_dir/cdk-solution-helper/index
-# if [ "$?" = "1" ]; then
-# 	echo "(cdk-solution-helper) ERROR: there is likely output above." 1>&2
-# 	exit 1
-# fi
+echo "Run the helper to clean-up the templates and remove unnecessary CDK elements"
+echo "node $template_dir/cdk-solution-helper/index"
+node $template_dir/cdk-solution-helper/index
+if [ "$?" = "1" ]; then
+	echo "(cdk-solution-helper) ERROR: there is likely output above." 1>&2
+	exit 1
+fi
 
 # Find and replace bucket_name, solution_name, and version
 echo "Find and replace bucket_name, solution_name, and version"
@@ -155,64 +155,68 @@ find $staging_dist_dir -iname "package-lock.json" -type f -exec rm -f "{}" \; 2>
 # ... For each asset.* source code artifact in the temporary /staging folder...
 cd $staging_dist_dir
 for d in `find . -mindepth 1 -maxdepth 1 -type d`; do
-
+    # cd $d
     # Rename the artifact, removing the period for handler compatibility
     pfname="$(basename -- $d)"
     fname="$(echo $pfname | sed -e 's/\.//g')"
-    echo "zip -r $fname.zip $fname"
+    echo "zipping the artifact"
     mv $d $fname
+    cd $fname
+    echo "zip -qr9 $staging_dist_dir/$fname.zip ."
+    zip -qr9 $staging_dist_dir/$fname.zip .
+    cd ..
 
     # Build the artifcats
-    if ls $fname/*.py 1> /dev/null 2>&1; then
-        echo "===================================="
-        echo "This is Python runtime"
-        echo "===================================="
-        cd $fname
-        venv_folder="./venv-prod/"
-        rm -fr .venv-test
-        rm -fr .venv-prod
-        echo "Initiating virtual environment"
-        python3 -m venv $venv_folder
-        source $venv_folder/bin/activate
-        # pip3 install -q -r requirements.txt --target .
-        python setup.py sdist
-        pip3 install dist/migration_lib-0.1.0.tar.gz --target .
-        deactivate
-        cd $staging_dist_dir/$fname/$venv_folder/lib/python3.*/site-packages
-        echo "zipping the artifact"
-        zip -qr9 $staging_dist_dir/$fname.zip .
-        cd $staging_dist_dir/$fname
-        zip -gq $staging_dist_dir/$fname.zip lambda*.py
-        cd $staging_dist_dir
-    # elif ls $fname/*.js 1> /dev/null 2>&1; then
+    # if ls $fname/*.py 1> /dev/null 2>&1; then
     #     echo "===================================="
-    #     echo "This is Node runtime"
+    #     echo "This is Python runtime"
     #     echo "===================================="
     #     cd $fname
-    #     echo "Clean and rebuild artifacts"
-    #     npm run clean
-    #     npm ci
-    #     if [ "$?" = "1" ]; then
-	#         echo "ERROR: Seems like package-lock.json does not exists or is out of sync with package.josn. Trying npm install instead" 1>&2
-    #         npm install
-    #     fi
+    #     venv_folder="./venv-prod/"
+    #     rm -fr .venv-test
+    #     rm -fr .venv-prod
+    #     echo "Initiating virtual environment"
+    #     python3 -m venv $venv_folder
+    #     source $venv_folder/bin/activate
+    #     # pip3 install -q -r requirements.txt --target .
+    #     python setup.py sdist
+    #     pip3 install dist/migration_lib-0.1.0.tar.gz --target .
+    #     deactivate
+    #     cd $staging_dist_dir/$fname/$venv_folder/lib/python3.*/site-packages
+    #     echo "zipping the artifact"
+    #     zip -qr9 $staging_dist_dir/$fname.zip .
+    #     cd $staging_dist_dir/$fname
+    #     zip -gq $staging_dist_dir/$fname.zip lambda*.py
     #     cd $staging_dist_dir
-    #     # Zip the artifact
-    #     echo "zip -r $fname.zip $fname"
-    #     zip -rq $fname.zip $fname
-    fi
+    # # elif ls $fname/*.js 1> /dev/null 2>&1; then
+    # #     echo "===================================="
+    # #     echo "This is Node runtime"
+    # #     echo "===================================="
+    # #     cd $fname
+    # #     echo "Clean and rebuild artifacts"
+    # #     npm run clean
+    # #     npm ci
+    # #     if [ "$?" = "1" ]; then
+	# #         echo "ERROR: Seems like package-lock.json does not exists or is out of sync with package.josn. Trying npm install instead" 1>&2
+    # #         npm install
+    # #     fi
+    # #     cd $staging_dist_dir
+    # #     # Zip the artifact
+    # #     echo "zip -r $fname.zip $fname"
+    # #     zip -rq $fname.zip $fname
+    # fi
 
     # Copy the zipped artifact from /staging to /regional-s3-assets
-    echo "cp $fname.zip $build_dist_dir"
-    cp $fname.zip $build_dist_dir
+    echo "mv $fname.zip $build_dist_dir"
+    mv $fname.zip $build_dist_dir
 
     # Remove the old, unzipped artifact from /staging
     echo "rm -rf $fname"
     rm -rf $fname
 
     # Remove the old, zipped artifact from /staging
-    echo "rm $fname.zip"
-    rm $fname.zip
+    # echo "rm $fname.zip"
+    # rm $fname.zip
 
     # ... repeat until all source code artifacts are zipped and placed in the
     # ... /regional-s3-assets folder

@@ -241,9 +241,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         bundling: {
           image: lambda.Runtime.PYTHON_3_8.bundlingDockerImage,
           command: [
-            'bash', '-c', `python setup.py sdist && 
-            pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output &&
-            cp lambda_function_* /asset-output/`,
+            'bash', '-c', `python setup.py sdist && mkdir /asset-output/python &&
+            pip install dist/migration_lib-0.1.0.tar.gz --target /asset-output/python`,
           ],
         },
       }),
@@ -259,7 +258,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     const handler = new lambda.Function(this, 'S3MigrationWorker', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
       layers: [layer],
       handler: 'lambda_function_worker.lambda_handler',
       memorySize: 1024,
@@ -359,7 +358,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     else {
       const handlerJobSender = new lambda.Function(this, 'S3MigrationJobSender', {
         runtime: lambda.Runtime.PYTHON_3_8,
-        code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
+        code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
         layers: [layer],
         handler: "lambda_function_jobsender.lambda_handler",
         memorySize: 1024,
