@@ -94,13 +94,14 @@ echo "npm install && npm run build"
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
-cdk synth --output=$staging_dist_dir
+cdk synth --output=$staging_dist_dir --json=true -c runType=ecs > $staging_dist_dir/$2.ecs.template.json
+cdk synth --output=$staging_dist_dir --json=true  > $staging_dist_dir/$2.lambda.template.json
 
 # Remove unnecessary output files
 echo "cd $staging_dist_dir"
 cd $staging_dist_dir
 echo "rm tree.json manifest.json cdk.out"
-rm tree.json manifest.json cdk.out
+rm tree.json manifest.json cdk.out AwsDataReplicationComponentS3Stack.template.json
 
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Template artifacts"
@@ -161,50 +162,10 @@ for d in `find . -mindepth 1 -maxdepth 1 -type d`; do
     fname="$(echo $pfname | sed -e 's/\.//g')"
     echo "zipping the artifact"
     mv $d $fname
-    cd $fname
+    pushd $fname
     echo "zip -qr9 $staging_dist_dir/$fname.zip ."
     zip -qr9 $staging_dist_dir/$fname.zip .
-    cd ..
-
-    # Build the artifcats
-    # if ls $fname/*.py 1> /dev/null 2>&1; then
-    #     echo "===================================="
-    #     echo "This is Python runtime"
-    #     echo "===================================="
-    #     cd $fname
-    #     venv_folder="./venv-prod/"
-    #     rm -fr .venv-test
-    #     rm -fr .venv-prod
-    #     echo "Initiating virtual environment"
-    #     python3 -m venv $venv_folder
-    #     source $venv_folder/bin/activate
-    #     # pip3 install -q -r requirements.txt --target .
-    #     python setup.py sdist
-    #     pip3 install dist/migration_lib-0.1.0.tar.gz --target .
-    #     deactivate
-    #     cd $staging_dist_dir/$fname/$venv_folder/lib/python3.*/site-packages
-    #     echo "zipping the artifact"
-    #     zip -qr9 $staging_dist_dir/$fname.zip .
-    #     cd $staging_dist_dir/$fname
-    #     zip -gq $staging_dist_dir/$fname.zip lambda*.py
-    #     cd $staging_dist_dir
-    # # elif ls $fname/*.js 1> /dev/null 2>&1; then
-    # #     echo "===================================="
-    # #     echo "This is Node runtime"
-    # #     echo "===================================="
-    # #     cd $fname
-    # #     echo "Clean and rebuild artifacts"
-    # #     npm run clean
-    # #     npm ci
-    # #     if [ "$?" = "1" ]; then
-	# #         echo "ERROR: Seems like package-lock.json does not exists or is out of sync with package.josn. Trying npm install instead" 1>&2
-    # #         npm install
-    # #     fi
-    # #     cd $staging_dist_dir
-    # #     # Zip the artifact
-    # #     echo "zip -r $fname.zip $fname"
-    # #     zip -rq $fname.zip $fname
-    # fi
+    popd
 
     # Copy the zipped artifact from /staging to /regional-s3-assets
     echo "mv $fname.zip $build_dist_dir"
@@ -213,13 +174,6 @@ for d in `find . -mindepth 1 -maxdepth 1 -type d`; do
     # Remove the old, unzipped artifact from /staging
     echo "rm -rf $fname"
     rm -rf $fname
-
-    # Remove the old, zipped artifact from /staging
-    # echo "rm $fname.zip"
-    # rm $fname.zip
-
-    # ... repeat until all source code artifacts are zipped and placed in the
-    # ... /regional-s3-assets folder
 
 done
 

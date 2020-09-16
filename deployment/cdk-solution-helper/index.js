@@ -40,7 +40,7 @@ fs.readdirSync(global_s3_assets).forEach(file => {
           fn.Properties.Code.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${assetPath}.zip`;
           // Set the S3 bucket reference
           fn.Properties.Code.S3Bucket = {
-            'Fn::Sub': '%%BUCKET_NAME%%'
+            'Fn::Sub': '%%BUCKET_NAME%%-${AWS::Region}'
           };
           // Set the handler
           // const handler = fn.Properties.Handler;
@@ -48,6 +48,7 @@ fs.readdirSync(global_s3_assets).forEach(file => {
         }
     });
 
+    // Clean-up Lambda layer code dependencies
     const lambdaLayers = Object.keys(resources).filter(function(key) {
       return resources[key].Type === "AWS::Lambda::LayerVersion";
     });
@@ -62,7 +63,7 @@ fs.readdirSync(global_s3_assets).forEach(file => {
           fn.Properties.Content.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${assetPath}.zip`;
           // Set the S3 bucket reference
           fn.Properties.Content.S3Bucket = {
-            'Fn::Sub': '%%BUCKET_NAME%%'
+            'Fn::Sub': '%%BUCKET_NAME%%-${AWS::Region}'
           };
           // // Set the handler
           // const handler = fn.Properties.Handler;
