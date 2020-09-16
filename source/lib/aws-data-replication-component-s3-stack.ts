@@ -18,6 +18,7 @@ import * as cr from '@aws-cdk/custom-resources';
 import * as iam from '@aws-cdk/aws-iam';
 import * as ecs from '@aws-cdk/aws-ecs';
 import * as ec2 from '@aws-cdk/aws-ec2';
+import * as ecr from '@aws-cdk/aws-ecr';
 
 const StorageClass = 'STANDARD'
 const MaxRetry = '20'  // Max retry for requests
@@ -85,8 +86,14 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       type: 'String'
     })
 
-    const ecsPublicSubnets = new cdk.CfnParameter(this, 'ecsPublicSubnets', {
-      description: 'ecs Cluster Public Subnet IDs delimited by comma',
+    const ecsPublicSubnetsA = new cdk.CfnParameter(this, 'ecsPublicSubnetsA', {
+      description: 'ecs Cluster Public Subnet ID A(Required if runType is ecs, please provide two public subnets at least)',
+      default: '',
+      type: 'String'
+    })
+
+    const ecsPublicSubnetsB = new cdk.CfnParameter(this, 'ecsPublicSubnetsB', {
+      description: 'ecs Cluster Public Subnet ID B (Required if runType is ecs, please provide two public subnets at least)',
       default: '',
       type: 'String'
     })
@@ -112,7 +119,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         },
         {
           Label: { default: 'ECS Cluster' },
-          Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsPublicSubnets.logicalId]
+          Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsPublicSubnetsA.logicalId, ecsPublicSubnetsB.logicalId, ecsPublicSubnetsB.logicalId]
         },
         {
           Label: { default: 'Credentials' },
@@ -154,7 +161,10 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         [ecsVpcId.logicalId]: {
           Default: 'VPC ID to run ECS task'
         },
-        [ecsPublicSubnets.logicalId]: {
+        [ecsPublicSubnetsA.logicalId]: {
+          Default: 'Public Subnet IDs to run ECS task'
+        },
+        [ecsPublicSubnetsB.logicalId]: {
           Default: 'Public Subnet IDs to run ECS task'
         },
       }
@@ -299,12 +309,16 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     // 8. Setup JobSender
     // if runType == ecs, use ecs to jobfinder , otherwise use lambda
     if (runType == 'ecs') {
+      const ecrRepositoryArn = 'arn:aws:ecr:us-west-2:347283850106:repository/s3-migration-jobsender'
+      // const repo = ecr.Repository.fromRepositoryName(this, 'JobSenderRepo', 's3-migration-jobsender')
+      const repo = ecr.Repository.fromRepositoryArn(this, 'JobSenderRepo', ecrRepositoryArn)
       const taskDefinition = new ecs.FargateTaskDefinition(this, 'JobSenderTaskDef', {
         cpu: 1024 * 4,
         memoryLimitMiB: 1024 * 8,
       });
       taskDefinition.addContainer('DefaultContainer', {
-        image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src')),
+        // image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src')),
+        image: ecs.ContainerImage.fromEcrRepository(repo),
         memoryLimitMiB: 1024 * 8,
         environment: {
           AWS_DEFAULT_REGION: this.region,
@@ -329,12 +343,10 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       s3InCurrentAccount.grantReadWrite(taskDefinition.taskRole);
 
       // Get existing ecs cluster.
-      const subnets: string[] = ecsPublicSubnets.valueAsString.split(',')
-
       const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
         vpcId: ecsVpcId.valueAsString,
         availabilityZones: this.availabilityZones,
-        publicSubnetIds: [subnets[0], subnets[1]]
+        publicSubnetIds: [ecsPublicSubnetsA.valueAsString, ecsPublicSubnetsB.valueAsString]
 
       })
 
