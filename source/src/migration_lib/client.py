@@ -27,7 +27,7 @@ S3_METADATA_ARGS = ['Metadata',
 
 
 class JobInfo():
-    """ a representation of an object to be migrated with minimum info. 
+    """ a representation of an object to be migrated with minimum info.
 
     There is no need to include the bucket info, as it's already stored in lambda env.
     """
@@ -77,7 +77,7 @@ class DownloadClient():
 
         :param include_version: whether to list objects with version id info. Default to False
 
-        :param latest_changes_only: whether to list objects with recent change only. Default to False. 
+        :param latest_changes_only: whether to list objects with recent change only. Default to False.
         This is currently a placehold and it hasn't been implemented yet.
 
         :returns: a list of `JobInfo` objects
@@ -108,7 +108,7 @@ class DownloadClient():
 
 
 class S3DownloadClient(DownloadClient):
-    r""" An implementation of download client with AWS S3. 
+    r""" An implementation of download client with AWS S3.
 
     Example Usage:
 
@@ -116,7 +116,7 @@ class S3DownloadClient(DownloadClient):
         for obj in client.list_objects():
             print(obj)
 
-    Note: 
+    Note:
         credentials is optional. If it should be provided, below is an example:
 
         credentials = {
@@ -125,7 +125,8 @@ class S3DownloadClient(DownloadClient):
             "region_name": "cn-northwest-1"
         }
 
-        This client also supports Qiniu Kodo, for Qiniu Kodo, the credentials must contain the qiniu endpoint url, for example:
+        This client also supports Qiniu Kodo and Tencent COS with native S3 SDK support. 
+        For them, the credentials must contain the related endpoint url, for example:
 
         credentials = {
             "aws_access_key_id": "<Your AccessKeyID>",
@@ -151,36 +152,30 @@ class S3DownloadClient(DownloadClient):
         if not version:
             version = 'null'
 
-        try:
-            if chunk_size:
-                logger.info(
-                    f'S3> Downloading {key} with {chunk_size} bytes start from {start}')
-                response_get_object = self._client.get_object(
-                    Bucket=self._bucket_name,
-                    Key=key,
-                    VersionId=version,
-                    Range="bytes=" + str(start) + "-" +
-                    str(start + chunk_size - 1)
-                )
-            else:
-                logger.info(
-                    f'S3> Downloading {key} with full size')
-                response_get_object = self._client.get_object(
-                    Bucket=self._bucket_name,
-                    Key=key,
-                    VersionId=version,
+        if chunk_size:
+            logger.info(
+                f'S3> Downloading {key} with {chunk_size} bytes start from {start}')
+            response_get_object = self._client.get_object(
+                Bucket=self._bucket_name,
+                Key=key,
+                # VersionId=version,
+                Range="bytes=" + str(start) + "-" +
+                str(start + chunk_size - 1)
+            )
+        else:
+            logger.info(
+                f'S3> Downloading {key} with full size')
+            response_get_object = self._client.get_object(
+                Bucket=self._bucket_name,
+                Key=key,
+                # VersionId=version,
+            )
+        body = response_get_object["Body"].read()
+        # TODO whether to return md5 string, currently it's a hash object. This is used in job processor as well.
+        # content_md5 = base64.b64encode(
+        #     chunkdata_md5.digest()).decode('utf-8')
 
-                )
-            body = response_get_object["Body"].read()
-            body_md5 = hashlib.md5(body)
-            # TODO whether to return md5 string, currently it's a hash object. This is used in job processor as well.
-            # content_md5 = base64.b64encode(
-            #     chunkdata_md5.digest()).decode('utf-8')
-        except Exception as e:
-            # logger.error(f'Fail in step_fn_small - {Des_bucket}/{Des_key} - {str(e)}')
-            logger.error(f'Error - {str(e)}')
-            # return "TIMEOUT"
-
+        body_md5 = hashlib.md5(body)
         return body, body_md5
 
     def _list_objects_without_version(self, latest_changes_only=False):
@@ -691,3 +686,50 @@ class DownloadClientError(Exception):
 
 class UploadClientError(Exception):
     pass
+
+
+class ClientManager():
+    """ Client wrapper to create clients for different types of sources """
+
+    def __init__(self):
+        pass
+
+    @classmethod
+    def create_download_client(cls, bucket_name, prefix='', credentials={}, source_type='S3'):
+        if source_type == 'Aliyun OSS':
+            client = AliOSSDownloadClient(
+                bucket_name=bucket_name, prefix=prefix, **credentials)
+        elif source_type == 'Qiniu Kodo':
+            if 'endpoint_url' not in credentials:
+                # if endpoint url is not provided, use region_name to create the endpoint url.
+                if 'region_name' not in credentials:
+                    logger.warning(
+                        f'Cannot find Region in credentials, default to cn-south-1')
+                    src_credentials['region_name'] = 'cn-south-1'
+                endpoint_url = 'https://s3-{}.qiniucs.com'.format(
+                    credentials['region_name'])
+                credentials['endpoint_url'] = endpoint_url
+
+            client = S3DownloadClient(
+                bucket_name=bucket_name, prefix=prefix, **credentials)
+        elif source_type == 'Tencent COS':
+            if 'endpoint_url' not in credentials:
+                # if endpoint url is not provided, use region_name to create the endpoint url.
+                if 'region_name' not in credentials:
+                    logger.warning(
+                        f'Cannot find Region in credentials, default to cn-south-1')
+                    src_credentials['region_name'] = 'ap-guangzhou'
+                endpoint_url = 'https://cos.{}.myqcloud.com'.format(
+                    credentials['region_name'])
+                credentials['endpoint_url'] = endpoint_url
+
+            client = S3DownloadClient(
+                bucket_name=bucket_name, prefix=prefix, **credentials)
+        else:
+            client = S3DownloadClient(
+                bucket_name=bucket_name, prefix=prefix, **credentials)
+        return client
+
+    @classmethod
+    def create_upload_client(cls, bucket_name, prefix='', credentials={}):
+        return S3UploadClient(bucket_name, prefix, **credentials)

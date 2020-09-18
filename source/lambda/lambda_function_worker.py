@@ -16,7 +16,7 @@ from botocore.config import Config
 
 from migration_lib.job import JobMigrator
 from migration_lib.service import DBService
-from migration_lib.client import S3DownloadClient, AliOSSDownloadClient, S3UploadClient, JobInfo
+from migration_lib.client import ClientManager, JobInfo
 from migration_lib.config import JobConfig
 
 # Env
@@ -53,29 +53,8 @@ src_credentials, des_credentials =  {}, credentials
 if job_type.upper() == 'GET':
     src_credentials, des_credentials = des_credentials, src_credentials
 
-# TODO Add an env var as source type. Valid options are ['S3', 'AliOSS', ...]
-# source_type = 'S3'
-if source_type == 'AliOSS':
-    src_client = AliOSSDownloadClient(
-        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
-elif source_type == 'Qiniu':
-    if 'endpoint_url' not in src_credentials:
-        # if endpoint url is not provided, use region_name to create the endpoint url.
-        if 'region_name' not in src_credentials:
-            logger.warning(f'Cannot find Qiniu Region in SSM parameter {ssm_parameter_credentials}, default to cn-south-1')
-            src_credentials['region_name'] = 'cn-south-1'
-        endpoint_url = 'https://s3-{}.qiniucs.com'.format(src_credentials['region_name'])
-        src_credentials['endpoint_url'] = endpoint_url
-    
-    src_client = S3DownloadClient(
-        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
-else:
-    # Default to S3
-    src_client = S3DownloadClient(
-            bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
-
-des_client = S3UploadClient(
-            bucket_name=dest_bucket_name, prefix=dest_bucket_prefix, **des_credentials)
+src_client = ClientManager.create_download_client(src_bucket_name, src_bucket_prefix, src_credentials, source_type)
+des_client = ClientManager.create_upload_client(dest_bucket_name, dest_bucket_prefix, des_credentials)
 
 try:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS)
@@ -111,16 +90,6 @@ def lambda_handler(event, context):
                 logger.info('Skip s3:TestEvent')
                 continue
 
-        # TODO Check if message is from S3? why?
-        # if 'Records' in job:  # S3 message contains 'Records'
-        #     for One_record in job['Records']:
-        #         if 's3' in One_record:
-        #             Src_bucket = One_record['s3']['bucket']['name']
-        #             Src_key = One_record['s3']['object']['key']
-        #             Src_key = urllib.parse.unquote_plus(Src_key)  # 加号转回空格
-        #             Size = One_record['s3']['object']['size']
-        #             ...
-
         if 'key' not in job:  # Invaid message.
             logger.warning(f'Wrong sqs job: {json.dumps(job, default=str)}')
             logger.warning('Try to handle next message')
@@ -136,12 +105,6 @@ def lambda_handler(event, context):
                                config, db, jobinfo, instance_id)
 
         migrator.start_migration()
-
-        # TODO update with more exceptional handling.
-        # if upload_etag_full != "TIMEOUT" and upload_etag_full != "ERR":
-        #     ...
-        # else:
-        #     raise TimeoutOrMaxRetry
 
     return {
         'statusCode': 200,

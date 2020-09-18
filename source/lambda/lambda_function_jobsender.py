@@ -10,7 +10,7 @@ from operator import itemgetter
 from botocore.config import Config
 import boto3
 
-from migration_lib.client import S3DownloadClient, AliOSSDownloadClient
+from migration_lib.client import ClientManager
 from migration_lib.service import SQSService, DBService
 from migration_lib.job import JobSender
 from migration_lib.config import JobConfig
@@ -44,31 +44,8 @@ src_credentials, des_credentials = {}, credentials
 if job_type.upper() == 'GET':
     src_credentials, des_credentials = des_credentials, src_credentials
 
-# TODO Add an env var as source type. Valid options are ['S3', 'AliOSS', ...]
-# source_type = 'S3'
-if source_type == 'AliOSS':
-    src_client = AliOSSDownloadClient(
-        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
-elif source_type == 'Qiniu':
-    if 'endpoint_url' not in src_credentials:
-        # if endpoint url is not provided, use region_name to create the endpoint url.
-        if 'region_name' not in src_credentials:
-            logger.warning(
-                f'Cannot find Qiniu Region in SSM parameter {ssm_parameter_credentials}, default to cn-south-1')
-            src_credentials['region_name'] = 'cn-south-1'
-        endpoint_url = 'https://s3-{}.qiniucs.com'.format(
-            src_credentials['region_name'])
-        src_credentials['endpoint_url'] = endpoint_url
-
-    src_client = S3DownloadClient(
-        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
-else:
-    # Default to S3
-    src_client = S3DownloadClient(
-        bucket_name=src_bucket_name, prefix=src_bucket_prefix, **src_credentials)
-
-des_client = S3DownloadClient(
-    bucket_name=dest_bucket_name, prefix=dest_bucket_prefix, **des_credentials)
+src_client = ClientManager.create_download_client(src_bucket_name, src_bucket_prefix, src_credentials, source_type)
+des_client = ClientManager.create_download_client(dest_bucket_name, dest_bucket_prefix, des_credentials)
 
 # handler
 def lambda_handler(event, context):

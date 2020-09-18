@@ -6,7 +6,7 @@ import migration_lib
 
 from migration_lib.job import JobMigrator, JobSender
 from migration_lib.service import SQSService, DBService
-from migration_lib.client import S3DownloadClient, AliOSSDownloadClient
+from migration_lib.client import ClientManager
 
 
 log_level = str(os.environ.get('LOG_LEVEL')).upper()
@@ -30,29 +30,6 @@ def get_credentials():
     return credentials
 
 
-def create_client(bucket_name, prefix, credentials, client_type='S3'):
-    if client_type == 'AliOSS':
-        client = AliOSSDownloadClient(
-            bucket_name=bucket_name, prefix=prefix, **credentials)
-    elif client_type == 'Qiniu':
-        if 'endpoint_url' not in credentials:
-            # if endpoint url is not provided, use region_name to create the endpoint url.
-            if 'region_name' not in credentials:
-                logger.warning(
-                    f'Cannot find Qiniu Region in SSM parameter {ssm_parameter_credentials}, default to cn-south-1')
-                src_credentials['region_name'] = 'cn-south-1'
-            endpoint_url = 'https://s3-{}.qiniucs.com'.format(
-                src_credentials['region_name'])
-            src_credentials['endpoint_url'] = endpoint_url
-
-        client = S3DownloadClient(
-            bucket_name=bucket_name, prefix=prefix, **credentials)
-    else:
-        client = S3DownloadClient(
-            bucket_name=bucket_name, prefix=prefix, **credentials)
-    return client
-
-
 def find_and_send_jobs(src_client, des_client, queue_name, table_name, include_version=False):
     sqs = SQSService(queue_name=queue_name)
     sqs_empty = sqs.is_empty()
@@ -73,14 +50,14 @@ def find_and_send_jobs(src_client, des_client, queue_name, table_name, include_v
 if __name__ == "__main__":
     logger.info('Start Finding Jobs')
     logger.info(migration_lib.__version__)
-    
+
     ssm_parameter_credentials = os.environ['SSM_PARAMETER_CREDENTIALS']
     table_queue_name = os.environ['TABLE_QUEUE_NAME']
     sqs_queue_name = os.environ['SQS_QUEUE_NAME']
     src_bucket_name = os.environ['SRC_BUCKET_NAME']
     src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
-    des_bucket_name = os.environ['DEST_BUCKET_NAME']
-    des_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
+    dest_bucket_name = os.environ['DEST_BUCKET_NAME']
+    dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
     job_type = os.environ['JOB_TYPE']
     source_type = os.environ['SOURCE_TYPE']
     max_retries = int(os.environ['MAX_RETRY'])
@@ -91,9 +68,10 @@ if __name__ == "__main__":
     if job_type.upper() == 'GET':
         src_credentials, des_credentials = des_credentials, src_credentials
 
-    src_client = create_client(
+    src_client = ClientManager.create_download_client(
         src_bucket_name, src_bucket_prefix, src_credentials, source_type)
-    des_client = create_client(
-        des_bucket_name, des_bucket_prefix, des_credentials)
+    des_client = ClientManager.create_download_client(
+        dest_bucket_name, dest_bucket_prefix, des_credentials)
 
-    find_and_send_jobs(src_client, des_client, sqs_queue_name, table_queue_name, include_version)
+    find_and_send_jobs(src_client, des_client, sqs_queue_name,
+                       table_queue_name, include_version)
