@@ -13,6 +13,7 @@ fi
 # Get reference for all important folders
 template_dir="$PWD"
 source_dir="$template_dir/../source"
+template_dist_dir="$template_dir/global-s3-assets"
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Get Env"
@@ -20,6 +21,18 @@ echo "--------------------------------------------------------------------------
 
 echo AWS_DEFAULT_REGION $1
 echo AWS_ACCOUNT_ID $2
+
+# partition=${1%%-*}
+if [[ $1 == cn-* ]];
+then
+  domain=$2.dkr.ecr.$1.amazonaws.com.cn
+else
+  domain=$2.dkr.ecr.$1.amazonaws.com
+fi
+
+echo $domain
+
+aws ecr get-login-password --region $1 | docker login --username AWS --password-stdin $domain
 
 echo "------------------------------------------------------------------------------"
 echo "[Build] Build Docker Image"
@@ -29,4 +42,21 @@ cd $source_dir
 IMAGE_REPO_NAME=s3-migration-jobsender
 IMAGE_TAG=latest
 docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG src/
-docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $1.dkr.ecr.$2.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG 
+docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $domain/$IMAGE_REPO_NAME:$IMAGE_TAG 
+
+
+
+echo "------------------------------------------------------------------------------"
+echo "[Push] Push Docker Image"
+echo "------------------------------------------------------------------------------"
+echo Push the docker image...
+cd $source_dir
+aws ecr create-repository --repository-name $IMAGE_REPO_NAME --region $1
+docker push $domain/$IMAGE_REPO_NAME:$IMAGE_TAG
+
+echo "Replace the docker image arn in cloud formation template"
+cd $template_dist_dir
+replace="s/us-west-2:347283850106/$1.$2/g"
+sed -i '' -e $replace $template_dist_dir/*.template
+replace="s/347283850106.dkr.ecr.us-west-2/$1.dkr.ecr.$2/g"
+sed -i '' -e $replace $template_dist_dir/*.template
