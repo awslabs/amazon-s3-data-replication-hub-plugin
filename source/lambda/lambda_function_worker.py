@@ -56,16 +56,17 @@ if job_type.upper() == 'GET':
 src_client = ClientManager.create_download_client(src_bucket_name, src_bucket_prefix, src_credentials, source_type)
 des_client = ClientManager.create_upload_client(dest_bucket_name, dest_bucket_prefix, des_credentials)
 
-try:
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    response = urllib.request.urlopen(
-        urllib.request.Request(checkip_url), timeout=3, context=context
-    ).read()
-    instance_id = "lambda-" + response.decode('utf-8')
-except urllib.error.URLError as e:
-    logger.warning(f'Fail to connect to checkip api: {checkip_url} - {str(e)}')
-    instance_id = 'lambda-ip-timeout'
+# try:
+#     context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+#     response = urllib.request.urlopen(
+#         urllib.request.Request(checkip_url), timeout=3, context=context
+#     ).read()
+#     instance_id = "lambda-" + response.decode('utf-8')
+# except urllib.error.URLError as e:
+#     logger.warning(f'Fail to connect to checkip api: {checkip_url} - {str(e)}')
+#     instance_id = 'lambda-ip-timeout'
 
+instance_id = 'lambda-ip-xx'
 
 class TimeoutOrMaxRetry(Exception):
     pass

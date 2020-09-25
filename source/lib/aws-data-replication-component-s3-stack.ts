@@ -20,6 +20,14 @@ import * as ecs from '@aws-cdk/aws-ecs';
 import * as ec2 from '@aws-cdk/aws-ec2';
 import * as ecr from '@aws-cdk/aws-ecr';
 
+/**
+ * cfn-nag suppression rule interface
+ */
+interface CfnNagSuppressRule {
+  readonly id: string;
+  readonly reason: string;
+}
+
 const StorageClass = 'STANDARD'
 const MaxRetry = '20'  // Max retry for requests
 const MaxThread = '50'  // Max threads per file
@@ -192,11 +200,27 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       nonKeyAttributes: ['desKey', 'versionId']
     })
 
+    const cfnDdb = ddbFileList.node.defaultChild as ddb.CfnTable;
+    this.addCfnNagSuppressRules(cfnDdb, [
+      {
+        id: 'W74',
+        reason: 'No need to use encryption'
+      }
+    ]);
+
     // 3. Setup SQS
     const sqsQueueDLQ = new sqs.Queue(this, 'S3MigrationQueueDLQ', {
       visibilityTimeout: cdk.Duration.minutes(15),
       retentionPeriod: cdk.Duration.days(14),
     })
+
+    const cfnSqsQueueDLQ = sqsQueueDLQ.node.defaultChild as sqs.CfnQueue;
+    this.addCfnNagSuppressRules(cfnSqsQueueDLQ, [
+      {
+        id: 'W48',
+        reason: 'No need to use encryption'
+      }
+    ]);
 
     const sqsQueue = new sqs.Queue(this, 'S3MigrationQueue', {
       visibilityTimeout: cdk.Duration.minutes(15),
@@ -207,33 +231,42 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     })
 
-    // 4. Setup API for Lambda to get IP address (for debug networking routing purpose)
-    const checkip = new api.RestApi(this, 'LambdaCheckIpAPI', {
-      cloudWatchRole: true,
-      deploy: true,
-      description: 'For Lambda get IP address',
-      defaultIntegration: new api.MockIntegration({
-        integrationResponses: [{
-          statusCode: '200',
-          responseTemplates: { "application/json": "$context.identity.sourceIp" }
-        }],
-        requestTemplates: { "application/json": '{"statusCode": 200}' }
-      }),
-      endpointConfiguration: {
-        types: [api.EndpointType.REGIONAL]
+    const cfnSqsQueue = sqsQueue.node.defaultChild as sqs.CfnQueue;
+    this.addCfnNagSuppressRules(cfnSqsQueue, [
+      {
+        id: 'W48',
+        reason: 'No need to use encryption'
       }
-    })
+    ]);
 
-    checkip.root.addMethod('GET', undefined, {
-      methodResponses: [
-        {
-          statusCode: '200',
-          responseModels: {
-            'application/json': api.Model.EMPTY_MODEL
-          }
-        }
-      ]
-    })
+    // 4. Setup API for Lambda to get IP address (for debug networking routing purpose)
+    // No used.
+    // const checkip = new api.RestApi(this, 'LambdaCheckIpAPI', {
+    //   cloudWatchRole: true,
+    //   deploy: true,
+    //   description: 'For Lambda get IP address',
+    //   defaultIntegration: new api.MockIntegration({
+    //     integrationResponses: [{
+    //       statusCode: '200',
+    //       responseTemplates: { "application/json": "$context.identity.sourceIp" }
+    //     }],
+    //     requestTemplates: { "application/json": '{"statusCode": 200}' }
+    //   }),
+    //   endpointConfiguration: {
+    //     types: [api.EndpointType.REGIONAL]
+    //   }
+    // })
+
+    // checkip.root.addMethod('GET', undefined, {
+    //   methodResponses: [
+    //     {
+    //       statusCode: '200',
+    //       responseModels: {
+    //         'application/json': api.Model.EMPTY_MODEL
+    //       }
+    //     }
+    //   ]
+    // })
 
     // 5. Get bucket
     // PUT - Source bucket in current account and destination in other account
@@ -273,7 +306,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       handler: 'lambda_function_worker.lambda_handler',
       memorySize: 1024,
       timeout: cdk.Duration.minutes(15),
-      tracing: lambda.Tracing.ACTIVE,
+      // tracing: lambda.Tracing.ACTIVE,
       environment: {
         TABLE_QUEUE_NAME: ddbFileList.tableName,
         SRC_BUCKET_NAME: srcBucketName.valueAsString,
@@ -281,7 +314,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         DEST_BUCKET_NAME: destBucketName.valueAsString,
         DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
         STORAGE_CLASS: StorageClass,
-        CHECK_IP_URL: checkip.url,
+        // CHECK_IP_URL: checkip.url,
         SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
         JOB_TYPE: jobType.valueAsString,
         SOURCE_TYPE: sourceType.valueAsString,
@@ -299,6 +332,14 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     handler.addEventSource(new SqsEventSource(sqsQueue, {
       batchSize: 1
     }));
+
+    const cfnHandlerFunction = handler.node.defaultChild as lambda.CfnFunction;
+    this.addCfnNagSuppressRules(cfnHandlerFunction, [
+      {
+        id: 'W58',
+        reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
+      }
+    ]);
 
     // 7. CloudWatch Rule. 
     // Schedule CRON event to trigger JobSender per hour
@@ -396,11 +437,20 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       sqsQueue.grantSendMessages(handlerJobSender);
       s3InCurrentAccount.grantReadWrite(handlerJobSender);
 
+      const cfnHandlerJobSender = handlerJobSender.node.defaultChild as lambda.CfnFunction;
+      this.addCfnNagSuppressRules(cfnHandlerJobSender, [
+        {
+          id: 'W58',
+          reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
+        }
+      ]);
+
       // Add target to cloudwatch rule.
       trigger.addTarget(new targets.LambdaFunction(handlerJobSender));
 
       // Custom resource to trigger JobSender Lambda once
       const jobSenderTrigger = new cr.AwsCustomResource(this, 'JobSenderTrigger', {
+        resourceType: 'Custom::CustomResource',
         policy: cr.AwsCustomResourcePolicy.fromStatements([new iam.PolicyStatement({
           actions: ['lambda:InvokeFunction'],
           effect: iam.Effect.ALLOW,
@@ -424,25 +474,33 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     // 9. Setup Cloudwatch Dashboard
     // Create Lambda logs filter to create network traffic metric
-    handler.logGroup.addMetricFilter('Completed-bytes', {
+    const lambdaFunctionLogs = new logs.LogGroup(this, 'ImageHandlerLogGroup', {
+      logGroupName: `/aws/lambda/${handler.functionName}`,
+      retention: logs.RetentionDays.TWO_WEEKS
+    });
+
+    // const cfnLambdaFunctionLogs = lambdaFunctionLogs.node.defaultChild as logs.CfnLogGroup;
+    // cfnLambdaFunctionLogs.retentionInDays = logs.RetentionDays.TWO_WEEKS;
+
+    lambdaFunctionLogs.addMetricFilter('Completed-bytes', {
       metricName: 'Completed-bytes',
       metricNamespace: 's3_migrate',
       metricValue: '$bytes',
       filterPattern: logs.FilterPattern.literal('[info, date, sn, p="--->Complete", bytes, key]')
     })
-    handler.logGroup.addMetricFilter('Uploading-bytes', {
+    lambdaFunctionLogs.addMetricFilter('Uploading-bytes', {
       metricName: 'Uploading-bytes',
       metricNamespace: 's3_migrate',
       metricValue: '$bytes',
       filterPattern: logs.FilterPattern.literal('[info, date, sn, p="--->Uploading", bytes, key]')
     })
-    handler.logGroup.addMetricFilter('Downloading-bytes', {
+    lambdaFunctionLogs.addMetricFilter('Downloading-bytes', {
       metricName: 'Downloading-bytes',
       metricNamespace: 's3_migrate',
       metricValue: '$bytes',
       filterPattern: logs.FilterPattern.literal('[info, date, sn, p="--->Downloading", bytes, key]')
     })
-    handler.logGroup.addMetricFilter('MaxMemoryUsed', {
+    lambdaFunctionLogs.addMetricFilter('MaxMemoryUsed', {
       metricName: 'MaxMemoryUsed',
       metricNamespace: 's3_migrate',
       metricValue: '$memory',
@@ -472,19 +530,19 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       statistic: 'Maximum',
       period: cdk.Duration.minutes(1)
     })
-    handler.logGroup.addMetricFilter('Error', {
+    lambdaFunctionLogs.addMetricFilter('Error', {
       metricName: 'ERROR-Logs',
       metricNamespace: 's3_migrate',
       metricValue: '1',
       filterPattern: logs.FilterPattern.literal('"ERROR"')
     })
-    handler.logGroup.addMetricFilter('WARNING', {
+    lambdaFunctionLogs.addMetricFilter('WARNING', {
       metricName: 'WARNING-Logs',
       metricNamespace: 's3_migrate',
       metricValue: '1',
       filterPattern: logs.FilterPattern.literal('"WARNING"')
     })
-    handler.logGroup.addMetricFilter('TIMEOUT', {
+    lambdaFunctionLogs.addMetricFilter('TIMEOUT', {
       metricName: 'TIMEOUT-Logs',
       metricNamespace: 's3_migrate',
       metricValue: '1',
@@ -575,9 +633,28 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     alarmTopic.addSubscription(new sub.EmailSubscription(alarmEmail.valueAsString));
     alarmDLQ.addAlarmAction(new actions.SnsAction(alarmTopic));
 
+    const cfnAlarmTopic = alarmTopic.node.defaultChild as sns.CfnTopic;
+    this.addCfnNagSuppressRules(cfnAlarmTopic, [
+      {
+        id: 'W47',
+        reason: 'No need to use encryption'
+      }
+    ]);
+
     new cdk.CfnOutput(this, 'Dashboard', {
       value: 'CloudWatch Dashboard name is S3Migration'
     })
 
+  }
+
+  /**
+   * Adds cfn-nag suppression rules to the AWS CloudFormation resource metadata.
+   * @param {cdk.CfnResource} resource Resource to add cfn-nag suppression rules
+   * @param {CfnNagSuppressRule[]} rules Rules to suppress
+   */
+  addCfnNagSuppressRules(resource: cdk.CfnResource, rules: CfnNagSuppressRule[]) {
+    resource.addMetadata('cfn_nag', {
+      rules_to_suppress: rules
+    });
   }
 }
