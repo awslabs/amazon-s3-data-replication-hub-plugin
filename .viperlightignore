@@ -3,4 +3,6 @@ CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 setup.py
 client.py
-package-lock.json 
+package-lock.json
+build-ecr.sh
+aws-data-replication-component-s3-stack*
