@@ -56,7 +56,7 @@ docker push $domain/$IMAGE_REPO_NAME:$IMAGE_TAG
 
 echo "Replace the docker image arn in cloud formation template"
 cd $template_dist_dir
-replace="s/us-west-2:347283850106/$1.$2/g"
+replace="s/us-west-2:347283850106/$1:$2/g"
 sed -i '' -e $replace $template_dist_dir/*.template
-replace="s/347283850106.dkr.ecr.us-west-2/$1.dkr.ecr.$2/g"
+replace="s/347283850106.dkr.ecr.us-west-2/$2.dkr.ecr.$1/g"
 sed -i '' -e $replace $template_dist_dir/*.template
