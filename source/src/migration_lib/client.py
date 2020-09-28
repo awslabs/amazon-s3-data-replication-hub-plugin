@@ -196,7 +196,9 @@ class S3DownloadClient(DownloadClient):
             # logger.info(response.get('Contents', []))
             contents = response.get('Contents', [])
 
-            job_list = [JobInfo(x['Key'], x['Size']) for x in contents]
+            # Exclude objects with GLACIER and DEEP_ARCHIVE storage class, they can't be downloaded.
+            job_list = [JobInfo(x['Key'], x['Size']) for x in contents
+                        if x['StorageClass'] not in ['GLACIER', 'DEEP_ARCHIVE']]
             # logger.info(
             #     f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
@@ -227,7 +229,8 @@ class S3DownloadClient(DownloadClient):
 
             contents = response.get('Versions', [])
             job_list = [JobInfo(x['Key'], x['Size'], x['VersionId'])
-                        for x in contents if x['IsLatest']]
+                        for x in contents
+                        if x['IsLatest'] and x['StorageClass'] not in ['GLACIER', 'DEEP_ARCHIVE']]
             # logger.info(
             #     f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
