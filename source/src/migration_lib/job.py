@@ -151,16 +151,16 @@ class JobMigrator():
         err = ''
         try:
             # Get object from client, upload Object to destination.
+            logger.info(f'----->Downloading {self._job.size} Bytes {self._src_client.bucket_name}/{self._job.key}')
             body, body_md5 = self._src_client.get_object(self._job.key, self._job.size)
             content_md5 = base64.b64encode(
                 body_md5.digest()).decode('utf-8')
-
+            
+            logger.info(f'----->Uploading {self._job.size} Bytes {self._src_client.bucket_name}/{self._job.key}')
             upload_etag_full = self._des_client.upload_object(
                 self._job.key, body, content_md5, self._job.storage_class, **extra_args)
 
-            logger.info(
-                f'Migrator> Complete migration of small file {upload_etag_full}')
-
+            logger.info(f'----->Complete {self._job.size} Bytes {self._src_client.bucket_name}/{self._job.key}')
         except Exception as e:
             logger.error(
                 f'Migrator> Unexpected error during migration of small file - {str(e)}')

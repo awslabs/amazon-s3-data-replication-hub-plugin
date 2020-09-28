@@ -486,19 +486,19 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       metricName: 'Completed-bytes',
       metricNamespace: 's3_migrate',
       metricValue: '$bytes',
-      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="--->Complete", bytes, key]')
+      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Complete", bytes, key]')
     })
     lambdaFunctionLogs.addMetricFilter('Uploading-bytes', {
       metricName: 'Uploading-bytes',
       metricNamespace: 's3_migrate',
       metricValue: '$bytes',
-      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="--->Uploading", bytes, key]')
+      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Uploading", bytes, key]')
     })
     lambdaFunctionLogs.addMetricFilter('Downloading-bytes', {
       metricName: 'Downloading-bytes',
       metricNamespace: 's3_migrate',
       metricValue: '$bytes',
-      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="--->Downloading", bytes, key]')
+      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Downloading", bytes, key]')
     })
     lambdaFunctionLogs.addMetricFilter('MaxMemoryUsed', {
       metricName: 'MaxMemoryUsed',
