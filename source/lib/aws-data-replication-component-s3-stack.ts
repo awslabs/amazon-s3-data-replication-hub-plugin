@@ -474,7 +474,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     // 9. Setup Cloudwatch Dashboard
     // Create Lambda logs filter to create network traffic metric
-    const lambdaFunctionLogs = new logs.LogGroup(this, 'ImageHandlerLogGroup', {
+    const lambdaFunctionLogs = new logs.LogGroup(this, 'HandlerLogGroup', {
       logGroupName: `/aws/lambda/${handler.functionName}`,
       retention: logs.RetentionDays.TWO_WEEKS
     });
