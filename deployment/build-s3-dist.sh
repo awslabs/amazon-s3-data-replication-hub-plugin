@@ -94,8 +94,7 @@ echo "npm install && npm run build"
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
-cdk synth --output=$staging_dist_dir --json=true -c runType=ecs > $staging_dist_dir/$2.ecs.template.json
-# cdk synth --output=$staging_dist_dir --json=true  > $staging_dist_dir/$2.lambda.template.json
+cdk synth --output=$staging_dist_dir --json=true > $staging_dist_dir/$2.template.json
 
 # Remove unnecessary output files
 echo "cd $staging_dist_dir"

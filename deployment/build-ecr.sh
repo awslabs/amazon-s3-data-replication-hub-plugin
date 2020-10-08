@@ -26,8 +26,10 @@ echo AWS_ACCOUNT_ID $2
 if [[ $1 == cn-* ]];
 then
   domain=$2.dkr.ecr.$1.amazonaws.com.cn
+  partition=aws-cn
 else
   domain=$2.dkr.ecr.$1.amazonaws.com
+  partition=aws
 fi
 
 echo $domain
@@ -51,12 +53,14 @@ echo "[Push] Push Docker Image"
 echo "------------------------------------------------------------------------------"
 echo Push the docker image...
 cd $source_dir
-aws ecr create-repository --repository-name $IMAGE_REPO_NAME --region $1
+aws ecr create-repository --repository-name $IMAGE_REPO_NAME --region $1 >/dev/null
 docker push $domain/$IMAGE_REPO_NAME:$IMAGE_TAG
 
 echo "Replace the docker image arn in cloud formation template"
 cd $template_dist_dir
-replace="s/us-west-2:347283850106/$1:$2/g"
+echo "arn prefix is arn:$partition:ecr:$1:$2"
+replace="s/arn:aws:ecr:us-west-2:347283850106/arn:$partition:ecr:$1:$2/g"
 sed -i '' -e $replace $template_dist_dir/*.template
+echo "uri prefix is $2.dkr.ecr.$1"
 replace="s/347283850106.dkr.ecr.us-west-2/$2.dkr.ecr.$1/g"
 sed -i '' -e $replace $template_dist_dir/*.template
