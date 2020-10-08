@@ -42,8 +42,6 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const runType = this.node.tryGetContext('runType');
-
     // 'PUT': Destination Bucket is not in current account.
     // 'GET': Source bucket is not in current account.
     const jobType = new cdk.CfnParameter(this, 'jobType', {
@@ -89,13 +87,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     })
 
     const ecsVpcId = new cdk.CfnParameter(this, 'ecsVpcId', {
-      description: 'ecs Cluster VPC ID to run ECS task, for example vpc-bef13dc7',
+      description: 'VPC ID to run ECS task, e.g. vpc-bef13dc7',
       default: '',
       type: 'AWS::EC2::VPC::Id'
     })
 
     const ecsSubnets = new cdk.CfnParameter(this, 'ecsSubnets', {
-      description: 'ecs Cluster Subnet IDs. Please provide two subnets at least delimited by comma, for example "subnet-97bfc4cd,subnet-7ad7de32" )',
+      description: 'Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32',
       default: '',
       type: 'List<AWS::EC2::Subnet::Id>'
     })
@@ -396,6 +394,12 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       },
     }));
 
+    const taskDefArnNoVersion = this.formatArn({
+      service: 'ecs',
+      resource: 'task-definition',
+      resourceName: taskDefinition.family
+    })
+
 
     // Custom resource to trigger JobSender ECS task once
     const jobSenderTrigger = new cr.AwsCustomResource(this, 'JobSenderTrigger', {
@@ -403,7 +407,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       policy: cr.AwsCustomResourcePolicy.fromStatements([new iam.PolicyStatement({
         actions: ['ecs:RunTask'],
         effect: iam.Effect.ALLOW,
-        resources: [taskDefinition.taskDefinitionArn]
+        resources: [taskDefArnNoVersion]
       }),
       new iam.PolicyStatement({
         actions: ['iam:PassRole'],
