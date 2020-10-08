@@ -12,15 +12,14 @@ S3 replication plugin. Each of the replication plugin can run independently.
 
 The following are the planned features of this plugin.
 
-- [x] Replicating Amazon S3 from AWS CN Partition to AWS Standard Partition.
-- [x] Replicating Amazon S3 from AWS Standard Partition to AWS CN Partition.
-- [X] Support Aliyun OSS, Qiniu Kodo, Tencent COS to Amazon S3, including both CN Partition and Standard Partition.
-- [x] Replicating object metadata.
-- [ ] Versioning support.
-- [x] Large size file support.
-- [x] Progress tracking and monitoring.
-- [x] Support provision in both CN Partition and Standard Partition.
-- [x] Deployment via AWS CDK and Cloudformation
+- [x] Amazon S3 object replication between AWS Standard partition and AWS CN partition
+- [x] Replication from Alibaba Cloud OSS to Amazon S3
+- [x] Replication from Tencent COS to Amazon S3
+- [x] Replication from Qiniu Kodo to Amazon S3
+- [ ] Replication from Huawei Cloud OBS
+- [x] Support replication with Metadata
+- [x] Support One-time replication
+- [x] Support Incremental replication
 
 ## Architect
 
@@ -83,35 +82,36 @@ If source cloud storage is Aliyun OSS, please create a similar `drh-credentials`
 
 The following are the all allowed parameters:
 
-| Parameter                 | Default          | Description                                                                               |
-|---------------------------|------------------|-------------------------------------------------------------------------------------------|
-| srcBucketName             | <requires input> | Source bucket name.                                                                       |
-| srcBucketPrefix           | ''               | Source bucket object prefix. The application will only copy keys with the certain prefix. |
-| destBucketName            | <requires input> | Destination bucket name.                                                                  |
-| destBucketPrefix          | ''               | Destination bucket prefix. The application will upload to certain prefix.                 |
-| jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.             |
-| sourceType                | AWS S3           | Choose type of source storage, for example Qiniu, S3 or AliOSS                            |
-| credentialsParameterStore | drh-credentials  | The Parameter Store used to keep AWS credentials for other regions.                       |
-| alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                           |
-| ecsClusterName            | <requires input> | ECS Cluster Name.                                                                         |
-| ecsVpcId                  | <requires input> | ecs Cluster VPC ID.                                                                       |
-| ecsPublicSubnetsA         | <requires input> | ecs Cluster Public Subnet ID A (please provide two public subnets at least)               |
-| ecsPublicSubnetsB         | <requires input> | ecs Cluster Public Subnet ID B (please provide two public subnets at least)               |
+| Parameter                 | Default          | Description                                                                                                               |
+|---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
+| srcBucketName             | <requires input> | Source bucket name.                                                                                                       |
+| srcBucketPrefix           | ''               | Source bucket object prefix. The application will only copy keys with the certain prefix.                                 |
+| destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
+| destBucketPrefix          | ''               | Destination bucket prefix. The application will upload to certain prefix.                                                 |
+| jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
+| sourceType                | AWS S3           | Choose type of source storage, for example Qiniu, S3 or AliOSS                                                            |
+| credentialsParameterStore | drh-credentials  | The Parameter Store used to keep AWS credentials for other regions.                                                       |
+| alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
+| ecsClusterName            | <requires input> | ECS Cluster Name to run ECS task                                                                                          |
+| ecsVpcId                  | <requires input> | VPC ID to run ECS task, e.g. vpc-bef13dc7                                                                                 |
+| ecsSubnets                | <requires input> | Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32  |
 
 
 ### Deploy via AWS Cloudformation
 
-1. 登录到AWS管理控制台，然后单击下面的按钮以启动无服务器图像处理程序 AWS CloudFormation 模板。
+Please follow below steps to deploy the plugin via AWS Cloudformation.
 
-    [![Launch Stack](launch-stack.svg)](https://us-west-2.console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://drh-s3-12345.s3-us-west-2.amazonaws.com/Aws-data-replication-component-s3/v1.0/Aws-data-replication-component-s3.ecs.template)
+1. Sign in to AWS Management Console, switch to the region to deploy the CloudFormation Stack.
+
+1. Click the following button to launch the CloudFormation Stack in the current region.
+
+    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://drh-solution.s3-us-west-2.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
     
-1. 默认情况下，该模板在 AWS 宁夏区域启动。 要在其他AWS区域中启动无服务器图像处理程序，请使用控制台导航栏中的区域选择器。
+1. Click **Next**. Assign a stack name and input values to parameters accordingly.
 
-1. 在**创建堆栈**页面上，确认 **Amazon S3 URL** 文本框中显示正确的模板URL，然后选择**下一步**。
+1. Click **Next** and select **Create Stack**.
 
-1. 在**指定堆栈详细信息**页面上，为解决方案堆栈分配名称。
-
-1. 在**参数**下，查看模板的参数并根据需要进行修改。 此解决方案使用以下默认值。
+> Note: **Time to deploy:** Approximately 15 minutes.
 
 
 ### Deploy via AWS CDK
@@ -189,22 +189,4 @@ Build and push to ECR repository:
 ```bash
 chmod +x ./build-ecr.sh
 ./build-ecr.sh $REGION $AWS_ACCOUNT_ID
-```
-
-Then you need to set up proper permission. For example
-```
-{
-  "Version": "2008-10-17",
-  "Statement": [
-    {
-      "Sid": "AllowPull",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": [
-        "ecr:BatchGetImage",
-        "ecr:GetDownloadUrlForLayer"
-      ]
-    }
-  ]
-}
 ```
