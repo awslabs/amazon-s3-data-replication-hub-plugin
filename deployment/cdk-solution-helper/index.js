@@ -68,6 +68,22 @@ fs.readdirSync(global_s3_assets).forEach(file => {
       // // Set the handler
       // const handler = fn.Properties.Handler;
       // fn.Properties.Handler = `${assetPath}/${handler}`;
+      lambdaFunctions.forEach(function (f) {
+        const fn = template.Resources[f];
+        let metadata = Object.assign(fn.Metadata);
+        fn.Metadata = {
+          ...metadata,
+          'cfn_nag': {
+            'rules_to_suppress': [
+              {
+                id: 'W58',
+                reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
+              }
+            ]
+          }
+        };
+      }
+      )
     }
   });
 

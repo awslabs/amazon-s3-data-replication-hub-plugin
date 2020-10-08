@@ -91,19 +91,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const ecsVpcId = new cdk.CfnParameter(this, 'ecsVpcId', {
       description: 'ecs Cluster VPC ID (Required if runType is ecs)',
       default: '',
-      type: 'String'
+      type: 'AWS::EC2::VPC::Id'
     })
 
-    const ecsPublicSubnetsA = new cdk.CfnParameter(this, 'ecsPublicSubnetsA', {
-      description: 'ecs Cluster Public Subnet ID A(Required if runType is ecs, please provide two public subnets at least)',
+    const ecsSubnets = new cdk.CfnParameter(this, 'ecsSubnets', {
+      description: 'ecs Cluster Subnet IDs. Please provide two subnets at least delimited by comma, for example "subnet-97bfc4cd,subnet-7ad7de32" )',
       default: '',
-      type: 'String'
-    })
-
-    const ecsPublicSubnetsB = new cdk.CfnParameter(this, 'ecsPublicSubnetsB', {
-      description: 'ecs Cluster Public Subnet ID B (Required if runType is ecs, please provide two public subnets at least)',
-      default: '',
-      type: 'String'
+      type: 'List<AWS::EC2::Subnet::Id>'
     })
 
     // The region credential (not the same account as Lambda) setting in SSM Parameter Store
@@ -127,7 +121,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         },
         {
           Label: { default: 'ECS Cluster' },
-          Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsPublicSubnetsA.logicalId, ecsPublicSubnetsB.logicalId, ecsPublicSubnetsB.logicalId]
+          Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId]
         },
         {
           Label: { default: 'Credentials' },
@@ -169,12 +163,9 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         [ecsVpcId.logicalId]: {
           Default: 'VPC ID to run ECS task'
         },
-        [ecsPublicSubnetsA.logicalId]: {
+        [ecsSubnets.logicalId]: {
           Default: 'Public Subnet IDs to run ECS task'
-        },
-        [ecsPublicSubnetsB.logicalId]: {
-          Default: 'Public Subnet IDs to run ECS task'
-        },
+        }
       }
     }
 
@@ -333,144 +324,119 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       batchSize: 1
     }));
 
-    const cfnHandlerFunction = handler.node.defaultChild as lambda.CfnFunction;
-    this.addCfnNagSuppressRules(cfnHandlerFunction, [
-      {
-        id: 'W58',
-        reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
-      }
-    ]);
+    // const cfnHandlerFunction = handler.node.defaultChild as lambda.CfnFunction;
+    // this.addCfnNagSuppressRules(cfnHandlerFunction, [
+    //   {
+    //     id: 'W58',
+    //     reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
+    //   }
+    // ]);
 
-    // 7. CloudWatch Rule. 
+    // 7. Setup JobSender ECS Task
+    const ecrRepositoryArn = 'arn:aws:ecr:us-west-2:347283850106:repository/s3-migration-jobsender'
+    // const repo = ecr.Repository.fromRepositoryName(this, 'JobSenderRepo', 's3-migration-jobsender')
+    const repo = ecr.Repository.fromRepositoryArn(this, 'JobSenderRepo', ecrRepositoryArn)
+    const taskDefinition = new ecs.FargateTaskDefinition(this, 'JobSenderTaskDef', {
+      cpu: 1024 * 4,
+      memoryLimitMiB: 1024 * 8,
+    });
+    taskDefinition.addContainer('DefaultContainer', {
+      // image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src')),
+      image: ecs.ContainerImage.fromEcrRepository(repo),
+      memoryLimitMiB: 1024 * 8,
+      environment: {
+        AWS_DEFAULT_REGION: this.region,
+        TABLE_QUEUE_NAME: ddbFileList.tableName,
+        SQS_QUEUE_NAME: sqsQueue.queueName,
+        SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
+        SRC_BUCKET_NAME: srcBucketName.valueAsString,
+        SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
+        DEST_BUCKET_NAME: destBucketName.valueAsString,
+        DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
+        JOB_TYPE: jobType.valueAsString,
+        SOURCE_TYPE: sourceType.valueAsString,
+        MAX_RETRY: MaxRetry,
+        INCLUDE_VERSION: IncludeVersion
+      },
+      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender' })
+    });
+
+    ssmCredentialsParam.grantRead(taskDefinition.taskRole)
+    ddbFileList.grantReadData(taskDefinition.taskRole);
+    sqsQueue.grantSendMessages(taskDefinition.taskRole);
+    s3InCurrentAccount.grantReadWrite(taskDefinition.taskRole);
+
+    // Get existing ecs cluster.
+    const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
+      vpcId: ecsVpcId.valueAsString,
+      availabilityZones: cdk.Fn.getAzs(),
+      publicSubnetIds: ecsSubnets.valueAsList
+
+    })
+
+    const cluster = ecs.Cluster.fromClusterAttributes(this, 'ECSCluster', {
+      clusterName: ecsClusterName.valueAsString,
+      vpc: vpc,
+      securityGroups: []
+    })
+
+    // 8. CloudWatch Rule. 
     // Schedule CRON event to trigger JobSender per hour
     const trigger = new events.Rule(this, 'CronTriggerJobSender', {
       schedule: events.Schedule.rate(cdk.Duration.hours(1)),
     })
 
-    // 8. Setup JobSender
-    // if runType == ecs, use ecs to jobfinder , otherwise use lambda
-    if (runType == 'ecs') {
-      const ecrRepositoryArn = 'arn:aws:ecr:us-west-2:347283850106:repository/s3-migration-jobsender'
-      // const repo = ecr.Repository.fromRepositoryName(this, 'JobSenderRepo', 's3-migration-jobsender')
-      const repo = ecr.Repository.fromRepositoryArn(this, 'JobSenderRepo', ecrRepositoryArn)
-      const taskDefinition = new ecs.FargateTaskDefinition(this, 'JobSenderTaskDef', {
-        cpu: 1024 * 4,
-        memoryLimitMiB: 1024 * 8,
-      });
-      taskDefinition.addContainer('DefaultContainer', {
-        // image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src')),
-        image: ecs.ContainerImage.fromEcrRepository(repo),
-        memoryLimitMiB: 1024 * 8,
-        environment: {
-          AWS_DEFAULT_REGION: this.region,
-          TABLE_QUEUE_NAME: ddbFileList.tableName,
-          SQS_QUEUE_NAME: sqsQueue.queueName,
-          SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
-          SRC_BUCKET_NAME: srcBucketName.valueAsString,
-          SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
-          DEST_BUCKET_NAME: destBucketName.valueAsString,
-          DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-          JOB_TYPE: jobType.valueAsString,
-          SOURCE_TYPE: sourceType.valueAsString,
-          MAX_RETRY: MaxRetry,
-          INCLUDE_VERSION: IncludeVersion
-        },
-        logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender' })
-      });
+    // Add target to cloudwatch rule.
+    trigger.addTarget(new targets.EcsTask({
+      cluster,
+      taskDefinition,
+      taskCount: 1,
+      subnetSelection: {
+        subnetType: ec2.SubnetType.PUBLIC,
+      },
+    }));
 
-      ssmCredentialsParam.grantRead(taskDefinition.taskRole)
-      ddbFileList.grantReadData(taskDefinition.taskRole);
-      sqsQueue.grantSendMessages(taskDefinition.taskRole);
-      s3InCurrentAccount.grantReadWrite(taskDefinition.taskRole);
 
-      // Get existing ecs cluster.
-      const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
-        vpcId: ecsVpcId.valueAsString,
-        availabilityZones: this.availabilityZones,
-        publicSubnetIds: [ecsPublicSubnetsA.valueAsString, ecsPublicSubnetsB.valueAsString]
-
-      })
-
-      const cluster = ecs.Cluster.fromClusterAttributes(this, 'ECSCluster', {
-        clusterName: ecsClusterName.valueAsString,
-        vpc: vpc,
-        securityGroups: []
-      })
-
-      // Add target to cloudwatch rule.
-      trigger.addTarget(new targets.EcsTask({
-        cluster,
-        taskDefinition,
-        taskCount: 1,
-        subnetSelection: {
-          subnetType: ec2.SubnetType.PUBLIC,
-        },
-      }));
-
-    }
-    else {
-      const handlerJobSender = new lambda.Function(this, 'S3MigrationJobSender', {
-        runtime: lambda.Runtime.PYTHON_3_8,
-        code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
-        layers: [layer],
-        handler: "lambda_function_jobsender.lambda_handler",
-        memorySize: 1024,
-        timeout: cdk.Duration.minutes(15),
-        tracing: lambda.Tracing.ACTIVE,
-        environment: {
-          TABLE_QUEUE_NAME: ddbFileList.tableName,
-          SQS_QUEUE_NAME: sqsQueue.queueName,
-          SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
-          SRC_BUCKET_NAME: srcBucketName.valueAsString,
-          SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
-          DEST_BUCKET_NAME: destBucketName.valueAsString,
-          DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-          JOB_TYPE: jobType.valueAsString,
-          SOURCE_TYPE: sourceType.valueAsString,
-          MAX_RETRY: MaxRetry,
-          INCLUDE_VERSION: IncludeVersion
-        }
-      })
-
-      ssmCredentialsParam.grantRead(handlerJobSender);
-      ddbFileList.grantReadData(handlerJobSender);
-      sqsQueue.grantSendMessages(handlerJobSender);
-      s3InCurrentAccount.grantReadWrite(handlerJobSender);
-
-      const cfnHandlerJobSender = handlerJobSender.node.defaultChild as lambda.CfnFunction;
-      this.addCfnNagSuppressRules(cfnHandlerJobSender, [
-        {
-          id: 'W58',
-          reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
-        }
-      ]);
-
-      // Add target to cloudwatch rule.
-      trigger.addTarget(new targets.LambdaFunction(handlerJobSender));
-
-      // Custom resource to trigger JobSender Lambda once
-      const jobSenderTrigger = new cr.AwsCustomResource(this, 'JobSenderTrigger', {
-        resourceType: 'Custom::CustomResource',
-        policy: cr.AwsCustomResourcePolicy.fromStatements([new iam.PolicyStatement({
-          actions: ['lambda:InvokeFunction'],
-          effect: iam.Effect.ALLOW,
-          resources: [handlerJobSender.functionArn]
-        })]),
-        timeout: cdk.Duration.minutes(15),
-        logRetention: logs.RetentionDays.ONE_DAY,
-        onCreate: {
-          service: 'Lambda',
-          action: 'invoke',
-          parameters: {
-            FunctionName: handlerJobSender.functionName,
-            InvocationType: 'Event'
+    // Custom resource to trigger JobSender ECS task once
+    const jobSenderTrigger = new cr.AwsCustomResource(this, 'JobSenderTrigger', {
+      resourceType: 'Custom::CustomResource',
+      policy: cr.AwsCustomResourcePolicy.fromStatements([new iam.PolicyStatement({
+        actions: ['ecs:RunTask'],
+        effect: iam.Effect.ALLOW,
+        resources: [taskDefinition.taskDefinitionArn]
+      }),
+      new iam.PolicyStatement({
+        actions: ['iam:PassRole'],
+        effect: iam.Effect.ALLOW,
+        resources: [taskDefinition.taskRole.roleArn]
+      }),
+      new iam.PolicyStatement({
+        actions: ['iam:PassRole'],
+        effect: iam.Effect.ALLOW,
+        resources: [taskDefinition.executionRole ? taskDefinition.executionRole.roleArn : taskDefinition.taskRole.roleArn]
+      }),
+      ]),
+      timeout: cdk.Duration.minutes(15),
+      // logRetention: logs.RetentionDays.ONE_DAY,
+      onCreate: {
+        service: 'ECS',
+        action: 'runTask',
+        parameters: {
+          launchType: ecs.LaunchType.FARGATE,
+          taskDefinition: taskDefinition.family,
+          cluster: cluster.clusterName,
+          count: 1,
+          networkConfiguration: {
+            awsvpcConfiguration: {
+              subnets: ecsSubnets.valueAsList,
+              assignPublicIp: "ENABLED",
+            }
           },
-          physicalResourceId: cr.PhysicalResourceId.of('JobSenderTriggerPhysicalId')
-        }
-      })
-      jobSenderTrigger.node.addDependency(handler, handlerJobSender, sqsQueue)
-
-    }
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('JobSenderTriggerPhysicalId')
+      }
+    })
+    jobSenderTrigger.node.addDependency(taskDefinition, sqsQueue)
 
     // 9. Setup Cloudwatch Dashboard
     // Create Lambda logs filter to create network traffic metric
