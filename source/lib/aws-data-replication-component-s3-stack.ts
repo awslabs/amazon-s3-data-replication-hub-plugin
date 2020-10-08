@@ -83,13 +83,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     })
 
     const ecsClusterName = new cdk.CfnParameter(this, 'ecsClusterName', {
-      description: 'ECS Cluster Name (Required if runType is ecs)',
+      description: 'ECS Cluster Name to run ECS task',
       default: '',
       type: 'String'
     })
 
     const ecsVpcId = new cdk.CfnParameter(this, 'ecsVpcId', {
-      description: 'ecs Cluster VPC ID (Required if runType is ecs)',
+      description: 'ecs Cluster VPC ID to run ECS task, for example vpc-bef13dc7',
       default: '',
       type: 'AWS::EC2::VPC::Id'
     })
@@ -164,7 +164,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           Default: 'VPC ID to run ECS task'
         },
         [ecsSubnets.logicalId]: {
-          Default: 'Public Subnet IDs to run ECS task'
+          Default: 'Subnet IDs to run ECS task'
         }
       }
     }
