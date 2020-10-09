@@ -54,8 +54,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const sourceType = new cdk.CfnParameter(this, 'sourceType', {
       description: 'Choose migration source, for example, S3 or AliOSS.',
       type: 'String',
-      default: 'AWS S3',
-      allowedValues: ['AWS S3', 'Aliyun OSS', 'Qiniu Kodo', 'Tencent COS']
+      default: 'AWS_S3',
+      allowedValues: ['AWS_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS']
     })
 
     const srcBucketName = new cdk.CfnParameter(this, 'srcBucketName', {

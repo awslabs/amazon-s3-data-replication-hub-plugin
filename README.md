@@ -75,8 +75,8 @@ The following are the all allowed parameters for deployment:
 | destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
 | destBucketPrefix          | ''               | Destination bucket prefix. The application will upload to certain prefix.                                                 |
 | jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
-| sourceType                | AWS S3           | Choose type of source storage, for example Qiniu, S3 or AliOSS                                                            |
-| credentialsParameterStore | drh-credentials  | The Parameter Name used to keep credentials in Parameter Store.                                                  |
+| sourceType                | AWS_S3           | Choose type of source storage, for example AWS_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                    |
+| credentialsParameterStore | drh-credentials  | The Parameter Name used to keep credentials in Parameter Store.                                                           |
 | alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
 | ecsClusterName            | <requires input> | ECS Cluster Name to run ECS task                                                                                          |
 | ecsVpcId                  | <requires input> | VPC ID to run ECS task, e.g. vpc-bef13dc7                                                                                 |
@@ -124,8 +124,10 @@ Use `cdk deploy` command to deploy the solution. Please specify the parameter va
 ```
 cdk deploy --parameters srcBucketName=<source-bucket-name> \
 --parameters destBucketName=<dest-bucket-name> \
---parameters alarmEmail=xxxxx@example.com \ 
---parameters ecsClusterName=mycluster \
+--parameters alarmEmail=xxxxx@example.com \
+--parameters jobType=GET \
+--parameters sourceType=AWS_S3 \
+--parameters ecsClusterName=test \
 --parameters ecsVpcId=vpc-bef13dc7 \
 --parameters ecsSubnets=subnet-97bfc4cd,subnet-7ad7de32
 ```

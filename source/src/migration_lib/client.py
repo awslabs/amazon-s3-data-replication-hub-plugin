@@ -273,7 +273,7 @@ class AliOSSDownloadClient(DownloadClient):
 
         credentials = {
             "oss_access_key_id": "<Your AccessKeyID>",
-            "oss_access_key_secret": "<Your AccessKeySecret>",
+            "oss_secret_access_key": "<Your AccessKeySecret>",
             "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
         }
     """
@@ -282,7 +282,7 @@ class AliOSSDownloadClient(DownloadClient):
         super().__init__(bucket_name, prefix, **credentials)
         endpoint = credentials['oss_endpoint']
         access_key_id = credentials['oss_access_key_id']
-        access_key_secret = credentials['oss_access_key_secret']
+        access_key_secret = credentials['oss_secret_access_key']
         auth = oss2.Auth(access_key_id, access_key_secret)
 
         self._client = oss2.Bucket(auth, endpoint, bucket_name)
@@ -737,10 +737,10 @@ class ClientManager():
 
 class Source(Enum):
     """ Enum of Different Sources """
-    AWS_S3 = 'AWS S3'
-    ALIYUN_OSS = 'Aliyun OSS'
-    TENCENT_COS = 'Tencent COS'
-    QINIU_KODO = 'Qiniu Kodo'
+    AWS_S3 = 'AWS_S3'
+    ALIYUN_OSS = 'Aliyun_OSS'
+    TENCENT_COS = 'Tencent_COS'
+    QINIU_KODO = 'Qiniu_Kodo'
 
     def get_endpoint_url(self, region_name):
         ''' Helper func to get endpoint url based on region name '''
