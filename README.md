@@ -16,7 +16,7 @@ The following are the planned features of this plugin.
 - [x] Replication from Alibaba Cloud OSS to Amazon S3
 - [x] Replication from Tencent COS to Amazon S3
 - [x] Replication from Qiniu Kodo to Amazon S3
-- [ ] Replication from Huawei Cloud OBS
+- [ ] Replication from Huawei Cloud OBS to Amazon S3
 - [x] Support replication with Metadata
 - [x] Support One-time replication
 - [x] Support Incremental replication
@@ -75,7 +75,7 @@ The following are the all allowed parameters for deployment:
 | destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
 | destBucketPrefix          | ''               | Destination bucket prefix. The application will upload to certain prefix.                                                 |
 | jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
-| sourceType                | AWS_S3           | Choose type of source storage, for example AWS_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                    |
+| sourceType                | Amazon_S3        | Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                    |
 | credentialsParameterStore | drh-credentials  | The Parameter Name used to keep credentials in Parameter Store.                                                           |
 | alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
 | ecsClusterName            | <requires input> | ECS Cluster Name to run ECS task                                                                                          |
@@ -126,7 +126,7 @@ cdk deploy --parameters srcBucketName=<source-bucket-name> \
 --parameters destBucketName=<dest-bucket-name> \
 --parameters alarmEmail=xxxxx@example.com \
 --parameters jobType=GET \
---parameters sourceType=AWS_S3 \
+--parameters sourceType=Amazon_S3 \
 --parameters ecsClusterName=test \
 --parameters ecsVpcId=vpc-bef13dc7 \
 --parameters ecsSubnets=subnet-97bfc4cd,subnet-7ad7de32

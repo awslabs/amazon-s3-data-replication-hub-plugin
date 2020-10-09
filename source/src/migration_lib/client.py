@@ -110,7 +110,7 @@ class DownloadClient():
 
 
 class S3DownloadClient(DownloadClient):
-    r""" An implementation of download client with AWS S3.
+    r""" An implementation of download client with Amazon S3.
 
     Example Usage:
 
@@ -468,7 +468,7 @@ class UploadClient():
 
 
 class S3UploadClient(UploadClient):
-    r""" An implementation of upload client with AWS S3. 
+    r""" An implementation of upload client with Amazon S3. 
 
     Example Usage:
 
@@ -700,7 +700,7 @@ class ClientManager():
         pass
 
     @classmethod
-    def create_download_client(cls, bucket_name, prefix='', region_name='', credentials={}, source_type='AWS S3'):
+    def create_download_client(cls, bucket_name, prefix='', region_name='', credentials={}, source_type='Amazon_S3'):
         source = Source(source_type)
         if source == Source.ALIYUN_OSS:
             credentials['oss_access_key_id'] = credentials.pop('access_key_id')
@@ -737,7 +737,7 @@ class ClientManager():
 
 class Source(Enum):
     """ Enum of Different Sources """
-    AWS_S3 = 'AWS_S3'
+    AMAZON_S3 = 'Amazon_S3'
     ALIYUN_OSS = 'Aliyun_OSS'
     TENCENT_COS = 'Tencent_COS'
     QINIU_KODO = 'Qiniu_Kodo'
