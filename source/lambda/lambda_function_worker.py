@@ -48,13 +48,22 @@ credentials = json.loads(ssm.get_parameter(
     WithDecryption=True
 )['Parameter']['Value'])
 
+# Region name will not be part of credentials in the future.
+region_name = credentials.pop('region_name')
+
 # Default Jobtype is GET, Only S3 supports PUT type.
-src_credentials, des_credentials =  {}, credentials
+src_credentials, des_credentials = {}, credentials
+src_region, des_region = '', region_name
 if job_type.upper() == 'GET':
     src_credentials, des_credentials = des_credentials, src_credentials
+    src_region, des_region = des_region, src_region
 
-src_client = ClientManager.create_download_client(src_bucket_name, src_bucket_prefix, src_credentials, source_type)
-des_client = ClientManager.create_upload_client(dest_bucket_name, dest_bucket_prefix, des_credentials)
+# if src_credentials:
+#     src_region = src_credentials
+src_client = ClientManager.create_download_client(
+    src_bucket_name, src_bucket_prefix, src_region, src_credentials, source_type)
+des_client = ClientManager.create_upload_client(
+    dest_bucket_name, dest_bucket_prefix, des_region, des_credentials)
 
 # try:
 #     context = ssl.SSLContext(ssl.PROTOCOL_TLS)
@@ -67,6 +76,7 @@ des_client = ClientManager.create_upload_client(dest_bucket_name, dest_bucket_pr
 #     instance_id = 'lambda-ip-timeout'
 
 instance_id = 'lambda-ip-xx'
+
 
 class TimeoutOrMaxRetry(Exception):
     pass

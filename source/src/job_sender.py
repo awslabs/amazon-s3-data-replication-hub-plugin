@@ -64,14 +64,19 @@ if __name__ == "__main__":
     include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
 
     credentials = get_credentials()
+    # Region name will not be part of credentials in the future.
+    region_name = credentials.pop('region_name')
+
     src_credentials, des_credentials = {}, credentials
+    src_region, des_region = '', region_name
     if job_type.upper() == 'GET':
         src_credentials, des_credentials = des_credentials, src_credentials
+        src_region, des_region = des_region, src_region
 
     src_client = ClientManager.create_download_client(
-        src_bucket_name, src_bucket_prefix, src_credentials, source_type)
+        src_bucket_name, src_bucket_prefix, src_region, src_credentials, source_type)
     des_client = ClientManager.create_download_client(
-        dest_bucket_name, dest_bucket_prefix, des_credentials)
+        dest_bucket_name, dest_bucket_prefix, des_region, des_credentials)
 
     find_and_send_jobs(src_client, des_client, sqs_queue_name,
                        table_queue_name, include_version)

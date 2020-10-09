@@ -6,6 +6,8 @@ import hashlib
 import base64
 import oss2
 
+from enum import Enum
+
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -48,7 +50,7 @@ class JobInfo():
 class DownloadClient():
     """ An abstract client to handle the list and download operations from cloud storage service """
 
-    def __init__(self, bucket_name, prefix="", **credentials):
+    def __init__(self, bucket_name, prefix='', **credentials):
         super().__init__()
         self._bucket_name = bucket_name
         self._prefix = prefix
@@ -135,7 +137,7 @@ class S3DownloadClient(DownloadClient):
         }
     """
 
-    def __init__(self, bucket_name, prefix="",  **credentials):
+    def __init__(self, bucket_name, prefix='', **credentials):
         super().__init__(bucket_name, prefix, **credentials)
 
         # TODO change to a parameter.
@@ -276,7 +278,7 @@ class AliOSSDownloadClient(DownloadClient):
         }
     """
 
-    def __init__(self, bucket_name, prefix="", **credentials):
+    def __init__(self, bucket_name, prefix='', **credentials):
         super().__init__(bucket_name, prefix, **credentials)
         endpoint = credentials['oss_endpoint']
         access_key_id = credentials['oss_access_key_id']
@@ -483,7 +485,7 @@ class S3UploadClient(UploadClient):
         }
     """
 
-    def __init__(self, bucket_name, prefix="",  **credentials):
+    def __init__(self, bucket_name, prefix='',  **credentials):
         super().__init__(bucket_name, prefix, **credentials)
 
         # TODO change to a parameter.
@@ -698,41 +700,58 @@ class ClientManager():
         pass
 
     @classmethod
-    def create_download_client(cls, bucket_name, prefix='', credentials={}, source_type='S3'):
-        if source_type == 'Aliyun OSS':
+    def create_download_client(cls, bucket_name, prefix='', region_name='', credentials={}, source_type='AWS S3'):
+        source = Source(source_type)
+        if source == Source.ALIYUN_OSS:
+            credentials['oss_access_key_id'] = credentials.pop('access_key_id')
+            credentials['oss_secret_access_key'] = credentials.pop(
+                'secret_access_key')
+            credentials['oss_endpoint'] = source.get_endpoint_url(
+                region_name)
+
             client = AliOSSDownloadClient(
                 bucket_name=bucket_name, prefix=prefix, **credentials)
-        elif source_type == 'Qiniu Kodo':
-            if 'endpoint_url' not in credentials:
-                # if endpoint url is not provided, use region_name to create the endpoint url.
-                if 'region_name' not in credentials:
-                    logger.warning(
-                        f'Cannot find Region in credentials, default to cn-south-1')
-                    src_credentials['region_name'] = 'cn-south-1'
-                endpoint_url = 'https://s3-{}.qiniucs.com'.format(
-                    credentials['region_name'])
-                credentials['endpoint_url'] = endpoint_url
-
-            client = S3DownloadClient(
-                bucket_name=bucket_name, prefix=prefix, **credentials)
-        elif source_type == 'Tencent COS':
-            if 'endpoint_url' not in credentials:
-                # if endpoint url is not provided, use region_name to create the endpoint url.
-                if 'region_name' not in credentials:
-                    logger.warning(
-                        f'Cannot find Region in credentials, default to cn-south-1')
-                    src_credentials['region_name'] = 'ap-guangzhou'
-                endpoint_url = 'https://cos.{}.myqcloud.com'.format(
-                    credentials['region_name'])
-                credentials['endpoint_url'] = endpoint_url
-
-            client = S3DownloadClient(
-                bucket_name=bucket_name, prefix=prefix, **credentials)
-        else:
+        else:  # for S3, Qiniu Kodo, Tencent COS
+            if credentials:
+                credentials['aws_access_key_id'] = credentials.pop(
+                    'access_key_id')
+                credentials['aws_secret_access_key'] = credentials.pop(
+                    'secret_access_key')
+                credentials['region_name'] = region_name
+                credentials['endpoint_url'] = source.get_endpoint_url(
+                    region_name)
             client = S3DownloadClient(
                 bucket_name=bucket_name, prefix=prefix, **credentials)
         return client
 
     @classmethod
-    def create_upload_client(cls, bucket_name, prefix='', credentials={}):
+    def create_upload_client(cls, bucket_name, prefix='', region_name='', credentials={}):
+        if credentials:
+            credentials['aws_access_key_id'] = credentials.pop(
+                'access_key_id')
+            credentials['aws_secret_access_key'] = credentials.pop(
+                'secret_access_key')
+            credentials['region_name'] = region_name
         return S3UploadClient(bucket_name, prefix, **credentials)
+
+
+class Source(Enum):
+    """ Enum of Different Sources """
+    AWS_S3 = 'AWS S3'
+    ALIYUN_OSS = 'Aliyun OSS'
+    TENCENT_COS = 'Tencent COS'
+    QINIU_KODO = 'Qiniu Kodo'
+
+    def get_endpoint_url(self, region_name):
+        ''' Helper func to get endpoint url based on region name '''
+        if self == Source.QINIU_KODO:
+            endpoint_url = 'https://s3-{}.qiniucs.com'.format(region_name)
+        elif self == Source.TENCENT_COS:
+            endpoint_url = 'https://cos.{}.myqcloud.com'.format(region_name)
+        elif self == Source.ALIYUN_OSS:
+            endpoint_url = 'https://oss-{}.aliyuncs.com'.format(region_name)
+        else:
+            endpoint_url = None
+
+        print(f'Util> Endpoint url for {self.name} is {endpoint_url}')
+        return endpoint_url
