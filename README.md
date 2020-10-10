@@ -25,17 +25,17 @@ The following are the planned features of this plugin.
 
 ![S3 Plugin Architect](s3-plugin-architect.png)
 
-The *JobSender* ECS Task lists all the objects in source and destination buckets and determines what objects should be
-replicated, a message for each object to be replicated will be created in SQS. A *time-based CloudWatch rule* will trigger the *JobSender* every hour.
+An ECS Task running in AWS Fargate lists all the objects in source and destination buckets and determines what objects should be
+replicated, a message for each object to be replicated will be created in SQS. A *time-based CloudWatch rule* will trigger the ECS task to run every hour.
 
 The *JobWorker* Lambda function consumes the message in SQS and transfer the object from source bucket to destination 
 bucket.
 
-If an object or a part of an object failed to transfer, the application will try a few times. If it still failed after
+If an object or a part of an object failed to transfer, the lambda will try a few times. If it still failed after
 a few retries, the message will be put in `SQS Dead-Letter-Queue`. A CloudWatch alarm will be triggered if there is message
-in this QLQ, and a subsequent email notification will be sent via SNS.
+in this QLQ, and a subsequent email notification will be sent via SNS. Note that the ECS task in the next run will identify the failed objects or parts and the replication process will start again for them.
 
-This application support transfer large size file. It will divide it into small parts and leverage the 
+This plugin supports transfer large size file. It will divide it into small parts and leverage the 
 [multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
 
 
@@ -47,10 +47,9 @@ Things to know about the deployment of this solution:
 - The deployment will take approximately 10 minutes.
 - Once the deployment is completed, the data replication task will start right away.
 
-
-
-
 ###  Before Deployment
+
+- Configure **credentials**
 
 You will need to provide `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read or write bucket in S3 from another partition or in other cloud storage service. And a Parameter Store is used to store the credentials in a secure manner.
 
@@ -64,6 +63,13 @@ Please create a **Parameter Store** in **AWS Systems Manager**, you can use defa
 }
 ```
 
+- Set up **ECS Cluster** and **VPC**
+
+The deployment of this solution will launch an ECS Task running in Fargate in your AWS Account, hence you will need to set up an ECS Cluster and the VPC before the deployment if you haven't got any. 
+
+> Note: For ECS Cluster, you can choose **Networking only** type. For VPC, please make sure the VPC should have at least two subnets accross two available zones.
+
+
 ### Available Parameters
 
 The following are the all allowed parameters for deployment:
@@ -71,9 +77,9 @@ The following are the all allowed parameters for deployment:
 | Parameter                 | Default          | Description                                                                                                               |
 |---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
 | srcBucketName             | <requires input> | Source bucket name.                                                                                                       |
-| srcBucketPrefix           | ''               | Source bucket object prefix. The application will only copy keys with the certain prefix.                                 |
+| srcBucketPrefix           | ''               | Source bucket object prefix. The plugin will only copy keys with the certain prefix.                                 |
 | destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
-| destBucketPrefix          | ''               | Destination bucket prefix. The application will upload to certain prefix.                                                 |
+| destBucketPrefix          | ''               | Destination bucket prefix. The plugin will upload to certain prefix.                                                 |
 | jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
 | sourceType                | Amazon_S3        | Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                    |
 | credentialsParameterStore | drh-credentials  | The Parameter Name used to keep credentials in Parameter Store.                                                           |
@@ -93,9 +99,9 @@ Please follow below steps to deploy this solution via AWS Cloudformation.
 
     [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://drh-solution.s3-us-west-2.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
     
-1. Click **Next**. Specify values to parameters accordingly. Change the stack name if needed.
+1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 
-1. Click **Next**. Configure additional stack options such as tags if needed. 
+1. Click **Next**. Configure additional stack options such as tags (Optional). 
 
 1. Click **Next**. Review and confirm acknowledgement,  then click **Create Stack**.
 
