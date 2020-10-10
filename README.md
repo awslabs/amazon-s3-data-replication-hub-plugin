@@ -41,7 +41,7 @@ This plugin supports transfer large size file. It will divide it into small part
 
 ## Deployment
 
-Things to know about the deployment of this solution:
+Things to know about the deployment of this plugin:
 
 - The deployment will automatically provision resources like lambda, dynamoDB table, ECS Task Definition in your AWS account, etc.
 - The deployment will take approximately 10 minutes.
@@ -65,9 +65,9 @@ Please create a **Parameter Store** in **AWS Systems Manager**, you can use defa
 
 - Set up **ECS Cluster** and **VPC**
 
-The deployment of this solution will launch an ECS Task running in Fargate in your AWS Account, hence you will need to set up an ECS Cluster and the VPC before the deployment if you haven't got any. 
+The deployment of this plugin will launch an ECS Task running in Fargate in your AWS Account, hence you will need to set up an ECS Cluster and the VPC before the deployment if you haven't got any. 
 
-> Note: For ECS Cluster, you can choose **Networking only** type. For VPC, please make sure the VPC should have at least two subnets accross two available zones.
+> Note: For ECS Cluster, you can choose **Networking only** type. For VPC, please make sure the VPC should have at least two subnets across two available zones.
 
 
 ### Available Parameters
@@ -91,7 +91,7 @@ The following are the all allowed parameters for deployment:
 
 ### Deploy via AWS Cloudformation
 
-Please follow below steps to deploy this solution via AWS Cloudformation.
+Please follow below steps to deploy this plugin via AWS Cloudformation.
 
 1. Sign in to AWS Management Console, switch to the region to deploy the CloudFormation Stack to.
 
@@ -105,13 +105,13 @@ Please follow below steps to deploy this solution via AWS Cloudformation.
 
 1. Click **Next**. Review and confirm acknowledgement,  then click **Create Stack**.
 
-If you want to make changes to the solution, you can follow [custom build](CUSTOM_BUILD.md) guide.
+If you want to make changes to this plugin, you can follow [custom build](CUSTOM_BUILD.md) guide.
 
 > Note: You can simply delete the stack from CloudFormation console if the replication task is no longer required.
 
 ### Deploy via AWS CDK
 
-If you want to use AWS CDK to deploy this solution, please make sure you have met below prerequisites:
+If you want to use AWS CDK to deploy this plugin, please make sure you have met below prerequisites:
 
 * [AWS Command Line Interface](https://aws.amazon.com/cli/)
 * Node.js 12.x or later
@@ -125,7 +125,7 @@ npm install -g aws-cdk
 npm install && npm run build
 ```
 
-Use `cdk deploy` command to deploy the solution. Please specify the parameter values accordingly, for example:
+Use `cdk deploy` command to deploy the plugin. Please specify the parameter values accordingly, for example:
 
 ```
 cdk deploy --parameters srcBucketName=<source-bucket-name> \
@@ -138,4 +138,4 @@ cdk deploy --parameters srcBucketName=<source-bucket-name> \
 --parameters ecsSubnets=subnet-97bfc4cd,subnet-7ad7de32
 ```
 
-> Note: You can simply run `cdk destroy` if the replication task is no longer required. This command will remove the solution stack from your AWS account.
+> Note: You can simply run `cdk destroy` if the replication task is no longer required. This command will remove the stack created by this plugin from your AWS account.
