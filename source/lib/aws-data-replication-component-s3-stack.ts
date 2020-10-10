@@ -45,17 +45,17 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     // 'PUT': Destination Bucket is not in current account.
     // 'GET': Source bucket is not in current account.
     const jobType = new cdk.CfnParameter(this, 'jobType', {
-      description: 'Choose GET if source bucket is not in current account. Otherwise, choose PUT.',
+      description: 'Choose GET if source bucket is not in current account. Otherwise, choose PUT',
       type: 'String',
       default: 'GET',
       allowedValues: ['PUT', 'GET']
     })
 
     const sourceType = new cdk.CfnParameter(this, 'sourceType', {
-      description: 'Choose migration source, for example, S3 or AliOSS.',
+      description: 'Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS',
       type: 'String',
-      default: 'AWS S3',
-      allowedValues: ['AWS S3', 'Aliyun OSS', 'Qiniu Kodo', 'Tencent COS']
+      default: 'Amazon_S3',
+      allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS']
     })
 
     const srcBucketName = new cdk.CfnParameter(this, 'srcBucketName', {
@@ -70,7 +70,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     })
 
     const destBucketName = new cdk.CfnParameter(this, 'destBucketName', {
-      description: 'Destination Bucket',
+      description: 'Destination Bucket Name',
       type: 'String'
     })
 

@@ -53,7 +53,7 @@ echo "[Push] Push Docker Image"
 echo "------------------------------------------------------------------------------"
 echo Push the docker image...
 cd $source_dir
-aws ecr create-repository --repository-name $IMAGE_REPO_NAME --region $1 >/dev/null
+aws ecr create-repository --repository-name $IMAGE_REPO_NAME --region $1 >/dev/null 2>&1
 docker push $domain/$IMAGE_REPO_NAME:$IMAGE_TAG
 
 echo "Replace the docker image arn in cloud formation template"
