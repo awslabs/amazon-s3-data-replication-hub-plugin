@@ -32,8 +32,7 @@ The *JobWorker* Lambda function consumes the message in SQS and transfer the obj
 bucket.
 
 If an object or a part of an object failed to transfer, the lambda will try a few times. If it still failed after
-a few retries, the message will be put in `SQS Dead-Letter-Queue`. A CloudWatch alarm will be triggered if there is message
-in this QLQ, and a subsequent email notification will be sent via SNS. Note that the ECS task in the next run will identify the failed objects or parts and the replication process will start again for them.
+a few retries, the message will be put in `SQS Dead-Letter-Queue`. A CloudWatch alarm will be triggered and a subsequent email notification will be sent via SNS. Note that the ECS task in the next run will identify the failed objects or parts and the replication process will start again for them.
 
 This plugin supports transfer large size file. It will divide it into small parts and leverage the 
 [multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
@@ -53,7 +52,7 @@ Things to know about the deployment of this plugin:
 
 You will need to provide `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read or write bucket in S3 from another partition or in other cloud storage service. And a Parameter Store is used to store the credentials in a secure manner.
 
-Please create a **Parameter Store** in **AWS Systems Manager**, you can use default name `drh-credentials` (optional), select **SecureString** as its type, and put the following in the **Value**.
+Please create a parameter in **Parameter Store** from **AWS Systems Manager**, you can use default name `drh-credentials` (optional), select **SecureString** as its type, and put a **Value** following below format.
 
 ```
 {
@@ -103,9 +102,9 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
 1. Click **Next**. Configure additional stack options such as tags (Optional). 
 
-1. Click **Next**. Review and confirm acknowledgement,  then click **Create Stack**.
+1. Click **Next**. Review and confirm acknowledgement,  then click **Create Stack** to start the deployment.
 
-If you want to make changes to this plugin, you can follow [custom build](CUSTOM_BUILD.md) guide.
+If you want to make custom changes to this plugin, you can follow [custom build](CUSTOM_BUILD.md) guide.
 
 > Note: You can simply delete the stack from CloudFormation console if the replication task is no longer required.
 
@@ -125,7 +124,7 @@ npm install -g aws-cdk
 npm install && npm run build
 ```
 
-Use `cdk deploy` command to deploy the plugin. Please specify the parameter values accordingly, for example:
+Then you can run `cdk deploy` command to deploy the plugin. Please specify the parameter values accordingly, for example:
 
 ```
 cdk deploy --parameters srcBucketName=<source-bucket-name> \

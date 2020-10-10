@@ -23,11 +23,11 @@ AWS Data Replication Hub是一个用于从不同的源复制数据到AWS的解�
 
 ![S3 Plugin Architect](s3-plugin-architect.png)
 
-在AWS Fargate中运行的ECS任务会列出源存储桶和目标存储桶中的所有对象，并确定应使用哪些对象复制后，将在SQS中为每个要复制的对象创建一条消息。 *基于时间的CloudWatch规则*将触发ECS任务每小时运行一次。
+在AWS Fargate中运行的ECS任务会列出源存储桶和目标存储桶中的所有对象，并确定应使用哪些对象复制后，将在SQS中为每个要复制的对象创建一条消息。 *CloudWatch定时规则*将触发ECS任务每小时运行一次。
 
-*JobWorker* Lambda函数使用SQS中的消息并将对象从源存储桶传输到目标桶。
+*JobWorker* Lambda函数从SQS中读取消息并根据消息将对象从源存储桶传输到目标桶。
 
-如果某个对象或对象的一部分传输失败，则lambda将尝试几次。 如果之后仍然失败，该消息将被放入“SQS Dead-Letter-Queue”中。 并将触发CloudWatch警报, 在此DLQ中，随后的电子邮件通知将通过SNS发送。 请注意，下一次运行中的ECS任务将识别出失败的对象或某些部分，并且复制过程将针对它们再次开始。
+如果某个对象或对象的一部分传输失败，则lambda将尝试几次。 如果之后仍然失败，该消息将被放入“SQS Dead-Letter-Queue”中。 并将触发CloudWatch警报，随后将通过SNS发送电子邮件通知。 请注意，下一次运行中的ECS任务将识别出这些失败的对象或部分，并且重新开始复制过程。
 
 该插件支持传输大文件。它将大文件分成多个小的部分并利用Amazon S3的[multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) 功能进行分段传输。
 
@@ -44,9 +44,9 @@ AWS Data Replication Hub是一个用于从不同的源复制数据到AWS的解�
 
 - 配置 **凭据**
 
-您需要提供“AccessKeyID”和“SecretAccessKey”（即“AK/SK”）凭据，才能从其他分区或其他云存储服务在S3中读取或写入存储桶。 凭据会以安全方式存储于参数存储区。
+您需要提供“AccessKeyID”和“SecretAccessKey”（即“AK/SK”）凭据，才能从其他分区S3或其他云存储服务中读取或写入存储桶。 凭据会以安全方式存储于参数存储区。
 
-请在**AWS Systems Manager** 的**参数存储区**创建一个参数，您可以使用默认名称`drh-credentials`（可选），选择 **SecureString** 作为其类型，然后将以下内容放入**值**所在位置。
+请在**AWS Systems Manager** 的**参数存储区**创建一个参数，您可以使用默认名称`drh-credentials`（可选），选择 **SecureString** 作为其类型，然后按照以下格式提供相应的**值**。
 
 ```
 {
@@ -58,7 +58,7 @@ AWS Data Replication Hub是一个用于从不同的源复制数据到AWS的解�
 
 - 配置 **ECS集群** and **VPC**
 
-此插件的部署将启动在您的AWS账户中的Fargate中运行的ECS任务，因此，如果您还没有部署ECS集群和VPC，则需要在部署之前对其进行设置。
+此插件的部署将在您的AWS账户中启动和运行ECS Fargate任务，因此，如果您还没有配置ECS集群和VPC，则需要在部署插件之前对其进行设置。
 
 > 注意：对于ECS群集，您可以选择**仅限网络**类型。 对于VPC，请确保VPC至少具有两个子网分布在两个可用区域上。
 
@@ -67,7 +67,7 @@ AWS Data Replication Hub是一个用于从不同的源复制数据到AWS的解�
 
 The following are the all allowed parameters for deployment:
 
-| Parameter                 | Default          | Description                                                                                     |
+| 参数                 | 默认值          | 说明                                                                                     |
 |---------------------------|------------------|-------------------------------------------------------------------------------------------------|
 | srcBucketName             | 需要指定          | 源存储桶名称                                                                                       |
 | srcBucketPrefix           | ''               | 源存储桶对象前缀。 插件只会复制具有特定前缀的对象.                                                      |
@@ -82,9 +82,9 @@ The following are the all allowed parameters for deployment:
 | ecsSubnets                | 需要指定          | 用于运行ECS任务的子网ID。 请提供至少两个以逗号分隔的子网，例如 子网97bfc4cd，子网7ad7de32                    |
 
 
-### Deploy via AWS Cloudformation
+### 用AWS Cloudformation方式部署
 
-请按照以下步骤通过AWS Cloudformation部署此解决方案。
+请按照以下步骤通过AWS Cloudformation部署此插件。
 
 1.登录到AWS管理控制台，切换到将CloudFormation Stack部署到的区域。
 
@@ -102,9 +102,9 @@ The following are the all allowed parameters for deployment:
 
 > 注意：如果不再需要复制任务，则可以从CloudFormation控制台中删除堆栈。
 
-### Deploy via AWS CDK
+### 用AWS CDK方式进行部署
 
-如果要使用AWS CDK部署此解决方案，请确保满足以下先决条件：
+如果要使用AWS CDK部署此插件，请确保满足以下先决条件：
 
 * [AWS Command Line Interface](https://aws.amazon.com/cli/)
 * Node.js 12.x 或以上版本
@@ -118,7 +118,7 @@ npm install -g aws-cdk
 npm install && npm run build
 ```
 
-然后使用“cdk deploy”命令来部署解决方案。 请相应地指定参数值，例如：
+然后使用“cdk deploy”命令来部署。请相应地指定参数值，例如：
 
 ```
 cdk deploy --parameters srcBucketName=<source-bucket-name> \
