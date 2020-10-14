@@ -753,5 +753,5 @@ class Source(Enum):
         else:
             endpoint_url = None
 
-        print(f'Util> Endpoint url for {self.name} is {endpoint_url}')
+        logger.info(f'Util> Endpoint url for {self.name} is {endpoint_url}')
         return endpoint_url

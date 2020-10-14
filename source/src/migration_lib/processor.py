@@ -10,7 +10,7 @@ from migration_lib.client import DownloadClient, UploadClient
 
 logger = logging.getLogger(__name__)
 
-# Process one job
+
 def job_processor(upload_id, index_list, partnumber_list, job, src_client: DownloadClient, des_client: UploadClient,
                   max_thread, chunk_size, max_retry, job_timeout, verify_md5_twice, include_version):
     # a worker thread generator
@@ -120,12 +120,12 @@ def job_processor(upload_id, index_list, partnumber_list, job, src_client: Downl
     src_key = job['Key']
     src_size = job['Size']
     des_bucket = des_client.bucket_name
-    des_key = job['Key']
+    des_key = job['DesKey']
     versionId = job['Version']
 
     # Execute in thread pool
     try:
-        stop_signal = threading.Event() 
+        stop_signal = threading.Event()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_thread) as pool:
             # Get the list of threads.
             threads = list(thread_gen(woker_thread, pool, stop_signal,
@@ -134,7 +134,8 @@ def job_processor(upload_id, index_list, partnumber_list, job, src_client: Downl
             result = concurrent.futures.wait(
                 threads, timeout=job_timeout, return_when="ALL_COMPLETED")
 
-            if "QUIT" in [t.result() for t in result[0]]:  # result[0] contains returned message of the thread.
+            # result[0] contains returned message of the thread.
+            if "QUIT" in [t.result() for t in result[0]]:
                 logger.warning(
                     f'QUIT. Canceling {len(result[1])} waiting threads in pool ...')
                 stop_signal.set()

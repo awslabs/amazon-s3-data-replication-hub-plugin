@@ -59,7 +59,8 @@ class JobSender():
         result = set()
         for des_list in des_list_gen:
             for obj in des_list:
-                result.add((obj.key, obj.size))
+                result.add(
+                    (remove_prefix(obj.key, self._des_client.prefix), obj.size))
         end = time.time()
         logger.info(
             f'JobSender> Time elapsed in getting full destination list is {end-start} seconds')
@@ -142,6 +143,7 @@ class JobMigrator():
         self._job = job
         self._db = db
         self._instance_id = instance_id
+        self._des_key = append_prefix(self._job.key, self._des_client.prefix)
 
     def _migration_small_file(self, **extra_args):
         logger.info(
@@ -151,16 +153,20 @@ class JobMigrator():
         err = ''
         try:
             # Get object from client, upload Object to destination.
-            logger.info(f'----->Downloading {self._job.size} Bytes {self._src_client.bucket_name}/{self._job.key}')
-            body, body_md5 = self._src_client.get_object(self._job.key, self._job.size)
+            logger.info(
+                f'----->Downloading {self._job.size} Bytes {self._src_client.bucket_name}/{self._job.key}')
+            body, body_md5 = self._src_client.get_object(
+                self._job.key, self._job.size)
             content_md5 = base64.b64encode(
                 body_md5.digest()).decode('utf-8')
-            
-            logger.info(f'----->Uploading {self._job.size} Bytes {self._src_client.bucket_name}/{self._job.key}')
-            upload_etag_full = self._des_client.upload_object(
-                self._job.key, body, content_md5, self._job.storage_class, **extra_args)
+            logger.info(
+                f'----->Uploading {self._job.size} Bytes {self._src_client.bucket_name}/{self._des_key}')
 
-            logger.info(f'----->Complete {self._job.size} Bytes {self._src_client.bucket_name}/{self._job.key}')
+            upload_etag_full = self._des_client.upload_object(
+                self._des_key, body, content_md5, self._job.storage_class, **extra_args)
+
+            logger.info(
+                f'----->Complete {self._job.size} Bytes {self._src_client.bucket_name}/{self._des_key}')
         except Exception as e:
             logger.error(
                 f'Migrator> Unexpected error during migration of small file - {str(e)}')
@@ -247,7 +253,7 @@ class JobMigrator():
             f"Migrator> Try get or create a new upload ID for multipart load")
 
         # try finding existing upload ID and parts.
-        uploaded_list = self._des_client.list_multipart_uploads(self._job.key)
+        uploaded_list = self._des_client.list_multipart_uploads(self._des_key)
         # if exists
         if uploaded_list:
             if self._config.clean_unfinished_upload:
@@ -257,13 +263,13 @@ class JobMigrator():
             else:
                 upload_id = uploaded_list[0]['UploadId']
                 part_list = self._des_client.list_parts(
-                    self._job.key, upload_id)
+                    self._des_key, upload_id)
                 part_numbers = [p['PartNumber'] for p in part_list]
 
                 return upload_id, part_numbers
 
         response_new_upload = self._des_client.create_multipart_upload(
-            self._job.key,
+            self._des_key,
             self._job.storage_class,
             **extra_args
         )
@@ -282,7 +288,7 @@ class JobMigrator():
         logger.info(
             f'Migrator> Index List: {index_list}, chunk size: {chunk_size_auto}')
 
-        job_dict = {'Key': self._job.key,
+        job_dict = {'Key': self._job.key, 'DesKey': self._des_key,
                     'Size': self._job.size, 'Version': self._job.version}
 
         # TODO Change to return two values (status, etag)
@@ -313,19 +319,36 @@ class JobMigrator():
         complete_etag = ''
         try:
             complete_etag = self._des_client.complete_multipart_upload(
-                self._job.key, upload_id)
+                self._des_key, upload_id)
             # if not complete_etag:
             #     logger.error(f'complete_etag ERR - {self._job.key}')
 
         except Exception as e:
-            logger.error(f'Migrator> Fail to complete upload for {self._job.key}')
+            logger.error(
+                f'Migrator> Fail to complete upload for {self._des_key}')
 
-            # if unable to merge the upload. Clean all the parts. 
+            # if unable to merge the upload. Clean all the parts.
             # The job will be restarted in the next run.
-            logger.error(f'Migrator> Clean uploaded parts for upload id: {upload_id}')
-            upload_list = [{'Key': self._job.key, 'UploadId': upload_id}]
+            logger.error(
+                f'Migrator> Clean uploaded parts for upload id: {upload_id}')
+            upload_list = [{'Key': self._des_key, 'UploadId': upload_id}]
             self._des_client.clean_unfinished_unload(upload_list)
             return complete_etag, str(e)
-        
+
         return complete_etag, ''
 
+
+def remove_prefix(key: str, prefix=''):
+    ''' helper function to remove prefix from key path
+
+    for example remove_prefix('a/b/c/d', 'a/b') = 'c/d'
+    '''
+    return key.replace(prefix+'/', '') if prefix else key
+
+
+def append_prefix(key: str, prefix=''):
+    ''' helper function to append prefix from key path
+
+    for example append_prefix('c/d', 'a/b') = 'a/b/c/d'
+    '''
+    return '{}/{}'.format(prefix, key) if prefix else key
