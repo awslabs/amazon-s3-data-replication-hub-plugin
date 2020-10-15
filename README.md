@@ -7,13 +7,13 @@ _This AWS Date Replication Hub - S3 Plugin is based on
 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) contributed by
 [huangzbaws@](https://github.com/huangzbaws)._
 
-AWS Data Replication Hub is a solution for replicating data from different sources into AWS. This project is for 
+[AWS Data Replication Hub](https://github.com/aws-samples/aws-data-replication-hub) is a solution for replicating data from different sources into AWS. This project is for 
 S3 replication plugin. Each of the replication plugin can run independently. 
 
 The following are the planned features of this plugin.
 
 - [x] Amazon S3 object replication between AWS Standard partition and AWS CN partition
-- [x] Replication from Alibaba Cloud OSS to Amazon S3
+- [x] Replication from Aliyun OSS to Amazon S3
 - [x] Replication from Tencent COS to Amazon S3
 - [x] Replication from Qiniu Kodo to Amazon S3
 - [ ] Replication from Huawei Cloud OBS to Amazon S3
@@ -43,7 +43,7 @@ This plugin supports transfer large size file. It will divide it into small part
 Things to know about the deployment of this plugin:
 
 - The deployment will automatically provision resources like lambda, dynamoDB table, ECS Task Definition in your AWS account, etc.
-- The deployment will take approximately 10 minutes.
+- The deployment will take approximately 3-5 minutes.
 - Once the deployment is completed, the data replication task will start right away.
 
 ###  Before Deployment
@@ -96,7 +96,13 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
 1. Click the following button to launch the CloudFormation Stack in that region.
 
-    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://drh-solution.s3-us-west-2.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+    - For Standard Partition
+
+    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+
+    - For China Partition
+
+    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions-cn-north-1.s3.amazonaws.com.cn/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
     
 1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 

@@ -14,7 +14,7 @@ To make changes to the solution, download or clone this repo, update the source 
 Run unit tests to make sure added customization passes the tests:
 
 ```bash
-chmod +x ./build-s3-dist.sh
+chmod +x ./run-unit-tests.sh
 ./run-unit-tests.sh
 ```
 
@@ -33,6 +33,14 @@ The CloudFormation template is configured to pull the Lambda deployment packages
 aws s3 mb s3://$DIST_OUTPUT_BUCKET-$REGION --region $REGION
 ```
 
+## 5. Build custom ECR image
+
+Build and push to ECR repository:
+```bash
+chmod +x ./build-ecr.sh
+./build-ecr.sh $REGION $AWS_ACCOUNT_ID
+```
+
 ## 5. Create the deployment packages
 Build the distributable:
 ```bash
@@ -44,12 +52,4 @@ Deploy the distributable to the Amazon S3 bucket in your account:
 ```bash
 aws s3 cp ./regional-s3-assets/ s3://$DIST_OUTPUT_BUCKET-$REGION/$SOLUTION_NAME/$VERSION/ --recursive --acl bucket-owner-full-control
 aws s3 cp ./global-s3-assets/ s3://$DIST_OUTPUT_BUCKET-$REGION/$SOLUTION_NAME/$VERSION/ --recursive --acl bucket-owner-full-control
-```
-
-## 6. Build custom ECR image
-
-Build and push to ECR repository:
-```bash
-chmod +x ./build-ecr.sh
-./build-ecr.sh $REGION $AWS_ACCOUNT_ID
 ```

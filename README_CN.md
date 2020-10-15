@@ -6,15 +6,15 @@
 _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://github.com/huangzbaws) 的
 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) 基础上开发的。_
 
-AWS Data Replication Hub是一个用于从不同的源复制数据到AWS的解决方案。本项目是该方案的其中一款插件（S3插件）。各插件是可以独立部署和运行的。
+[AWS Data Replication Hub](https://github.com/aws-samples/aws-data-replication-hub)是一个用于从不同的源复制数据到AWS的解决方案。本项目是该方案的其中一款插件（S3插件）。各插件是可以独立部署和运行的。
 
 以下是本插件计划提供的功能列表：
 
-- [x] 用于Amazon S3 国内和海外的相互复制
-- [x] 用于从阿里云OSS 复制到Amazon S3
-- [x] 用于从腾讯云COS 复制到Amazon S3
-- [x] 用于从七牛云Kodo 复制到Amazon S3
-- [ ] 用于从华为云OBS 复制到Amazon S3
+- [x] 用于Amazon S3国内和海外的相互复制
+- [x] 用于从阿里云OSS复制到Amazon S3
+- [x] 用于从腾讯云COS复制到Amazon S3
+- [x] 用于从七牛云Kodo复制到Amazon S3
+- [ ] 用于从华为云OBS复制到Amazon S3
 - [x] 支持元数据信息的复制
 - [x] 支持单次全量复制
 - [x] 支持增量复制
@@ -37,7 +37,7 @@ AWS Data Replication Hub是一个用于从不同的源复制数据到AWS的解�
 有关此插件的部署的注意事项：:
 
 - 部署本插件会自动在您的AWS账号里创建包括Lambda, DyanomoDB表，ECS任务等
-- 部署预计用时10分钟
+- 部署预计用时3-5分钟
 - 一旦部署完成，复制任务就会马上开始
 
 ###  部署前准备
@@ -63,9 +63,9 @@ AWS Data Replication Hub是一个用于从不同的源复制数据到AWS的解�
 > 注意：对于ECS群集，您可以选择**仅限网络**类型。 对于VPC，请确保VPC至少具有两个子网分布在两个可用区域上。
 
 
-### Available Parameters
+### 可用参数
 
-The following are the all allowed parameters for deployment:
+以下是部署时可用的参数列表:
 
 | 参数                 | 默认值          | 说明                                                                                     |
 |---------------------------|------------------|-------------------------------------------------------------------------------------------------|
@@ -90,7 +90,13 @@ The following are the all allowed parameters for deployment:
 
 1.单击以下按钮在该区域中启动CloudFormation堆栈。
 
-    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://drh-solution.s3-us-west-2.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+  - 部署到AWS海外区
+
+  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+
+  - 部署到AWS中国区
+
+  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions-cn-north-1.s3.amazonaws.com.cn/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
     
 1.单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
 
