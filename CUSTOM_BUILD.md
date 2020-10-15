@@ -41,7 +41,7 @@ chmod +x ./build-ecr.sh
 ./build-ecr.sh $REGION $AWS_ACCOUNT_ID
 ```
 
-## 5. Create the deployment packages
+## 6. Create the deployment packages
 Build the distributable:
 ```bash
 chmod +x ./build-s3-dist.sh
