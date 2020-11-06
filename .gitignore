@@ -1,0 +1,31 @@
+source/*.js
+source/*/*.js
+!jest.config.js
+*.d.ts
+node_modules
+package-lock.json
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Parcel build directories
+.cache
+.build
+
+# Python build
+build
+dist
+*.egg-info
+__pycache__
+.venv
+
+# General
+.DS_Store
+.vscode
+
+# Deployment
+staging
+global-s3-assets
+regional-s3-assets
+viperlight
