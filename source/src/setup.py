@@ -13,13 +13,14 @@ def get_version():
     init = open(os.path.join(ROOT, NAME, '__init__.py')).read()
     return VERSION_RE.search(init).group(1)
 
+
 setup(
     name=NAME,
     version=get_version(),
-    description="Replication Component for AWS Data Replication Hub",
+    description="S3 Replication Lib for AWS Data Replication Hub",
     author="Amazon Web Services",
     author_email="aws@amazon.com",
-    url="https://github.com/awslab/",
+    url="https://github.com/awslabs/amazon-s3-data-replication-hub-plugin",
 
     # package_dir={"": "./migration_lib"},
     packages=find_packages(),
