@@ -28,7 +28,6 @@ interface CfnNagSuppressRule {
   readonly reason: string;
 }
 
-const StorageClass = 'STANDARD'
 const MaxRetry = '20'  // Max retry for requests
 const MaxThread = '50'  // Max threads per file
 const MaxParallelFile = '1'  // Recommend to be 1 in AWS Lambda
@@ -80,6 +79,14 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       type: 'String'
     })
 
+    // 'STANDARD'|'REDUCED_REDUNDANCY'|'STANDARD_IA'|'ONEZONE_IA'|'INTELLIGENT_TIERING'|'GLACIER'|'DEEP_ARCHIVE'|'OUTPOSTS',
+    const destStorageClass = new cdk.CfnParameter(this, 'destStorageClass', {
+      description: 'Destination Storage Class, Default to STANDAD',
+      default: 'STANDARD',
+      type: 'String',
+      allowedValues: ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING']
+    })
+
     const ecsClusterName = new cdk.CfnParameter(this, 'ecsClusterName', {
       description: 'ECS Cluster Name to run ECS task',
       default: '',
@@ -115,7 +122,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       ParameterGroups: [
         {
           Label: { default: 'Source & Destination' },
-          Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId, destBucketName.logicalId, destBucketPrefix.logicalId, jobType.logicalId, sourceType.logicalId]
+          Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId, destBucketName.logicalId, destBucketPrefix.logicalId, jobType.logicalId, sourceType.logicalId, destStorageClass.logicalId]
         },
         {
           Label: { default: 'ECS Cluster' },
@@ -142,6 +149,9 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         },
         [destBucketPrefix.logicalId]: {
           default: 'Destination Bucket Prefix'
+        },
+        [destStorageClass.logicalId]: {
+          default: 'Destination Storage Class'
         },
         [jobType.logicalId]: {
           default: 'Job Type'
@@ -282,12 +292,6 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       description: 'Migration Lambda layer',
     });
 
-    // const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
-    //   code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
-    //   compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
-    //   description: 'Migration Lambda layer',
-    // });
-
     const handler = new lambda.Function(this, 'S3MigrationWorker', {
       runtime: lambda.Runtime.PYTHON_3_8,
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
@@ -302,8 +306,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
         DEST_BUCKET_NAME: destBucketName.valueAsString,
         DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-        STORAGE_CLASS: StorageClass,
-        // CHECK_IP_URL: checkip.url,
+        STORAGE_CLASS: destStorageClass.valueAsString,
         SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
         JOB_TYPE: jobType.valueAsString,
         SOURCE_TYPE: sourceType.valueAsString,
