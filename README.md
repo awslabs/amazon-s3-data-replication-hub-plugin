@@ -75,18 +75,22 @@ The following are the all allowed parameters for deployment:
 
 | Parameter                 | Default          | Description                                                                                                               |
 |---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
-| srcBucketName             | <requires input> | Source bucket name.                                                                                                       |
-| srcBucketPrefix           | ''               | Source bucket object prefix. The plugin will only copy keys with the certain prefix.                                 |
-| destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
-| destBucketPrefix          | ''               | Destination bucket prefix. The plugin will upload to certain prefix.                                                 |
+| sourceType                | Amazon_S3        | Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                 |
 | jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
-| sourceType                | Amazon_S3        | Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                    |
-| credentialsParameterStore | drh-credentials  | The Parameter Name used to keep credentials in Parameter Store.                                                           |
-| alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
+| srcBucketName             | <requires input> | Source bucket name.                                                                                                       |
+| srcBucketPrefix           | ''               | Source bucket object prefix. The plugin will only copy keys with the certain prefix.                                      |
+| destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
+| destBucketPrefix          | ''               | Destination bucket prefix. The plugin will upload to certain prefix.                                                      |
+| destStorageClass          | STANDARD         | Destination Object Storage Class.  Allowed options: 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
 | ecsClusterName            | <requires input> | ECS Cluster Name to run ECS task                                                                                          |
 | ecsVpcId                  | <requires input> | VPC ID to run ECS task, e.g. vpc-bef13dc7                                                                                 |
 | ecsSubnets                | <requires input> | Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32  |
-
+| credentialsParameterStore | drh-credentials  | The Parameter Name used to keep credentials in Parameter Store.                                                           |
+| alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
+| lambdaMemory              | 256              | Lambda Memory, default to 256 MB.                                                                                         |
+| multipartThreshold        | 10               | Threshold Size for multipart upload in MB, default to 10 (MB)                                                             |
+| chunkSize                 | 5                | Chunk Size for multipart upload in MB, default to 5 (MB)                                                                  |
+| maxThreads                |10                | Max Theads to run multipart upload in lambda, default to 10                                                               |
 
 ### Deploy via AWS Cloudformation
 
@@ -98,11 +102,11 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
     - For Standard Partition
 
-    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
 
     - For China Partition
 
-    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions-cn-north-1.s3.amazonaws.com.cn/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
     
 1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 

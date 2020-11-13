@@ -20,6 +20,8 @@ from migration_lib.client import ClientManager, JobInfo
 from migration_lib.config import JobConfig
 
 # Env
+job_timeout = 870
+include_version = True
 table_queue_name = os.environ['TABLE_QUEUE_NAME']
 default_storage_class = os.environ['STORAGE_CLASS']
 src_bucket_name = os.environ['SRC_BUCKET_NAME']
@@ -27,14 +29,11 @@ src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
 dest_bucket_name = os.environ['DEST_BUCKET_NAME']
 dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
 ssm_parameter_credentials = os.environ['SSM_PARAMETER_CREDENTIALS']
-# checkip_url = os.environ['CHECK_IP_URL']
 job_type = os.environ['JOB_TYPE']
 source_type = os.environ['SOURCE_TYPE']
-max_retries = int(os.environ['MAX_RETRY'])
-max_threads = int(os.environ['MAX_THREAD'])
-max_parallel_file = int(os.environ['MAX_PARALLEL_FILE'])  # Not used in lambda
-job_timeout = int(os.environ['JOB_TIMEOUT'])
-include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
+multipart_threshold = int(os.environ['MULTIPART_THRESHOLD'])
+chunk_size = int(os.environ['CHUNK_SIZE'])
+max_threads = int(os.environ['MAX_THREADS'])
 
 
 logger = logging.getLogger()
@@ -110,7 +109,10 @@ def lambda_handler(event, context):
 
         jobinfo = JobInfo(**job)
         config = JobConfig(include_version=include_version,
-                           job_timeout=job_timeout)
+                           job_timeout=job_timeout,
+                           multipart_threshold=multipart_threshold,
+                           chunk_size=chunk_size,
+                           max_threads=max_threads)
         db = DBService(table_queue_name)
         migrator = JobMigrator(src_client, des_client,
                                config, db, jobinfo, instance_id)
