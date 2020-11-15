@@ -67,19 +67,24 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 以下是部署时可用的参数列表:
 
-| 参数                 | 默认值          | 说明                                                                                     |
-|---------------------------|------------------|-------------------------------------------------------------------------------------------------|
-| srcBucketName             | 需要指定          | 源存储桶名称                                                                                       |
-| srcBucketPrefix           | ''               | 源存储桶对象前缀。 插件只会复制具有特定前缀的对象.                                                      |
-| destBucketName            | <需要指定         | 目标存储桶名称                                                                                     |
-| destBucketPrefix          | ''               | 目标存储桶前缀。插件将上传到指定的前缀。                                                               |
-| jobType                   | GET              | 如果源存储桶不在当前帐户中，请选择GET。 否则，选择PUT                                                   |
-| sourceType                | Amazon_S3        | 选择源存储类型，例如Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                  |
-| credentialsParameterStore | drh-credentials  | 用于将凭据保存在参数存储中的参数名称                                                                   |
-| alarmEmail                | 需要指定          | 警报电子邮件。 错误将发送到此电子邮件.                                                                  |
-| ecsClusterName            | 需要指定          | 用于运行ECS任务的ECS集群名称                                                                         |
-| ecsVpcId                  | 需要指定          | 用于运行ECS任务的VPC ID，例如 vpc-bef13dc7                                                           |
-| ecsSubnets                | 需要指定          | 用于运行ECS任务的子网ID。 请提供至少两个以逗号分隔的子网，例如 子网97bfc4cd，子网7ad7de32                    |
+| 参数                       | 默认值            | 说明                                                                                                               |
+|---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
+| sourceType                | Amazon_S3        | 选择源存储类型，例如Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                 |
+| jobType                   | GET              | 如果源存储桶不在当前帐户中，请选择GET。 否则，选择PUT                                              |
+| srcBucketName             | 需要指定          | 源存储桶名称                                                                                                       |
+| srcBucketPrefix           | ''               | 源存储桶对象前缀。 插件只会复制具有特定前缀的对象.                                        |
+| destBucketName            | 需要指定          | 目标存储桶名称                                                                                                  |
+| destBucketPrefix          | ''               | 目标存储桶前缀。插件将上传到指定的前缀                                                      |
+| destStorageClass          | STANDARD       | 目标存储类型，可选的值有 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
+| ecsClusterName            | 需要指定          | 用于运行ECS任务的ECS集群名称                                                                                          |
+| ecsVpcId                  | 需要指定          | 用于运行ECS任务的VPC ID，例如 vpc-bef13dc7                                                                                  |
+| ecsSubnets                | 需要指定          | 用于运行ECS任务的子网ID。 请提供至少两个以逗号分隔的子网，例如 子网97bfc4cd，子网7ad7de32   |
+| credentialsParameterStore | drh-credentials  | 用于将凭据保存在参数存储中的参数名称                                                           |
+| alarmEmail                | 需要指定           | 警报电子邮件。 错误将发送到此电子邮件.                                                                          |
+| lambdaMemory              | 256              | Lambda内存， 默认为 256 MB                                                                                      |
+| multipartThreshold        | 10               | 分段上传的阀值（单位： MB）默认为10 MB                                                             |
+| chunkSize                 | 5                | 分片大小，默认为5 MB                                                                  |
+| maxThreads                |10                | Lambda分段上传的线程数                                                              |
 
 
 ### 用AWS Cloudformation方式部署
@@ -92,11 +97,11 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
   - 部署到AWS海外区
 
-  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
 
   - 部署到AWS中国区
 
-  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions-cn-north-1.s3.amazonaws.com.cn/Aws-data-replication-component-s3/v1.0.0/Aws-data-replication-component-s3.template)
+  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
     
 1.单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
 
