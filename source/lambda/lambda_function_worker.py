@@ -31,8 +31,8 @@ dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
 ssm_parameter_credentials = os.environ['SSM_PARAMETER_CREDENTIALS']
 job_type = os.environ['JOB_TYPE']
 source_type = os.environ['SOURCE_TYPE']
-multipart_threshold = int(os.environ['MULTIPART_THRESHOLD'])
-chunk_size = int(os.environ['CHUNK_SIZE'])
+multipart_threshold = int(os.environ['MULTIPART_THRESHOLD']) * 1024 * 1024
+chunk_size = int(os.environ['CHUNK_SIZE']) * 1024 * 1024
 max_threads = int(os.environ['MAX_THREADS'])
 
 
