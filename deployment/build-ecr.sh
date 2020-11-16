@@ -4,9 +4,9 @@
 #
 
 # Check to see if the required parameters have been provided:
-if [ -z "$1" ] || [ -z "$2" ]; then
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
     echo "Please provide the account_id and aws_default_region to build the ecr image."
-    echo "For example: ./build-ecr.sh us-west-2 1234567890"
+    echo "For example: ./build-ecr.sh us-west-2 1234567890 v1.0.0"
     exit 1
 fi
 
@@ -41,8 +41,8 @@ echo "[Build] Build Docker Image"
 echo "------------------------------------------------------------------------------"
 echo Building the docker image...
 cd $source_dir
-IMAGE_REPO_NAME=s3-migration-jobsender
-IMAGE_TAG=latest
+IMAGE_REPO_NAME=s3-replication-jobsender
+IMAGE_TAG=$3
 docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG src/
 docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $domain/$IMAGE_REPO_NAME:$IMAGE_TAG 
 
@@ -63,4 +63,7 @@ replace="s/arn:aws:ecr:us-west-2:347283850106/arn:$partition:ecr:$1:$2/g"
 sed -i '' -e $replace $template_dist_dir/*.template
 echo "uri prefix is $2.dkr.ecr.$1"
 replace="s/347283850106.dkr.ecr.us-west-2/$2.dkr.ecr.$1/g"
+sed -i '' -e $replace $template_dist_dir/*.template
+echo "replace tag"
+replace="s/s3-replication-jobsender:latest/s3-replication-jobsender:$IMAGE_TAG/g"
 sed -i '' -e $replace $template_dist_dir/*.template

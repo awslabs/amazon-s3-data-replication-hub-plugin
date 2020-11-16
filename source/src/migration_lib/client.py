@@ -213,7 +213,7 @@ class S3DownloadClient(DownloadClient):
     def _list_objects_versions(self, latest_changes_only=False):
         """List objects from S3 bucket"""
         logger.info(
-            'S3> List objects in bucket {self._bucket_name} with version info')
+            f'S3> List objects in bucket {self._bucket_name} with version info')
 
         # TODO implement latest_changes_only.
         job_list = []
@@ -318,7 +318,7 @@ class AliOSSDownloadClient(DownloadClient):
 
     def _list_objects_without_version(self, latest_changes_only=False):
         logger.info(
-            'OSS> list objects from OSS in bucket {self._bucket_name} without version info')
+            f'OSS> list objects from OSS in bucket {self._bucket_name} without version info')
         # TODO implement latest_changes_only.
         job_list = []
 
@@ -343,7 +343,7 @@ class AliOSSDownloadClient(DownloadClient):
 
     def _list_objects_versions(self, latest_changes_only=False):
         logger.info(
-            'OSS> List objects in bucket {self._bucket_name} with version info')
+            f'OSS> List objects in bucket {self._bucket_name} with version info')
         # TODO implement latest_changes_only.
         job_list = []
 

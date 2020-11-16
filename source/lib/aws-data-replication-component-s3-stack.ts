@@ -28,12 +28,6 @@ interface CfnNagSuppressRule {
   readonly reason: string;
 }
 
-const StorageClass = 'STANDARD'
-const MaxRetry = '20'  // Max retry for requests
-const MaxThread = '50'  // Max threads per file
-const MaxParallelFile = '1'  // Recommend to be 1 in AWS Lambda
-const JobTimeout = '870'  // Timeout for each job, should be less than AWS Lambda timeout
-const IncludeVersion = 'False'  // Whethere versionId should be considered during delta comparation and object migration
 /***
  * BEFORE DEPLOY CDK, please setup a "drh-credentials" secure parameter in ssm parameter store MANUALLY!
  */
@@ -80,6 +74,14 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       type: 'String'
     })
 
+    // 'STANDARD'|'REDUCED_REDUNDANCY'|'STANDARD_IA'|'ONEZONE_IA'|'INTELLIGENT_TIERING'|'GLACIER'|'DEEP_ARCHIVE'|'OUTPOSTS',
+    const destStorageClass = new cdk.CfnParameter(this, 'destStorageClass', {
+      description: 'Destination Storage Class, Default to STANDAD',
+      default: 'STANDARD',
+      type: 'String',
+      allowedValues: ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING']
+    })
+
     const ecsClusterName = new cdk.CfnParameter(this, 'ecsClusterName', {
       description: 'ECS Cluster Name to run ECS task',
       default: '',
@@ -100,7 +102,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     // The region credential (not the same account as Lambda) setting in SSM Parameter Store
     const credentialsParameterStore = new cdk.CfnParameter(this, 'credentialsParameterStore', {
-      description: 'The Parameter Store used to keep AWS credentials for other regions',
+      description: 'The Parameter Store used to keep AK/SK credentials',
       default: 'drh-credentials',
       type: 'String'
     })
@@ -111,58 +113,126 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       description: 'Errors will be sent to this email.'
     })
 
+    // const includeMetadata = new cdk.CfnParameter(this, 'includeMetadata', {
+    //   description: 'Including metadata',
+    //   default: 'YES',
+    //   type: 'String',
+    //   allowedValues: ['TRUE', 'FALSE']
+    // })
+
+    const lambdaMemory = new cdk.CfnParameter(this, 'lambdaMemory', {
+      description: 'Lambda Memory, default to 256 MB',
+      default: '256',
+      type: 'Number',
+      allowedValues: ['128', '256', '512', '1024']
+    })
+
+    const multipartThreshold = new cdk.CfnParameter(this, 'multipartThreshold', {
+      description: 'Threshold Size for multipart upload in MB, default to 10 (MB)',
+      default: '10',
+      type: 'String',
+      allowedValues: ['10', '15', '20', '50', '100'],
+    })
+
+    const chunkSize = new cdk.CfnParameter(this, 'chunkSize', {
+      description: 'Chunk Size for multipart upload in MB, default to 5 (MB)',
+      default: '5',
+      type: 'String',
+      allowedValues: ['5', '10']
+    })
+
+    const maxThreads = new cdk.CfnParameter(this, 'maxThreads', {
+      description: 'Max Theads to run multipart upload in lambda, default to 10',
+      default: '10',
+      type: 'String',
+      allowedValues: ['5', '10', '20', '50'],
+    })
+
+
+    this.templateOptions.description = 'Data Replication Hub - S3 Plugin Cloudformation Template';
+
     this.templateOptions.metadata = {
-      ParameterGroups: [
-        {
-          Label: { default: 'Source & Destination' },
-          Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId, destBucketName.logicalId, destBucketPrefix.logicalId, jobType.logicalId, sourceType.logicalId]
-        },
-        {
-          Label: { default: 'ECS Cluster' },
-          Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId]
-        },
-        {
-          Label: { default: 'Credentials' },
-          Parameters: [credentialsParameterStore.logicalId]
-        },
-        {
-          Label: { default: 'Notification' },
-          Parameters: [alarmEmail.logicalId]
-        }
-      ],
-      ParameterLabels: {
-        [srcBucketName.logicalId]: {
-          default: 'Source Bucket Name'
-        },
-        [srcBucketPrefix.logicalId]: {
-          default: 'Source Bucket Prefix'
-        },
-        [destBucketName.logicalId]: {
-          default: 'Destination Bucket Name'
-        },
-        [destBucketPrefix.logicalId]: {
-          default: 'Destination Bucket Prefix'
-        },
-        [jobType.logicalId]: {
-          default: 'Job Type'
-        },
-        [sourceType.logicalId]: {
-          default: 'Source Type'
-        },
-        [credentialsParameterStore.logicalId]: {
-          Default: 'Parameter Store for AWS Credentials'
-        },
-        [alarmEmail.logicalId]: {
-          default: 'Alarm Email'
-        },
-        [ecsClusterName.logicalId]: {
-          Default: 'ECS Cluster Name'
-        },
-        [ecsVpcId.logicalId]: {
-          Default: 'VPC ID to run ECS task'
-        },
-        [ecsSubnets.logicalId]: {
-          Default: 'Subnet IDs to run ECS task'
+      'AWS::CloudFormation::Interface': {
+        ParameterGroups: [
+          {
+            Label: { default: 'General' },
+            Parameters: [sourceType.logicalId, jobType.logicalId]
+          },
+          {
+            Label: { default: 'Source' },
+            Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId]
+          },
+          {
+            Label: { default: 'Destination' },
+            Parameters: [destBucketName.logicalId, destBucketPrefix.logicalId, destStorageClass.logicalId]
+          },
+          {
+            Label: { default: 'ECS Cluster' },
+            Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId]
+          },
+          {
+            Label: { default: 'Credentials' },
+            Parameters: [credentialsParameterStore.logicalId]
+          },
+          {
+            Label: { default: 'Notification' },
+            Parameters: [alarmEmail.logicalId]
+          },
+          {
+            Label: { default: 'Advanced Options' },
+            Parameters: [lambdaMemory.logicalId, multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId]
+          }
+        ],
+        ParameterLabels: {
+          [sourceType.logicalId]: {
+            default: 'Source Type'
+          },
+          [jobType.logicalId]: {
+            default: 'Job Type'
+          },
+          [srcBucketName.logicalId]: {
+            default: 'Source Bucket Name'
+          },
+          [srcBucketPrefix.logicalId]: {
+            default: 'Source Bucket Prefix'
+          },
+          [destBucketName.logicalId]: {
+            default: 'Destination Bucket Name'
+          },
+          [destBucketPrefix.logicalId]: {
+            default: 'Destination Bucket Prefix'
+          },
+          [destStorageClass.logicalId]: {
+            default: 'Destination Storage Class'
+          },
+          [ecsClusterName.logicalId]: {
+            Default: 'ECS Cluster Name to run Fargate task'
+          },
+          [ecsVpcId.logicalId]: {
+            Default: 'VPC ID to run Fargate task'
+          },
+          [ecsSubnets.logicalId]: {
+            Default: 'Subnet IDs to run Fargate task'
+          },
+          [credentialsParameterStore.logicalId]: {
+            Default: 'Parameter Store for Credentials'
+          },
+          [alarmEmail.logicalId]: {
+            default: 'Alarm Email'
+          },
+          [lambdaMemory.logicalId]: {
+            default: 'Lambda Memory'
+          },
+          [multipartThreshold.logicalId]: {
+            default: 'Multipart Threshold'
+          },
+          [chunkSize.logicalId]: {
+            default: 'Chunk Size'
+          },
+          [maxThreads.logicalId]: {
+            default: 'Max Threads'
+          },
+
         }
       }
     }
@@ -282,18 +352,12 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       description: 'Migration Lambda layer',
     });
 
-    // const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
-    //   code: lambda.Code.fromAsset(path.join(__dirname, '../src')),
-    //   compatibleRuntimes: [lambda.Runtime.PYTHON_3_8],
-    //   description: 'Migration Lambda layer',
-    // });
-
     const handler = new lambda.Function(this, 'S3MigrationWorker', {
       runtime: lambda.Runtime.PYTHON_3_8,
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
       layers: [layer],
       handler: 'lambda_function_worker.lambda_handler',
-      memorySize: 1024,
+      memorySize: lambdaMemory.valueAsNumber,
       timeout: cdk.Duration.minutes(15),
       // tracing: lambda.Tracing.ACTIVE,
       environment: {
@@ -302,16 +366,14 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
         DEST_BUCKET_NAME: destBucketName.valueAsString,
         DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-        STORAGE_CLASS: StorageClass,
-        // CHECK_IP_URL: checkip.url,
+        STORAGE_CLASS: destStorageClass.valueAsString,
         SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
         JOB_TYPE: jobType.valueAsString,
         SOURCE_TYPE: sourceType.valueAsString,
-        MAX_RETRY: MaxRetry,
-        MAX_THREAD: MaxThread,
-        MAX_PARALLEL_FILE: MaxParallelFile,
-        JOB_TIMEOUT: JobTimeout,
-        INCLUDE_VERSION: IncludeVersion
+        MULTIPART_THRESHOLD: multipartThreshold.valueAsString,
+        CHUNK_SIZE: chunkSize.valueAsString,
+        MAX_THREADS: maxThreads.valueAsString,
+
       }
     })
 
@@ -331,8 +393,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     // ]);
 
     // 7. Setup JobSender ECS Task
-    const ecrRepositoryArn = 'arn:aws:ecr:us-west-2:347283850106:repository/s3-migration-jobsender'
-    // const repo = ecr.Repository.fromRepositoryName(this, 'JobSenderRepo', 's3-migration-jobsender')
+    const ecrRepositoryArn = 'arn:aws:ecr:us-west-2:347283850106:repository/s3-replication-jobsender'
+    // const repo = ecr.Repository.fromRepositoryName(this, 'JobSenderRepo', 's3-replication-jobsender')
     const repo = ecr.Repository.fromRepositoryArn(this, 'JobSenderRepo', ecrRepositoryArn)
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'JobSenderTaskDef', {
       cpu: 1024 * 4,
@@ -353,8 +415,6 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
         JOB_TYPE: jobType.valueAsString,
         SOURCE_TYPE: sourceType.valueAsString,
-        MAX_RETRY: MaxRetry,
-        INCLUDE_VERSION: IncludeVersion
       },
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender' })
     });

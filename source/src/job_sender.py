@@ -60,9 +60,8 @@ if __name__ == "__main__":
     dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
     job_type = os.environ['JOB_TYPE']
     source_type = os.environ['SOURCE_TYPE']
-    max_retries = int(os.environ['MAX_RETRY'])
-    include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
-
+    # include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
+    include_version = True
     credentials = get_credentials()
     # Region name will not be part of credentials in the future.
     region_name = credentials.pop('region_name')
