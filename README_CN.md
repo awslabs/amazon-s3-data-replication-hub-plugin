@@ -6,7 +6,7 @@
 _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://github.com/huangzbaws) 的
 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) 基础上开发的。_
 
-[AWS Data Replication Hub](https://github.com/aws-samples/aws-data-replication-hub)是一个用于从不同的源复制数据到AWS的解决方案。本项目是该方案的其中一款插件（S3插件）。各插件是可以独立部署和运行的。
+[AWS Data Replication Hub](https://github.com/awslabs/aws-data-replication-hub)是一个用于从不同的源复制数据到AWS的解决方案。本项目是该方案的其中一款插件（S3插件）。各插件是可以独立部署和运行的。
 
 以下是本插件计划提供的功能列表：
 
@@ -101,7 +101,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
   - 部署到AWS中国区
 
-  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
+  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
     
 1.单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
 
