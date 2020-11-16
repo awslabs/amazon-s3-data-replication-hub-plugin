@@ -7,7 +7,7 @@ _This AWS Date Replication Hub - S3 Plugin is based on
 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) contributed by
 [huangzbaws@](https://github.com/huangzbaws)._
 
-[AWS Data Replication Hub](https://github.com/aws-samples/aws-data-replication-hub) is a solution for replicating data from different sources into AWS. This project is for 
+[AWS Data Replication Hub](https://github.com/awslabs/aws-data-replication-hub) is a solution for replicating data from different sources into AWS. This project is for 
 S3 replication plugin. Each of the replication plugin can run independently. 
 
 The following are the planned features of this plugin.
@@ -106,7 +106,7 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
     - For China Partition
 
-    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
+    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
     
 1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 
