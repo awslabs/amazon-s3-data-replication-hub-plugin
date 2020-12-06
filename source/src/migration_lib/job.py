@@ -134,7 +134,7 @@ class JobMigrator():
     """
 
     def __init__(self, src_client: DownloadClient, des_client: UploadClient,
-                 config: JobConfig, db: DBService, job: JobInfo, instance_id: str):
+                 config: JobConfig, db: DBService, job: JobInfo):
         super().__init__()
 
         self._src_client = src_client
@@ -142,11 +142,10 @@ class JobMigrator():
         self._config = config
         self._job = job
         self._db = db
-        self._instance_id = instance_id
         self._des_key = append_prefix(self._job.key, self._des_client.prefix)
 
     def _migration_small_file(self, **extra_args):
-        logger.info(
+        logger.debug(
             f"Migrator> Migrating small file {self._job.key}")
 
         upload_etag_full = ''
@@ -175,7 +174,7 @@ class JobMigrator():
         return upload_etag_full, err
 
     def _migration_big_file(self, **extra_args):
-        logger.info(
+        logger.debug(
             f"Migrator> Migrating big file {self._job.key}")
 
         upload_id, part_list = self._start_multipart_upload(**extra_args)
@@ -196,7 +195,7 @@ class JobMigrator():
         return complete_etag, err
 
     def start_migration(self):
-        logger.info("Migrator> Start a migration Job")
+        logger.debug("Migrator> Start a migration Job")
 
         src_bucket = self._src_client.bucket_name
         src_prefix = self._src_client.prefix
@@ -214,16 +213,16 @@ class JobMigrator():
                 f"Migrator> Get extra metadata info for {extra_args}")
 
         # if self._config.log_to_db:
-        logger.info(f'Migrator> Log into DB')
+        logger.debug(f'Migrator> Log into DB')
         self._db.log_job_start(src_bucket, src_prefix, des_bucket, des_prefix,
-                               self._job, self._instance_id, extra_args)
+                               self._job, extra_args)
 
         if self._job.size <= self._config.multipart_threshold:
             etag, status = self._migration_small_file(**extra_args)
         else:
             etag, status = self._migration_big_file(**extra_args)
 
-        logger.info(f'Migrator> Complete load into DB')
+        logger.debug(f'Migrator> Complete load into DB')
         self._db.log_job_end(src_bucket, self._job.key, etag, status)
 
     def _split(self, size, chunk_size, max_parts=MAX_PARTS):
@@ -249,7 +248,7 @@ class JobMigrator():
                 Initialize the multiple upload process to generate an uploadID and return.
         """
 
-        logger.info(
+        logger.debug(
             f"Migrator> Try get or create a new upload ID for multipart load")
 
         # try finding existing upload ID and parts.
@@ -277,7 +276,7 @@ class JobMigrator():
         return response_new_upload, []
 
     def _parallel_upload(self, upload_id, part_list):
-        logger.info(
+        logger.debug(
             f"Migrator> Start Uploading ...{upload_id} in Parallel")
 
         index_list, chunk_size_auto = self._split(
@@ -285,7 +284,7 @@ class JobMigrator():
             self._config.chunk_size
         )
 
-        logger.info(
+        logger.debug(
             f'Migrator> Index List: {index_list}, chunk size: {chunk_size_auto}')
 
         job_dict = {'Key': self._job.key, 'DesKey': self._des_key,
@@ -315,7 +314,7 @@ class JobMigrator():
         return upload_etag_full
 
     def _complete_upload(self, upload_id):
-        logger.info(f"Migrator> Complete Upload...{upload_id}")
+        logger.debug(f"Migrator> Complete Upload...{upload_id}")
         complete_etag = ''
         try:
             complete_etag = self._des_client.complete_multipart_upload(

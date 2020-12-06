@@ -22,10 +22,10 @@ class DBService():
         self._table_name = table_name
         self._table = dynamodb.Table(table_name)
 
-    def log_job_start(self, src_bucket, src_prefix, des_bucket, des_prefix, job:JobInfo, instance_id, extra_args):
+    def log_job_start(self, src_bucket, src_prefix, des_bucket, des_prefix, job: JobInfo, extra_args):
         """  create an item(record) in dynamoDB table when a job is started """
 
-        logger.info(
+        logger.debug(
             f'DynamoDB> Create job record for {src_bucket} - {job.key} - {extra_args}')
         cur_time = time.time()
         table_key = str(PurePosixPath(src_bucket) / job.key)
@@ -34,10 +34,10 @@ class DBService():
         if job.key[-1] == '/':  # 针对空目录对象
             table_key += '/'
 
-        # Expires is with datetime format and can't be directly stored in DynamoDB. 
+        # Expires is with datetime format and can't be directly stored in DynamoDB.
         if 'Expires' in extra_args:
             extra_args['Expires'] = str(extra_args['Expires'].timestamp())
-            
+
         try:
             self._table.put_item(
                 Item={
@@ -49,7 +49,6 @@ class DBService():
                     'extraInfo':  extra_args,
                     # 'startTime':  time.asctime(time.localtime(cur_time)),
                     'startTime': int(cur_time),
-                    'instanceID':  instance_id,
                     'jobStatus':  'Started',
                     'tryTime': 1,
                     'versionId':  job.version,
@@ -63,7 +62,7 @@ class DBService():
 
     def log_job_end(self, src_bucket, key, etag, err):
         """ Update an item(record) with a updated Status and completed time """
-        logger.info(
+        logger.debug(
             f'DynamoDB> Update job record for {src_bucket} - {key}')
 
         cur_time = time.time()
@@ -90,7 +89,7 @@ class DBService():
                 UpdateExpression='SET endTime = :et, totalSpentTime=:et-startTime, jobStatus = :js, etag = :etag, err = :err',
             )
 
-            logger.info(f'DynamoDB> Write DB response: {response}')
+            logger.debug(f'DynamoDB> Write DB response: {response}')
 
         except Exception as e:
             logger.error(
@@ -98,7 +97,7 @@ class DBService():
         return
 
     def get_versionid(self, des_bucket):
-        logger.info(f'DynamoDB> Get des_bucket versionId list')
+        logger.debug(f'DynamoDB> Get des_bucket versionId list')
 
         # TODO Test this.
         ver_list = {}
@@ -191,7 +190,8 @@ class SQSService():
         try:
             sqs_in_flight = self._sqs.get_queue_attributes(
                 QueueUrl=self._sqs_queue_url,
-                AttributeNames=['ApproximateNumberOfMessagesNotVisible', 'ApproximateNumberOfMessages']
+                AttributeNames=[
+                    'ApproximateNumberOfMessagesNotVisible', 'ApproximateNumberOfMessages']
             )
         except Exception as e:
             logger.error(f'SQS> Fail to get_queue_attributes: {str(e)}')

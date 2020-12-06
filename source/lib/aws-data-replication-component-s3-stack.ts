@@ -2,7 +2,6 @@ import * as cdk from '@aws-cdk/core';
 import * as ssm from '@aws-cdk/aws-ssm';
 import * as ddb from '@aws-cdk/aws-dynamodb';
 import * as sqs from '@aws-cdk/aws-sqs';
-import * as api from '@aws-cdk/aws-apigateway';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as path from 'path';
 import { SqsEventSource } from "@aws-cdk/aws-lambda-event-sources";
@@ -373,7 +372,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         MULTIPART_THRESHOLD: multipartThreshold.valueAsString,
         CHUNK_SIZE: chunkSize.valueAsString,
         MAX_THREADS: maxThreads.valueAsString,
-
+        LOG_LEVEL: 'INFO',
       }
     })
 
