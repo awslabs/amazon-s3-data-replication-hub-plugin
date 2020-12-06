@@ -10,6 +10,7 @@ from enum import Enum
 
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from botocore import UNSIGNED
 
 from migration_lib.config import (MAX_ATTEMPTS, MAX_KEYS, MAX_PARTS,
                                   MAX_POOL_CONNECTION)
@@ -127,7 +128,7 @@ class S3DownloadClient(DownloadClient):
             "region_name": "cn-northwest-1"
         }
 
-        This client also supports Qiniu Kodo and Tencent COS with native S3 SDK support. 
+        This client also supports Qiniu Kodo and Tencent COS with native S3 SDK support.
         For them, the credentials must contain the related endpoint url, for example:
 
         credentials = {
@@ -140,9 +141,14 @@ class S3DownloadClient(DownloadClient):
     def __init__(self, bucket_name, prefix='', **credentials):
         super().__init__(bucket_name, prefix, **credentials)
 
-        # TODO change to a parameter.
-        s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
-                           retries={'max_attempts': MAX_ATTEMPTS})
+        if credentials.get('no_auth'):
+            credentials.pop('no_auth')
+            s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
+                               signature_version=UNSIGNED,
+                               retries={'max_attempts': MAX_ATTEMPTS})
+        else:
+            s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
+                               retries={'max_attempts': MAX_ATTEMPTS})
         try:
             self._client = boto3.client('s3', config=s3_config, **credentials)
         except Exception as e:
@@ -260,7 +266,7 @@ class S3DownloadClient(DownloadClient):
 
 
 class AliOSSDownloadClient(DownloadClient):
-    r""" An implemented download client with Aliyun OSS. 
+    r""" An implemented download client with Aliyun OSS.
 
     Example Usage:
 
@@ -268,7 +274,7 @@ class AliOSSDownloadClient(DownloadClient):
         for obj in client.list_objects():
             print(obj)
 
-    Note: 
+    Note:
         credentials must be in a form of dict. Below is an example:
 
         credentials = {
@@ -451,7 +457,8 @@ class UploadClient():
 
         :returns: A list of keys and the relevent upload IDs:
 
-            [{'Key': object_key, 'UploadID': multipart_upload_id, 'Initiated': initiated_datetime},...]
+            [{'Key': object_key, 'UploadID': multipart_upload_id,
+                'Initiated': initiated_datetime},...]
 
         This method must be implemented by subclasses.
         """
@@ -468,15 +475,15 @@ class UploadClient():
 
 
 class S3UploadClient(UploadClient):
-    r""" An implementation of upload client with Amazon S3. 
+    r""" An implementation of upload client with Amazon S3.
 
     Example Usage:
 
         client = S3UploadClient(bucket_name='my-bucket')
         ...
 
-    Note: 
-        credentials is optional, 
+    Note:
+        credentials is optional,
 
         credentials = {
             "aws_access_key_id": "<Your AccessKeyID>",
@@ -713,10 +720,11 @@ class ClientManager():
                 bucket_name=bucket_name, prefix=prefix, **credentials)
         else:  # for S3, Qiniu Kodo, Tencent COS
             if credentials:
-                credentials['aws_access_key_id'] = credentials.pop(
-                    'access_key_id')
-                credentials['aws_secret_access_key'] = credentials.pop(
-                    'secret_access_key')
+                if credentials.get('access_key_id'):
+                    credentials['aws_access_key_id'] = credentials.pop(
+                        'access_key_id')
+                    credentials['aws_secret_access_key'] = credentials.pop(
+                        'secret_access_key')
                 credentials['region_name'] = region_name
                 credentials['endpoint_url'] = source.get_endpoint_url(
                     region_name)
