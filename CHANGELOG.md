@@ -19,3 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - ECR image is now tagged with version number.
+
+
+## [1.0.2] - 2020-12-06
+
+### Changed
+- Change to use CDK v1.74.0
+- Reduce the number of logs generated.
+
+### Added
+- Add support of accessing s3 with no-sign-request
