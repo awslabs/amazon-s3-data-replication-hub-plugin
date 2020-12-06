@@ -27,7 +27,7 @@
 #  - version-code: version of the package
 
 # Important: CDK global version number
-cdk_version=1.62.0
+# cdk_version=1.74.0
 
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
@@ -85,16 +85,17 @@ echo "--------------------------------------------------------------------------
 # Install the global aws-cdk package
 echo "cd $source_dir"
 cd $source_dir
-echo "npm install -g aws-cdk@$cdk_version"
-npm install -g aws-cdk@$cdk_version
+# echo "npm install -g aws-cdk@$cdk_version"
+# npm install -g aws-cdk@$cdk_version
 
 # Install and build
 echo "npm install && npm run build"
 # npm install && npm run build
+npm run build
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
-cdk synth --output=$staging_dist_dir --json=true > $staging_dist_dir/$2.template.json
+npx cdk synth --output=$staging_dist_dir --json=true > $staging_dist_dir/$2.template.json
 
 # Remove unnecessary output files
 echo "cd $staging_dist_dir"

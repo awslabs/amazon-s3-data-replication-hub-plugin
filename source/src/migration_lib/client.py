@@ -10,6 +10,7 @@ from enum import Enum
 
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from botocore import UNSIGNED
 
 from migration_lib.config import (MAX_ATTEMPTS, MAX_KEYS, MAX_PARTS,
                                   MAX_POOL_CONNECTION)
@@ -127,7 +128,7 @@ class S3DownloadClient(DownloadClient):
             "region_name": "cn-northwest-1"
         }
 
-        This client also supports Qiniu Kodo and Tencent COS with native S3 SDK support. 
+        This client also supports Qiniu Kodo and Tencent COS with native S3 SDK support.
         For them, the credentials must contain the related endpoint url, for example:
 
         credentials = {
@@ -140,22 +141,27 @@ class S3DownloadClient(DownloadClient):
     def __init__(self, bucket_name, prefix='', **credentials):
         super().__init__(bucket_name, prefix, **credentials)
 
-        # TODO change to a parameter.
-        s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
-                           retries={'max_attempts': MAX_ATTEMPTS})
+        if credentials.get('no_auth'):
+            credentials.pop('no_auth')
+            s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
+                               signature_version=UNSIGNED,
+                               retries={'max_attempts': MAX_ATTEMPTS})
+        else:
+            s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
+                               retries={'max_attempts': MAX_ATTEMPTS})
         try:
             self._client = boto3.client('s3', config=s3_config, **credentials)
         except Exception as e:
             logger.error(f'Fail to create a client session: {str(e)}')
 
     def get_object(self, key, size, start=0, chunk_size=0, version=None):
-        logger.info("S3> Get Object from S3")
+        logger.debug("S3> Get Object from S3")
 
         if not version:
             version = 'null'
 
         if chunk_size:
-            logger.info(
+            logger.debug(
                 f'S3> Downloading {key} with {chunk_size} bytes start from {start}')
             response_get_object = self._client.get_object(
                 Bucket=self._bucket_name,
@@ -165,7 +171,7 @@ class S3DownloadClient(DownloadClient):
                 str(start + chunk_size - 1)
             )
         else:
-            logger.info(
+            logger.debug(
                 f'S3> Downloading {key} with full size')
             response_get_object = self._client.get_object(
                 Bucket=self._bucket_name,
@@ -181,7 +187,7 @@ class S3DownloadClient(DownloadClient):
         return body, body_md5
 
     def _list_objects_without_version(self, latest_changes_only=False):
-        logger.info(
+        logger.debug(
             f'S3> list objects in bucket {self._bucket_name} from S3 without version info')
         # TODO implement latest_changes_only.
         job_list = []
@@ -195,13 +201,13 @@ class S3DownloadClient(DownloadClient):
             if continuation_token:
                 list_kwargs['ContinuationToken'] = continuation_token
             response = self._client.list_objects_v2(**list_kwargs)
-            # logger.info(response.get('Contents', []))
+            # logger.debug(response.get('Contents', []))
             contents = response.get('Contents', [])
 
             # Exclude objects with GLACIER and DEEP_ARCHIVE storage class, they can't be downloaded.
             job_list = [JobInfo(x['Key'], x['Size']) for x in contents
                         if x['StorageClass'] not in ['GLACIER', 'DEEP_ARCHIVE']]
-            # logger.info(
+            # logger.debug(
             #     f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
             if not response.get('IsTruncated'):  # At the end of the list
@@ -212,7 +218,7 @@ class S3DownloadClient(DownloadClient):
 
     def _list_objects_versions(self, latest_changes_only=False):
         """List objects from S3 bucket"""
-        logger.info(
+        logger.debug(
             f'S3> List objects in bucket {self._bucket_name} with version info')
 
         # TODO implement latest_changes_only.
@@ -227,13 +233,13 @@ class S3DownloadClient(DownloadClient):
             if key_marker:
                 list_kwargs['KeyMarker'] = key_marker
             response = self._client.list_object_versions(**list_kwargs)
-            # logger.info(response.get('Contents', []))
+            # logger.debug(response.get('Contents', []))
 
             contents = response.get('Versions', [])
             job_list = [JobInfo(x['Key'], x['Size'], x['VersionId'])
                         for x in contents
                         if x['IsLatest'] and x['StorageClass'] not in ['GLACIER', 'DEEP_ARCHIVE']]
-            # logger.info(
+            # logger.debug(
             #     f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
             if not response.get('IsTruncated'):  # At the end of the list
@@ -250,7 +256,7 @@ class S3DownloadClient(DownloadClient):
             return self._list_objects_without_version(latest_changes_only=latest_changes_only)
 
     def head_object(self, key):
-        logger.info("S3> Get extra metadata info")
+        logger.debug("S3> Get extra metadata info")
         head = self._client.head_object(
             Bucket=self._bucket_name,
             Key=key
@@ -260,7 +266,7 @@ class S3DownloadClient(DownloadClient):
 
 
 class AliOSSDownloadClient(DownloadClient):
-    r""" An implemented download client with Aliyun OSS. 
+    r""" An implemented download client with Aliyun OSS.
 
     Example Usage:
 
@@ -268,7 +274,7 @@ class AliOSSDownloadClient(DownloadClient):
         for obj in client.list_objects():
             print(obj)
 
-    Note: 
+    Note:
         credentials must be in a form of dict. Below is an example:
 
         credentials = {
@@ -288,7 +294,7 @@ class AliOSSDownloadClient(DownloadClient):
         self._client = oss2.Bucket(auth, endpoint, bucket_name)
 
     def get_object(self, key, size, start=0, chunk_size=0, version=None):
-        logger.info("OSS> Get Object from Aliyun OSS")
+        logger.debug("OSS> Get Object from Aliyun OSS")
 
         if chunk_size:
             end = start + chunk_size
@@ -296,7 +302,7 @@ class AliOSSDownloadClient(DownloadClient):
             if end > size:
                 end = size
 
-            logger.info(
+            logger.debug(
                 f'OSS> Downloading {key} with {end-start} bytes start from {start}')
 
             byte_range = (start, end-1)
@@ -305,7 +311,7 @@ class AliOSSDownloadClient(DownloadClient):
                                              )
 
         else:
-            logger.info(
+            logger.debug(
                 f'OSS> Downloading {key} with full size')
             result = self._client.get_object(key=key)
 
@@ -317,7 +323,7 @@ class AliOSSDownloadClient(DownloadClient):
         return body, body_md5
 
     def _list_objects_without_version(self, latest_changes_only=False):
-        logger.info(
+        logger.debug(
             f'OSS> list objects from OSS in bucket {self._bucket_name} without version info')
         # TODO implement latest_changes_only.
         job_list = []
@@ -332,7 +338,7 @@ class AliOSSDownloadClient(DownloadClient):
 
             job_list = [JobInfo(x.key, x.size, 'null')
                         for x in result.object_list]
-            # logger.info(
+            # logger.debug(
             #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
             if not result.is_truncated:  # At the end of the list
@@ -342,7 +348,7 @@ class AliOSSDownloadClient(DownloadClient):
         yield job_list
 
     def _list_objects_versions(self, latest_changes_only=False):
-        logger.info(
+        logger.debug(
             f'OSS> List objects in bucket {self._bucket_name} with version info')
         # TODO implement latest_changes_only.
         job_list = []
@@ -358,7 +364,7 @@ class AliOSSDownloadClient(DownloadClient):
             job_list = [JobInfo(x.key, x.size, x.versionid)
                         for x in result.versions if x.is_latest]
 
-            # logger.info(
+            # logger.debug(
             #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
             if not result.is_truncated:  # At the end of the list
                 break
@@ -375,7 +381,7 @@ class AliOSSDownloadClient(DownloadClient):
             return self._list_objects_without_version(latest_changes_only=latest_changes_only)
 
     def head_object(self, key):
-        logger.info("OSS> head Object")
+        logger.debug("OSS> head Object")
         # TODO check this.
         head = self._client.head_object(key)
         content_type = head.content_type
@@ -451,7 +457,8 @@ class UploadClient():
 
         :returns: A list of keys and the relevent upload IDs:
 
-            [{'Key': object_key, 'UploadID': multipart_upload_id, 'Initiated': initiated_datetime},...]
+            [{'Key': object_key, 'UploadID': multipart_upload_id,
+                'Initiated': initiated_datetime},...]
 
         This method must be implemented by subclasses.
         """
@@ -468,15 +475,15 @@ class UploadClient():
 
 
 class S3UploadClient(UploadClient):
-    r""" An implementation of upload client with Amazon S3. 
+    r""" An implementation of upload client with Amazon S3.
 
     Example Usage:
 
         client = S3UploadClient(bucket_name='my-bucket')
         ...
 
-    Note: 
-        credentials is optional, 
+    Note:
+        credentials is optional,
 
         credentials = {
             "aws_access_key_id": "<Your AccessKeyID>",
@@ -497,7 +504,7 @@ class S3UploadClient(UploadClient):
             logger.error(f'Fail to create a client session: {str(e)}')
 
     def _put_object(self, key, body, content_md5, storage_class,  **extra_args):
-        logger.info(
+        logger.debug(
             f'S3> Uploading Small file {self._bucket_name}/{key}')
 
         # TODO Currently, storage_class is default to the same one, do we need to update to used original storage class?
@@ -518,17 +525,17 @@ class S3UploadClient(UploadClient):
         return self._put_object(key, body, content_md5, storage_class, **extra_args)
 
     def clean_unfinished_unload(self, uploaded_list):
-        logger.info(
+        logger.debug(
             f'S3> clean unfinished uploads')
         for upload in uploaded_list:
-            logger.info(f'S3> Found upload: {upload}')
+            logger.debug(f'S3> Found upload: {upload}')
             try:
                 self._client.abort_multipart_upload(
                     Bucket=self._bucket_name,
                     Key=upload['Key'],
                     UploadId=upload['UploadId']
                 )
-                logger.info(
+                logger.debug(
                     f'S3> Abort multipart upload for {upload["Key"]} with upload id {upload["UploadId"]}')
             except Exception as e:
                 logger.error(
@@ -536,7 +543,7 @@ class S3UploadClient(UploadClient):
         pass
 
     def delete_object(self, key):
-        logger.info(f'S3> Delete {self._bucket_name}/{key}')
+        logger.debug(f'S3> Delete {self._bucket_name}/{key}')
         try:
             self._client.delete_object(
                 Bucket=self._bucket_name,
@@ -547,7 +554,7 @@ class S3UploadClient(UploadClient):
                 f'Fail to delete S3 object - {self._bucket_name}/{key} - {str(e)}')
 
     def create_multipart_upload(self, key, storage_class,  **extra_args):
-        logger.info("S3> Create multipart upload for big file")
+        logger.debug("S3> Create multipart upload for big file")
 
         upload_id = self._client.create_multipart_upload(
             Bucket=self._bucket_name,
@@ -571,14 +578,14 @@ class S3UploadClient(UploadClient):
 
             for page in response_iterator:
                 if "Parts" in page:
-                    logger.info(
+                    logger.debug(
                         f'Got list_parts: {len(page["Parts"])} - {self._bucket_name}/{key}')
                     for p in page["Parts"]:
                         part_list.append({
                             "ETag": p["ETag"],
                             "PartNumber": p["PartNumber"]
                         })
-            # logger.info(f'>> Found Part List: {part_list}')
+            # logger.debug(f'>> Found Part List: {part_list}')
         except Exception as e:
             logger.error(
                 f'Fail to list parts while completeUpload - {self._bucket_name}/{key} - {str(e)}')
@@ -586,7 +593,7 @@ class S3UploadClient(UploadClient):
         return part_list
 
     def list_multipart_uploads(self, key=None):
-        logger.info(
+        logger.debug(
             f'S3> List multipart upload for {key}')
         uploaded_list = []
         paginator = self._client.get_paginator('list_multipart_uploads')
@@ -598,12 +605,12 @@ class S3UploadClient(UploadClient):
             for page in response_iterator:
                 if "Uploads" in page:
                     for i in page["Uploads"]:
-                        logger.info(
-                            f'S3> Unfinished upload, Key: {i["Key"]}, uploadId:{i["UploadId"]} - Time: {i["Initiated"]}')
+                        # logger.debug(
+                        #     f'S3> Unfinished upload, Key: {i["Key"]}, uploadId:{i["UploadId"]} - Time: {i["Initiated"]}')
                         if key:
                             # if Key is provided, only return the upload id for that key.
                             if i['Key'] == key:
-                                logger.info(
+                                logger.debug(
                                     f'Found upload ID: {i["UploadId"]}')
                                 uploaded_list.append({
                                     "Key": i["Key"],
@@ -618,14 +625,14 @@ class S3UploadClient(UploadClient):
                                 "UploadId": i["UploadId"]
                             })
 
-                    logger.info(f'S3> Found list: {uploaded_list}')
+                    logger.debug(f'S3> Found list: {uploaded_list}')
         except Exception as e:
             logger.error(
                 f'Fail to list multipart upload - {self._bucket_name}/{self._prefix} - {str(e)}')
         return uploaded_list
 
     def complete_multipart_upload(self, key, upload_id):
-        logger.info(
+        logger.debug(
             f'S3> Complete multipart upload for {key} - upload ID - {upload_id}')
         # List all the parts.
         past_list = self.list_parts(key, upload_id)
@@ -640,7 +647,7 @@ class S3UploadClient(UploadClient):
                 MultipartUpload=part_list_args
             )
             etag = response_complete['ETag']
-            logger.info(f'S3> Merged: {self._bucket_name}/{key}')
+            logger.debug(f'S3> Merged: {self._bucket_name}/{key}')
         except Exception as e:
             logger.error(
                 f'S3> Fail to complete multipart upload {self._bucket_name}/{key}, {str(e)}')
@@ -649,9 +656,9 @@ class S3UploadClient(UploadClient):
 
     def upload_part(self, key, body, body_md5, part_number, upload_id=None):
         # TODO update upload_part
-        logger.info(
+        logger.debug(
             f'S3> Uploading part for {key} with part number {part_number}')
-        # logger.info(f'--->Uploading {len(getBody)} Bytes {Des_bucket}/{Des_key} - {partnumber}/{total}')
+        # logger.debug(f'--->Uploading {len(getBody)} Bytes {Des_bucket}/{Des_key} - {partnumber}/{total}')
         self._client.upload_part(
             Body=body,
             Bucket=self._bucket_name,
@@ -713,10 +720,11 @@ class ClientManager():
                 bucket_name=bucket_name, prefix=prefix, **credentials)
         else:  # for S3, Qiniu Kodo, Tencent COS
             if credentials:
-                credentials['aws_access_key_id'] = credentials.pop(
-                    'access_key_id')
-                credentials['aws_secret_access_key'] = credentials.pop(
-                    'secret_access_key')
+                if credentials.get('access_key_id'):
+                    credentials['aws_access_key_id'] = credentials.pop(
+                        'access_key_id')
+                    credentials['aws_secret_access_key'] = credentials.pop(
+                        'secret_access_key')
                 credentials['region_name'] = region_name
                 credentials['endpoint_url'] = source.get_endpoint_url(
                     region_name)
@@ -753,5 +761,5 @@ class Source(Enum):
         else:
             endpoint_url = None
 
-        logger.info(f'Util> Endpoint url for {self.name} is {endpoint_url}')
+        logger.debug(f'Util> Endpoint url for {self.name} is {endpoint_url}')
         return endpoint_url

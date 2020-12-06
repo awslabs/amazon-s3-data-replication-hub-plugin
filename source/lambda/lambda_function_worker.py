@@ -36,8 +36,15 @@ chunk_size = int(os.environ['CHUNK_SIZE']) * 1024 * 1024
 max_threads = int(os.environ['MAX_THREADS'])
 
 
+log_level = str(os.environ.get('LOG_LEVEL')).upper()
+if log_level not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+    log_level = 'INFO'
+
+# logging.basicConfig(level=log_level)
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# logger.setLevel(logging.INFO)
+logger.setLevel(log_level)
+
 
 # Get connection credentials
 ssm = boto3.client('ssm')
@@ -74,8 +81,6 @@ des_client = ClientManager.create_upload_client(
 #     logger.warning(f'Fail to connect to checkip api: {checkip_url} - {str(e)}')
 #     instance_id = 'lambda-ip-timeout'
 
-instance_id = 'lambda-ip-xx'
-
 
 class TimeoutOrMaxRetry(Exception):
     pass
@@ -86,7 +91,6 @@ class WrongRecordFormat(Exception):
 
 
 def lambda_handler(event, context):
-    print("Lambda or NAT IP Address:", instance_id)
     logger.info(json.dumps(event, default=str))
 
     for trigger_record in event['Records']:
@@ -115,7 +119,7 @@ def lambda_handler(event, context):
                            max_threads=max_threads)
         db = DBService(table_queue_name)
         migrator = JobMigrator(src_client, des_client,
-                               config, db, jobinfo, instance_id)
+                               config, db, jobinfo)
 
         migrator.start_migration()
 
