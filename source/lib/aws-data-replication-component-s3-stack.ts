@@ -6,25 +6,35 @@ import * as lambda from '@aws-cdk/aws-lambda';
 import * as path from 'path';
 import { SqsEventSource } from "@aws-cdk/aws-lambda-event-sources";
 import * as s3 from '@aws-cdk/aws-s3';
-import * as events from '@aws-cdk/aws-events';
-import * as targets from '@aws-cdk/aws-events-targets';
-import * as logs from '@aws-cdk/aws-logs';
 import * as cw from '@aws-cdk/aws-cloudwatch';
 import * as actions from '@aws-cdk/aws-cloudwatch-actions';
 import * as sns from '@aws-cdk/aws-sns';
 import * as sub from '@aws-cdk/aws-sns-subscriptions';
-import * as cr from '@aws-cdk/custom-resources';
-import * as iam from '@aws-cdk/aws-iam';
-import * as ecs from '@aws-cdk/aws-ecs';
-import * as ec2 from '@aws-cdk/aws-ec2';
-import * as ecr from '@aws-cdk/aws-ecr';
 
+
+import { EcsStack, EcsTaskProps } from "./ecs-jobsender-stack";
+import { DashboardStack, DBProps } from "./dashboard-stack";
+import { Queue } from '@aws-cdk/aws-sqs';
+
+// import *
 /**
  * cfn-nag suppression rule interface
  */
 interface CfnNagSuppressRule {
   readonly id: string;
   readonly reason: string;
+}
+
+export interface JobDetails {
+  readonly srcBucketName: string,
+  readonly srcPrefix: string,
+  readonly destBucketName: string,
+  readonly destPrefix: string,
+  readonly jobType: string,
+  readonly sourceType: string,
+  readonly tableName: string,
+  readonly queueName: string,
+  readonly credParamName: string,
 }
 
 /***
@@ -236,7 +246,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     }
 
-    // 1. Get SSM parameter of credentials
+    // Get SSM parameter of credentials
     const ssmCredentialsParam = ssm.StringParameter.fromStringParameterAttributes(this, 'SSMParameterCredentials', {
       parameterName: credentialsParameterStore.valueAsString,
       simpleName: true,
@@ -244,7 +254,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       version: 1
     });
 
-    // 2. Setup DynamoDB
+    // Setup DynamoDB
     const ddbFileList = new ddb.Table(this, 'S3MigrationTable', {
       partitionKey: { name: 'objectKey', type: ddb.AttributeType.STRING },
       billingMode: ddb.BillingMode.PAY_PER_REQUEST,
@@ -266,7 +276,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     ]);
 
-    // 3. Setup SQS
+    // Setup SQS
     const sqsQueueDLQ = new sqs.Queue(this, 'S3MigrationQueueDLQ', {
       visibilityTimeout: cdk.Duration.minutes(15),
       retentionPeriod: cdk.Duration.days(14),
@@ -297,36 +307,9 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     ]);
 
-    // 4. Setup API for Lambda to get IP address (for debug networking routing purpose)
-    // No used.
-    // const checkip = new api.RestApi(this, 'LambdaCheckIpAPI', {
-    //   cloudWatchRole: true,
-    //   deploy: true,
-    //   description: 'For Lambda get IP address',
-    //   defaultIntegration: new api.MockIntegration({
-    //     integrationResponses: [{
-    //       statusCode: '200',
-    //       responseTemplates: { "application/json": "$context.identity.sourceIp" }
-    //     }],
-    //     requestTemplates: { "application/json": '{"statusCode": 200}' }
-    //   }),
-    //   endpointConfiguration: {
-    //     types: [api.EndpointType.REGIONAL]
-    //   }
-    // })
 
-    // checkip.root.addMethod('GET', undefined, {
-    //   methodResponses: [
-    //     {
-    //       statusCode: '200',
-    //       responseModels: {
-    //         'application/json': api.Model.EMPTY_MODEL
-    //       }
-    //     }
-    //   ]
-    // })
 
-    // 5. Get bucket
+    // Get bucket
     // PUT - Source bucket in current account and destination in other account
     // GET - Dest bucket in current account and source bucket in other account
     const isGet = new cdk.CfnCondition(this, 'isGet', {
@@ -383,274 +366,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       batchSize: 1
     }));
 
-    // const cfnHandlerFunction = handler.node.defaultChild as lambda.CfnFunction;
-    // this.addCfnNagSuppressRules(cfnHandlerFunction, [
-    //   {
-    //     id: 'W58',
-    //     reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
-    //   }
-    // ]);
-
-    // 7. Setup JobSender ECS Task
-    const ecrRepositoryArn = 'arn:aws:ecr:us-west-2:347283850106:repository/s3-replication-jobsender'
-    // const repo = ecr.Repository.fromRepositoryName(this, 'JobSenderRepo', 's3-replication-jobsender')
-    const repo = ecr.Repository.fromRepositoryArn(this, 'JobSenderRepo', ecrRepositoryArn)
-    const taskDefinition = new ecs.FargateTaskDefinition(this, 'JobSenderTaskDef', {
-      cpu: 1024 * 4,
-      memoryLimitMiB: 1024 * 8,
-    });
-    taskDefinition.addContainer('DefaultContainer', {
-      // image: ecs.ContainerImage.fromAsset(path.join(__dirname, '../src')),
-      image: ecs.ContainerImage.fromEcrRepository(repo),
-      memoryLimitMiB: 1024 * 8,
-      environment: {
-        AWS_DEFAULT_REGION: this.region,
-        TABLE_QUEUE_NAME: ddbFileList.tableName,
-        SQS_QUEUE_NAME: sqsQueue.queueName,
-        SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
-        SRC_BUCKET_NAME: srcBucketName.valueAsString,
-        SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
-        DEST_BUCKET_NAME: destBucketName.valueAsString,
-        DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-        JOB_TYPE: jobType.valueAsString,
-        SOURCE_TYPE: sourceType.valueAsString,
-      },
-      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender' })
-    });
-
-    ssmCredentialsParam.grantRead(taskDefinition.taskRole)
-    ddbFileList.grantReadData(taskDefinition.taskRole);
-    sqsQueue.grantSendMessages(taskDefinition.taskRole);
-    s3InCurrentAccount.grantReadWrite(taskDefinition.taskRole);
-
-    // Get existing ecs cluster.
-    const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
-      vpcId: ecsVpcId.valueAsString,
-      availabilityZones: cdk.Fn.getAzs(),
-      publicSubnetIds: ecsSubnets.valueAsList
-
-    })
-
-    const cluster = ecs.Cluster.fromClusterAttributes(this, 'ECSCluster', {
-      clusterName: ecsClusterName.valueAsString,
-      vpc: vpc,
-      securityGroups: []
-    })
-
-    // 8. CloudWatch Rule. 
-    // Schedule CRON event to trigger JobSender per hour
-    const trigger = new events.Rule(this, 'CronTriggerJobSender', {
-      schedule: events.Schedule.rate(cdk.Duration.hours(1)),
-    })
-
-    // Add target to cloudwatch rule.
-    trigger.addTarget(new targets.EcsTask({
-      cluster,
-      taskDefinition,
-      taskCount: 1,
-      subnetSelection: {
-        subnetType: ec2.SubnetType.PUBLIC,
-      },
-    }));
-
-    const taskDefArnNoVersion = this.formatArn({
-      service: 'ecs',
-      resource: 'task-definition',
-      resourceName: taskDefinition.family
-    })
-
-
-    // Custom resource to trigger JobSender ECS task once
-    const jobSenderTrigger = new cr.AwsCustomResource(this, 'JobSenderTrigger', {
-      resourceType: 'Custom::CustomResource',
-      policy: cr.AwsCustomResourcePolicy.fromStatements([new iam.PolicyStatement({
-        actions: ['ecs:RunTask'],
-        effect: iam.Effect.ALLOW,
-        resources: [taskDefArnNoVersion]
-      }),
-      new iam.PolicyStatement({
-        actions: ['iam:PassRole'],
-        effect: iam.Effect.ALLOW,
-        resources: [taskDefinition.taskRole.roleArn]
-      }),
-      new iam.PolicyStatement({
-        actions: ['iam:PassRole'],
-        effect: iam.Effect.ALLOW,
-        resources: [taskDefinition.executionRole ? taskDefinition.executionRole.roleArn : taskDefinition.taskRole.roleArn]
-      }),
-      ]),
-      timeout: cdk.Duration.minutes(15),
-      // logRetention: logs.RetentionDays.ONE_DAY,
-      onCreate: {
-        service: 'ECS',
-        action: 'runTask',
-        parameters: {
-          launchType: ecs.LaunchType.FARGATE,
-          taskDefinition: taskDefinition.family,
-          cluster: cluster.clusterName,
-          count: 1,
-          networkConfiguration: {
-            awsvpcConfiguration: {
-              subnets: ecsSubnets.valueAsList,
-              assignPublicIp: "ENABLED",
-            }
-          },
-        },
-        physicalResourceId: cr.PhysicalResourceId.of('JobSenderTriggerPhysicalId')
-      }
-    })
-    jobSenderTrigger.node.addDependency(taskDefinition, sqsQueue)
-
-    // 9. Setup Cloudwatch Dashboard
-    // Create Lambda logs filter to create network traffic metric
-    const lambdaFunctionLogs = new logs.LogGroup(this, 'HandlerLogGroup', {
-      logGroupName: `/aws/lambda/${handler.functionName}`,
-      retention: logs.RetentionDays.TWO_WEEKS
-    });
-
-    // const cfnLambdaFunctionLogs = lambdaFunctionLogs.node.defaultChild as logs.CfnLogGroup;
-    // cfnLambdaFunctionLogs.retentionInDays = logs.RetentionDays.TWO_WEEKS;
-
-    lambdaFunctionLogs.addMetricFilter('Completed-bytes', {
-      metricName: 'Completed-bytes',
-      metricNamespace: 's3_migrate',
-      metricValue: '$bytes',
-      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Complete", bytes, key]')
-    })
-    lambdaFunctionLogs.addMetricFilter('Uploading-bytes', {
-      metricName: 'Uploading-bytes',
-      metricNamespace: 's3_migrate',
-      metricValue: '$bytes',
-      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Uploading", bytes, key]')
-    })
-    lambdaFunctionLogs.addMetricFilter('Downloading-bytes', {
-      metricName: 'Downloading-bytes',
-      metricNamespace: 's3_migrate',
-      metricValue: '$bytes',
-      filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Downloading", bytes, key]')
-    })
-    lambdaFunctionLogs.addMetricFilter('MaxMemoryUsed', {
-      metricName: 'MaxMemoryUsed',
-      metricNamespace: 's3_migrate',
-      metricValue: '$memory',
-      filterPattern: logs.FilterPattern.literal('[head="REPORT", a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, memory, MB="MB", rest]')
-    })
-    const lambdaMetricComplete = new cw.Metric({
-      namespace: 's3_migrate',
-      metricName: 'Completed-bytes',
-      statistic: 'Sum',
-      period: cdk.Duration.minutes(1)
-    })
-    const lambdaMetricUpload = new cw.Metric({
-      namespace: 's3_migrate',
-      metricName: 'Uploading-bytes',
-      statistic: 'Sum',
-      period: cdk.Duration.minutes(1)
-    })
-    const lambdaMetricDownload = new cw.Metric({
-      namespace: 's3_migrate',
-      metricName: 'Downloading-bytes',
-      statistic: 'Sum',
-      period: cdk.Duration.minutes(1)
-    })
-    const lambdaMetricMaxMemoryUsed = new cw.Metric({
-      namespace: 's3_migrate',
-      metricName: 'MaxMemoryUsed',
-      statistic: 'Maximum',
-      period: cdk.Duration.minutes(1)
-    })
-    lambdaFunctionLogs.addMetricFilter('Error', {
-      metricName: 'ERROR-Logs',
-      metricNamespace: 's3_migrate',
-      metricValue: '1',
-      filterPattern: logs.FilterPattern.literal('"ERROR"')
-    })
-    lambdaFunctionLogs.addMetricFilter('WARNING', {
-      metricName: 'WARNING-Logs',
-      metricNamespace: 's3_migrate',
-      metricValue: '1',
-      filterPattern: logs.FilterPattern.literal('"WARNING"')
-    })
-    lambdaFunctionLogs.addMetricFilter('TIMEOUT', {
-      metricName: 'TIMEOUT-Logs',
-      metricNamespace: 's3_migrate',
-      metricValue: '1',
-      filterPattern: logs.FilterPattern.literal('"Task time out"')
-    })
-    const logMetricError = new cw.Metric({
-      namespace: 's3_migrate',
-      metricName: 'ERROR-Logs',
-      statistic: 'SUM',
-      period: cdk.Duration.minutes(1)
-    })
-    const logMetricWarning = new cw.Metric({
-      namespace: 's3_migrate',
-      metricName: 'WARNING-Logs',
-      statistic: 'Sum',
-      period: cdk.Duration.minutes(1)
-    })
-    const logMetricTimeout = new cw.Metric({
-      namespace: 's3_migrate',
-      metricName: 'TIMEOUT-Logs',
-      statistic: 'Sum',
-      period: cdk.Duration.minutes(1)
-    })
-
-    // Dashboard to monitor SQS and Lambda
-    const board = new cw.Dashboard(this, 'S3Migration');
-    board.addWidgets(
-      new cw.GraphWidget({
-        title: 'Lambda-NETWORK',
-        left: [lambdaMetricDownload, lambdaMetricUpload, lambdaMetricComplete]
-      }),
-      new cw.GraphWidget({
-        title: 'Lambda-concurrent',
-        left: [handler.metric('ConcurrentExecutions', { period: cdk.Duration.minutes(1) })]
-      }),
-      new cw.GraphWidget({
-        title: 'Lambda-invocations/errors/throttles',
-        left: [
-          handler.metricInvocations({ period: cdk.Duration.minutes(1) }),
-          handler.metricErrors({ period: cdk.Duration.minutes(1) }),
-          handler.metricThrottles({ period: cdk.Duration.minutes(1) })
-        ]
-      }),
-      new cw.GraphWidget({
-        title: 'Lambda-duration',
-        left: [handler.metricDuration({ period: cdk.Duration.minutes(1) })]
-      })
-    )
-
-    board.addWidgets(
-      new cw.GraphWidget({
-        title: 'Lambda_MaxMemoryUsed(MB)',
-        left: [lambdaMetricMaxMemoryUsed]
-      }),
-      new cw.GraphWidget({
-        title: 'ERROR/WARNING Logs',
-        left: [logMetricError],
-        right: [logMetricWarning, logMetricTimeout]
-      }),
-      new cw.GraphWidget({
-        title: 'SQS-Jobs',
-        left: [
-          sqsQueue.metricApproximateNumberOfMessagesVisible({ period: cdk.Duration.minutes(1) }),
-          sqsQueue.metricApproximateNumberOfMessagesNotVisible({ period: cdk.Duration.minutes(1) })
-        ]
-      }),
-      new cw.SingleValueWidget({
-        title: 'Running/Waiting and Dead Jobs',
-        metrics: [
-          sqsQueue.metricApproximateNumberOfMessagesNotVisible({ period: cdk.Duration.minutes(1) }),
-          sqsQueue.metricApproximateNumberOfMessagesVisible({ period: cdk.Duration.minutes(1) }),
-          sqsQueueDLQ.metricApproximateNumberOfMessagesNotVisible({ period: cdk.Duration.minutes(1) }),
-          sqsQueueDLQ.metricApproximateNumberOfMessagesVisible({ period: cdk.Duration.minutes(1) })
-        ],
-        height: 6
-      })
-    )
-
-    // 10. Alarm for queue - DLQ
+    // Setup Alarm for queue - DLQ
     const alarmDLQ = new cw.Alarm(this, 'SQSDLQAlarm', {
       metric: sqsQueueDLQ.metricApproximateNumberOfMessagesVisible(),
       threshold: 0,
@@ -670,8 +386,46 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     ]);
 
+
+    // Setup Fargate Task
+    const jobDetails: JobDetails = {
+      queueName: sqsQueue.queueName,
+      tableName: ddbFileList.tableName,
+      credParamName: credentialsParameterStore.valueAsString,
+      srcBucketName: srcBucketName.valueAsString,
+      srcPrefix: srcBucketPrefix.valueAsString,
+      destBucketName: destBucketName.valueAsString,
+      destPrefix: destBucketPrefix.valueAsString,
+      // storageClass: destStorageClass.valueAsString,
+      jobType: jobType.valueAsString,
+      sourceType: sourceType.valueAsString,
+    }
+
+    const ecsProps: EcsTaskProps = {
+      job: jobDetails,
+      ecsVpcId: ecsVpcId.valueAsString,
+      ecsSubnetIds: ecsSubnets.valueAsList,
+      ecsClusterName: ecsClusterName.valueAsString,
+    }
+    const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
+
+    ssmCredentialsParam.grantRead(ecsStack.taskDefinition.taskRole)
+    ddbFileList.grantReadData(ecsStack.taskDefinition.taskRole);
+    sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
+    s3InCurrentAccount.grantReadWrite(ecsStack.taskDefinition.taskRole);
+
+
+    // Setup Cloudwatch Dashboard
+    const dbProps: DBProps = {
+      handler: handler,
+      queue: sqsQueue,
+      queueDLQ: sqsQueueDLQ,
+    }
+    new DashboardStack(this, 'DashboardStack', dbProps);
+
+
     new cdk.CfnOutput(this, 'Dashboard', {
-      value: 'CloudWatch Dashboard name is S3Migration'
+      value: `CloudWatch Dashboard name is ${cdk.Aws.STACK_NAME}-Dashboard`
     })
 
   }
