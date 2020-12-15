@@ -91,7 +91,7 @@ class WrongRecordFormat(Exception):
 
 
 def lambda_handler(event, context):
-    logger.info(json.dumps(event, default=str))
+    logger.debug(json.dumps(event, default=str))
 
     for trigger_record in event['Records']:
         trigger_body = trigger_record['body']
@@ -104,14 +104,46 @@ def lambda_handler(event, context):
                 logger.info('Skip s3:TestEvent')
                 continue
 
-        if 'key' not in job:  # Invaid message.
-            logger.warning(f'Wrong sqs job: {json.dumps(job, default=str)}')
-            logger.warning('Try to handle next message')
-            raise WrongRecordFormat
+        if 'Records' in job:  # S3 Events
+            for One_record in job['Records']:
+                if 's3' in One_record:
+                    # bucket = One_record['s3']['bucket']['name']
+                    # logger.debug(bucket)
+                    key = One_record['s3']['object']['key']
+                    # unquote and also replace plus signs with spaces
+                    key = urllib.parse.unquote_plus(key)
+                    logger.debug(key)
 
-        job['storage_class'] = default_storage_class
+                    size = One_record['s3']['object']['size']
+                    logger.debug(size)
 
-        jobinfo = JobInfo(**job)
+                    if "versionId" in One_record['s3']['object']:
+                        version = One_record['s3']['object']['versionId']
+                    else:
+                        version = 'null'
+
+                    jobinfo = JobInfo(
+                        key=key,
+                        size=size,
+                        version=version,
+                        storage_class=default_storage_class)
+                else:
+                    logger.warning(
+                        f'Wrong sqs job: {json.dumps(job, default=str)}')
+                    logger.warning('Try to handle next message')
+                    raise WrongRecordFormat
+        else:
+            if 'key' not in job:  # Invaid message.
+                logger.warning(
+                    f'Wrong sqs job: {json.dumps(job, default=str)}')
+                logger.warning('Try to handle next message')
+                raise WrongRecordFormat
+
+            job['storage_class'] = default_storage_class
+            jobinfo = JobInfo(**job)
+
+        logger.info(jobinfo)
+
         config = JobConfig(include_version=include_version,
                            job_timeout=job_timeout,
                            multipart_threshold=multipart_threshold,

@@ -3,6 +3,7 @@ import * as ssm from '@aws-cdk/aws-ssm';
 import * as ddb from '@aws-cdk/aws-dynamodb';
 import * as sqs from '@aws-cdk/aws-sqs';
 import * as lambda from '@aws-cdk/aws-lambda';
+import * as iam from '@aws-cdk/aws-iam';
 import * as path from 'path';
 import { SqsEventSource } from "@aws-cdk/aws-lambda-event-sources";
 import * as s3 from '@aws-cdk/aws-s3';
@@ -14,7 +15,6 @@ import * as sub from '@aws-cdk/aws-sns-subscriptions';
 
 import { EcsStack, EcsTaskProps } from "./ecs-jobsender-stack";
 import { DashboardStack, DBProps } from "./dashboard-stack";
-import { Queue } from '@aws-cdk/aws-sqs';
 
 // import *
 /**
@@ -276,6 +276,16 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     ]);
 
+    // Get bucket
+    // PUT - Source bucket in current account and destination in other account
+    // GET - Dest bucket in current account and source bucket in other account
+    const isGet = new cdk.CfnCondition(this, 'isGet', {
+      expression: cdk.Fn.conditionEquals('GET', jobType),
+    });
+
+    const bucketName = cdk.Fn.conditionIf(isGet.logicalId, destBucketName.valueAsString, srcBucketName.valueAsString).toString();
+    const s3InCurrentAccount = s3.Bucket.fromBucketName(this, `BucketName`, bucketName);
+
     // Setup SQS
     const sqsQueueDLQ = new sqs.Queue(this, 'S3MigrationQueueDLQ', {
       visibilityTimeout: cdk.Duration.minutes(15),
@@ -307,17 +317,17 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     ]);
 
-
-
-    // Get bucket
-    // PUT - Source bucket in current account and destination in other account
-    // GET - Dest bucket in current account and source bucket in other account
-    const isGet = new cdk.CfnCondition(this, 'isGet', {
-      expression: cdk.Fn.conditionEquals('GET', jobType),
-    });
-
-    const bucketName = cdk.Fn.conditionIf(isGet.logicalId, destBucketName.valueAsString, srcBucketName.valueAsString).toString();
-    const s3InCurrentAccount = s3.Bucket.fromBucketName(this, `BucketName`, bucketName);
+    sqsQueue.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ['SQS:SendMessage'],
+      effect: iam.Effect.ALLOW,
+      resources: [sqsQueue.queueArn],
+      principals: [new iam.ServicePrincipal('s3.amazonaws.com')],
+      conditions: {
+        StringEquals: {
+          "aws:SourceArn": s3InCurrentAccount.bucketArn
+        }
+      }
+    }))
 
     // 6. Setup Worker Lambda functions
     const layer = new lambda.LayerVersion(this, 'MigrationLayer', {
