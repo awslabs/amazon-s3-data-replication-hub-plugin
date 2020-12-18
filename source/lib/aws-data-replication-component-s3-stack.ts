@@ -15,8 +15,8 @@ import * as sub from '@aws-cdk/aws-sns-subscriptions';
 
 import { EcsStack, EcsTaskProps } from "./ecs-jobsender-stack";
 import { DashboardStack, DBProps } from "./dashboard-stack";
+import { StackEventHandler, EventProps } from "./stack-event-handler";
 
-// import *
 /**
  * cfn-nag suppression rule interface
  */
@@ -129,6 +129,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     //   allowedValues: ['TRUE', 'FALSE']
     // })
 
+    const enableS3Event = new cdk.CfnParameter(this, 'enableS3Event', {
+      description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
+      default: 'No',
+      type: 'String',
+      allowedValues: ['Yes', 'No']
+    })
+
     const lambdaMemory = new cdk.CfnParameter(this, 'lambdaMemory', {
       description: 'Lambda Memory, default to 256 MB',
       default: '256',
@@ -189,7 +196,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           },
           {
             Label: { default: 'Advanced Options' },
-            Parameters: [lambdaMemory.logicalId, multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId]
+            Parameters: [enableS3Event.logicalId, lambdaMemory.logicalId, multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId]
           }
         ],
         ParameterLabels: {
@@ -228,6 +235,9 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           },
           [alarmEmail.logicalId]: {
             default: 'Alarm Email'
+          },
+          [enableS3Event.logicalId]: {
+            default: 'Enable S3 Event'
           },
           [lambdaMemory.logicalId]: {
             default: 'Lambda Memory'
@@ -424,7 +434,6 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
     s3InCurrentAccount.grantReadWrite(ecsStack.taskDefinition.taskRole);
 
-
     // Setup Cloudwatch Dashboard
     const dbProps: DBProps = {
       handler: handler,
@@ -433,9 +442,47 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     }
     new DashboardStack(this, 'DashboardStack', dbProps);
 
+    // Setup Stack Event Handler
+    const eventProps: EventProps = {
+      bucket: s3InCurrentAccount,
+      prefix: srcBucketPrefix.valueAsString,
+      queue: sqsQueue,
+      enableS3Event: enableS3Event.valueAsString,
+      jobType: jobType.valueAsString,
+      taskDefinition: ecsStack.taskDefinition,
+      ecsVpcId: ecsVpcId.valueAsString,
+      ecsSubnetIds: ecsSubnets.valueAsList,
+      ecsClusterName: ecsClusterName.valueAsString,
+      securityGroupName: ecsStack.securityGroup.securityGroupName,
+    }
+    new StackEventHandler(this, 'StackEventHandler', eventProps);
 
     new cdk.CfnOutput(this, 'Dashboard', {
-      value: `CloudWatch Dashboard name is ${cdk.Aws.STACK_NAME}-Dashboard`
+      value: `${cdk.Aws.STACK_NAME}-Dashboard`,
+      description: 'CloudWatch Dashboard name'
+    })
+    new cdk.CfnOutput(this, 'TaskDefinitionName', {
+      value: ecsStack.taskDefinition.family,
+      description: 'Task Definition Name'
+    })
+    new cdk.CfnOutput(this, 'QueueName', {
+      value: sqsQueue.queueName,
+      description: 'Queue Name'
+    })
+
+    new cdk.CfnOutput(this, 'DLQQueueName', {
+      value: sqsQueueDLQ.queueName,
+      description: 'Dead Letter Queue Name'
+    })
+
+    new cdk.CfnOutput(this, 'MigrationLambda', {
+      value: handler.functionName,
+      description: 'Migration Lambda Function Name'
+    })
+
+    new cdk.CfnOutput(this, 'MigrationLambdaLogGroup', {
+      value: handler.logGroup.logGroupName,
+      description: 'Migration Lambda Log Group Name'
     })
 
   }
