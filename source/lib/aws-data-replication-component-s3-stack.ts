@@ -480,11 +480,6 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       description: 'Migration Lambda Function Name'
     })
 
-    new cdk.CfnOutput(this, 'MigrationLambdaLogGroup', {
-      value: handler.logGroup.logGroupName,
-      description: 'Migration Lambda Log Group Name'
-    })
-
   }
 
   /**

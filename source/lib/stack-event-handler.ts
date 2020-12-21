@@ -68,7 +68,6 @@ export class StackEventHandler extends Construct {
 
         const lambdaProvider = new cr.Provider(this, 'Provider', {
             onEventHandler: onEventHandler,
-            // logRetention: logs.RetentionDays.ONE_DAY   // default is INFINITE
         });
 
         new CustomResource(this, 'DRHS3CustomResource', {
