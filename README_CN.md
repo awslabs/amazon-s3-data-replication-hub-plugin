@@ -80,7 +80,8 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 | ecsVpcId                  | 需要指定          | 用于运行ECS任务的VPC ID，例如 vpc-bef13dc7                                                                                  |
 | ecsSubnets                | 需要指定          | 用于运行ECS任务的子网ID。 请提供至少两个以逗号分隔的子网，例如 子网97bfc4cd，子网7ad7de32   |
 | credentialsParameterStore | drh-credentials  | 用于将凭据保存在参数存储中的参数名称                                                           |
-| alarmEmail                | 需要指定           | 警报电子邮件。 错误将发送到此电子邮件.                                                                          |
+| alarmEmail                | 需要指定           | 警报电子邮件。 错误将发送到此电子邮件                                                                          |
+| enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用                                    |
 | lambdaMemory              | 256              | Lambda内存， 默认为 256 MB                                                                                      |
 | multipartThreshold        | 10               | 分段上传的阀值（单位： MB）默认为10 MB                                                             |
 | chunkSize                 | 5                | 分片大小，默认为5 MB                                                                  |
