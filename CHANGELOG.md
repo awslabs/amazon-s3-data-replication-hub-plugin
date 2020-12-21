@@ -29,3 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add support of accessing s3 with no-sign-request
+
+## [1.1.0] - 2020-12-06
+
+### Changed
+- Use custom provider to handling stack events
+
+### Added
+- Add support of triggering replication base on S3 Event.
