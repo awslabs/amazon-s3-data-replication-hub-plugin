@@ -56,22 +56,22 @@ export class DashboardStack extends Construct {
         })
         const lambdaMetricComplete = new cw.Metric({
             namespace: 's3_migrate',
-            metricName: 'Completed-bytes',
+            metricName: 'Completed-Bytes',
             statistic: 'Sum',
             period: Duration.minutes(1)
         })
-        const lambdaMetricUpload = new cw.Metric({
-            namespace: 's3_migrate',
-            metricName: 'Uploading-bytes',
-            statistic: 'Sum',
-            period: Duration.minutes(1)
-        })
-        const lambdaMetricDownload = new cw.Metric({
-            namespace: 's3_migrate',
-            metricName: 'Downloading-bytes',
-            statistic: 'Sum',
-            period: Duration.minutes(1)
-        })
+        // const lambdaMetricUpload = new cw.Metric({
+        //     namespace: 's3_migrate',
+        //     metricName: 'Uploading-bytes',
+        //     statistic: 'Sum',
+        //     period: Duration.minutes(1)
+        // })
+        // const lambdaMetricDownload = new cw.Metric({
+        //     namespace: 's3_migrate',
+        //     metricName: 'Downloading-bytes',
+        //     statistic: 'Sum',
+        //     period: Duration.minutes(1)
+        // })
         const lambdaMetricMaxMemoryUsed = new cw.Metric({
             namespace: 's3_migrate',
             metricName: 'MaxMemoryUsed',
@@ -123,7 +123,7 @@ export class DashboardStack extends Construct {
         this.dashboard.addWidgets(
             new cw.GraphWidget({
                 title: 'Lambda-NETWORK',
-                left: [lambdaMetricDownload, lambdaMetricUpload, lambdaMetricComplete]
+                left: [lambdaMetricComplete]
             }),
             new cw.GraphWidget({
                 title: 'Lambda-concurrent',

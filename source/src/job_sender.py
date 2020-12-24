@@ -19,15 +19,31 @@ logger = logging.getLogger()
 logger.info("The log level is %s", log_level)
 
 
-def get_credentials():
-    ssm = boto3.client('ssm')
-    logger.info(f'Get ssm_parameter_credentials: {ssm_parameter_credentials}')
-    credentials = json.loads(ssm.get_parameter(
-        Name=ssm_parameter_credentials,
-        WithDecryption=True
-    )['Parameter']['Value'])
+def get_credentials(ssm_parameter_credentials):
+    no_auth = False
 
-    return credentials
+    # Get connection credentials
+    if ssm_parameter_credentials:
+        ssm = boto3.client('ssm')
+        logger.info(
+            f'Get ssm_parameter_credentials: {ssm_parameter_credentials}')
+        credentials = json.loads(ssm.get_parameter(
+            Name=ssm_parameter_credentials,
+            WithDecryption=True
+        )['Parameter']['Value'])
+
+        # Default Jobtype is GET, Only S3 supports PUT type.
+        src_credentials, des_credentials = {}, credentials
+        src_region, des_region = '', region_name
+        if job_type == 'GET':
+            src_credentials, des_credentials = des_credentials, src_credentials
+            src_region, des_region = des_region, src_region
+    else:
+        # no_auth will enable accessing S3 with no-sign-request
+        no_auth = True
+        src_credentials, des_credentials = {}, {}
+
+    return src_credentials, des_credentials, no_auth
 
 
 def find_and_send_jobs(src_client, des_client, queue_name, table_name, include_version=False):
@@ -58,22 +74,20 @@ if __name__ == "__main__":
     src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
     dest_bucket_name = os.environ['DEST_BUCKET_NAME']
     dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
-    job_type = os.environ['JOB_TYPE']
+    region_name = os.environ['REGION_NAME']
+    job_type = os.environ['JOB_TYPE'].upper()
     source_type = os.environ['SOURCE_TYPE']
     # include_version = os.environ['INCLUDE_VERSION'].upper() == 'TRUE'
-    include_version = True
-    credentials = get_credentials()
-    # Region name will not be part of credentials in the future.
-    region_name = credentials.pop('region_name')
+    include_version = False
+    src_credentials, des_credentials, no_auth = get_credentials(
+        ssm_parameter_credentials)
 
-    src_credentials, des_credentials = {}, credentials
     src_region, des_region = '', region_name
-    if job_type.upper() == 'GET':
-        src_credentials, des_credentials = des_credentials, src_credentials
+    if job_type == 'GET':
         src_region, des_region = des_region, src_region
 
     src_client = ClientManager.create_download_client(
-        src_bucket_name, src_bucket_prefix, src_region, src_credentials, source_type)
+        src_bucket_name, src_bucket_prefix, src_region, src_credentials, source_type, no_auth)
     des_client = ClientManager.create_download_client(
         dest_bucket_name, dest_bucket_prefix, des_region, des_credentials)
 
