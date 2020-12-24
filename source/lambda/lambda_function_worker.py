@@ -21,7 +21,7 @@ from migration_lib.config import JobConfig
 
 # Env
 job_timeout = 870
-include_version = True
+include_version = False
 table_queue_name = os.environ['TABLE_QUEUE_NAME']
 default_storage_class = os.environ['STORAGE_CLASS']
 src_bucket_name = os.environ['SRC_BUCKET_NAME']
@@ -29,12 +29,12 @@ src_bucket_prefix = os.environ['SRC_BUCKET_PREFIX']
 dest_bucket_name = os.environ['DEST_BUCKET_NAME']
 dest_bucket_prefix = os.environ['DEST_BUCKET_PREFIX']
 ssm_parameter_credentials = os.environ['SSM_PARAMETER_CREDENTIALS']
-job_type = os.environ['JOB_TYPE']
+region_name = os.environ['REGION_NAME']
+job_type = os.environ['JOB_TYPE'].upper()
 source_type = os.environ['SOURCE_TYPE']
 multipart_threshold = int(os.environ['MULTIPART_THRESHOLD']) * 1024 * 1024
 chunk_size = int(os.environ['CHUNK_SIZE']) * 1024 * 1024
 max_threads = int(os.environ['MAX_THREADS'])
-
 
 log_level = str(os.environ.get('LOG_LEVEL')).upper()
 if log_level not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
@@ -45,29 +45,36 @@ logger = logging.getLogger()
 # logger.setLevel(logging.INFO)
 logger.setLevel(log_level)
 
-
+no_auth = False
 # Get connection credentials
-ssm = boto3.client('ssm')
-logger.info(f'Get ssm_parameter_credentials: {ssm_parameter_credentials}')
-credentials = json.loads(ssm.get_parameter(
-    Name=ssm_parameter_credentials,
-    WithDecryption=True
-)['Parameter']['Value'])
+if ssm_parameter_credentials:
+    ssm = boto3.client('ssm')
+    logger.info(f'Get ssm_parameter_credentials: {ssm_parameter_credentials}')
+    credentials = json.loads(ssm.get_parameter(
+        Name=ssm_parameter_credentials,
+        WithDecryption=True
+    )['Parameter']['Value'])
 
-# Region name will not be part of credentials in the future.
-region_name = credentials.pop('region_name')
+    # Default Jobtype is GET, Only S3 supports PUT type.
+    src_credentials, des_credentials = {}, credentials
+    src_region, des_region = '', region_name
+    if job_type == 'GET':
+        src_credentials, des_credentials = des_credentials, src_credentials
+        src_region, des_region = des_region, src_region
+else:
+    # no_auth will enable accessing S3 with no-sign-request
+    no_auth = True
+    src_credentials, des_credentials = {}, {}
 
-# Default Jobtype is GET, Only S3 supports PUT type.
-src_credentials, des_credentials = {}, credentials
+
 src_region, des_region = '', region_name
-if job_type.upper() == 'GET':
-    src_credentials, des_credentials = des_credentials, src_credentials
+if job_type == 'GET':
     src_region, des_region = des_region, src_region
 
-# if src_credentials:
-#     src_region = src_credentials
+    # if src_credentials:
+    #     src_region = src_credentials
 src_client = ClientManager.create_download_client(
-    src_bucket_name, src_bucket_prefix, src_region, src_credentials, source_type)
+    src_bucket_name, src_bucket_prefix, src_region, src_credentials, source_type, no_auth)
 des_client = ClientManager.create_upload_client(
     dest_bucket_name, dest_bucket_prefix, des_region, des_credentials)
 

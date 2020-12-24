@@ -27,7 +27,7 @@ setup(
 
     install_requires=[
         # "boto3",
-        "oss2"
+        # "oss2"
     ],
 
     python_requires=">=3.6",

@@ -1,8 +1,9 @@
-FROM python:3.8.5-slim
+FROM python:3.8-slim
 WORKDIR /app
 
 ENV LOG_LEVEL INFO
 ENV SSM_PARAMETER_CREDENTIALS drh-credentials
+ENV REGION_NAME region
 ENV TABLE_QUEUE_NAME table
 ENV SQS_QUEUE_NAME queue
 ENV SRC_BUCKET_NAME source
@@ -14,5 +15,6 @@ ENV SOURCE_TYPE S3
 ENV AWS_DEFAULT_REGION us-east-1
 
 COPY . .
+RUN pip install boto3
 RUN pip install -r requirements.txt
 CMD ["python", "job_sender.py"]

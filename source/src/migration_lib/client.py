@@ -4,7 +4,8 @@ import os
 import boto3
 import hashlib
 import base64
-import oss2
+import urllib
+# import oss2
 
 from enum import Enum
 
@@ -27,6 +28,16 @@ S3_METADATA_ARGS = ['Metadata',
                     'CacheControl',
                     'Expires',
                     'WebsiteRedirectLocation']
+
+GCS_METADATA_ARGS = ['Metadata',
+                     'ContentDisposition',
+                     'ContentLanguage',
+                     'ContentType',
+                     'ContentEncoding',
+                     #  'CacheControl',
+                     #  'Expires',
+                     'WebsiteRedirectLocation'
+                     ]
 
 
 class JobInfo():
@@ -51,7 +62,7 @@ class JobInfo():
 class DownloadClient():
     """ An abstract client to handle the list and download operations from cloud storage service """
 
-    def __init__(self, bucket_name, prefix='', **credentials):
+    def __init__(self, bucket_name, prefix='', *args, **kwargs):
         super().__init__()
         self._bucket_name = bucket_name
         self._prefix = prefix
@@ -138,19 +149,12 @@ class S3DownloadClient(DownloadClient):
         }
     """
 
-    def __init__(self, bucket_name, prefix='', **credentials):
+    def __init__(self, bucket_name, prefix, source, config, **credentials):
         super().__init__(bucket_name, prefix, **credentials)
+        self._source = source
 
-        if credentials.get('no_auth'):
-            credentials.pop('no_auth')
-            s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
-                               signature_version=UNSIGNED,
-                               retries={'max_attempts': MAX_ATTEMPTS})
-        else:
-            s3_config = Config(max_pool_connections=MAX_POOL_CONNECTION,
-                               retries={'max_attempts': MAX_ATTEMPTS})
         try:
-            self._client = boto3.client('s3', config=s3_config, **credentials)
+            self._client = boto3.client('s3', config=config, **credentials)
         except Exception as e:
             logger.error(f'Fail to create a client session: {str(e)}')
 
@@ -186,27 +190,44 @@ class S3DownloadClient(DownloadClient):
         body_md5 = hashlib.md5(body)
         return body, body_md5
 
+    def _list_objects_func(self, **kwargs):
+        ''' Function to list Objects from buckets
+
+        For Google GCS S3 SDK, listing objects can only be performed using the Amazon S3 V1 list objects method.
+        Therefore, create a wrapper for choosing the right listing function based on source type.
+        '''
+        if self._source == Source.GOOGLE_GCS:
+            return self._client.list_objects(**kwargs)
+        else:
+            return self._client.list_objects_v2(**kwargs)
+
     def _list_objects_without_version(self, latest_changes_only=False):
         logger.debug(
             f'S3> list objects in bucket {self._bucket_name} from S3 without version info')
         # TODO implement latest_changes_only.
-        job_list = []
 
-        # Use list_objects_v2() to get the list.
+        # Looping to list all the objects
         continuation_token = None
         while True:
+            job_list = []
             list_kwargs = {'Bucket': self._bucket_name,
                            'MaxKeys': MAX_KEYS,
                            'Prefix': self._prefix, }
             if continuation_token:
                 list_kwargs['ContinuationToken'] = continuation_token
-            response = self._client.list_objects_v2(**list_kwargs)
+            response = self._list_objects_func(**list_kwargs)
             # logger.debug(response.get('Contents', []))
             contents = response.get('Contents', [])
 
             # Exclude objects with GLACIER and DEEP_ARCHIVE storage class, they can't be downloaded.
-            job_list = [JobInfo(x['Key'], x['Size']) for x in contents
-                        if x['StorageClass'] not in ['GLACIER', 'DEEP_ARCHIVE']]
+            if self._source == Source.GOOGLE_GCS:
+                # For GCP StorageClass might not be included in the response
+                # also for GCP, need to use urllib to get the right key
+                job_list = [JobInfo(urllib.parse.unquote_plus(x['Key']), x['Size']) for x in contents
+                            if x.get('StorageClass') not in ['GLACIER', 'DEEP_ARCHIVE']]
+            else:
+                job_list = [JobInfo(x['Key'], x['Size']) for x in contents
+                            if x.get('StorageClass') not in ['GLACIER', 'DEEP_ARCHIVE']]
             # logger.debug(
             #     f'S3> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
@@ -261,140 +282,146 @@ class S3DownloadClient(DownloadClient):
             Bucket=self._bucket_name,
             Key=key
         )
-        extra_args = {m: head[m] for m in S3_METADATA_ARGS if head.get(m)}
+
+        if self._source == Source.GOOGLE_GCS:
+            # Temporary removed 'CacheControl' and 'Expires' for Google GCS
+            extra_args = {m: head[m] for m in GCS_METADATA_ARGS if head.get(m)}
+        else:
+            extra_args = {m: head[m] for m in S3_METADATA_ARGS if head.get(m)}
+
         return extra_args
 
 
-class AliOSSDownloadClient(DownloadClient):
-    r""" An implemented download client with Aliyun OSS.
+# class AliOSSDownloadClient(DownloadClient):
+#     r""" An implemented download client with Aliyun OSS.
 
-    Example Usage:
+#     Example Usage:
 
-        client = AliOSSDownloadClient(bucket_name='my-bucket', **credentials)
-        for obj in client.list_objects():
-            print(obj)
+#         client = AliOSSDownloadClient(bucket_name='my-bucket', **credentials)
+#         for obj in client.list_objects():
+#             print(obj)
 
-    Note:
-        credentials must be in a form of dict. Below is an example:
+#     Note:
+#         credentials must be in a form of dict. Below is an example:
 
-        credentials = {
-            "oss_access_key_id": "<Your AccessKeyID>",
-            "oss_secret_access_key": "<Your AccessKeySecret>",
-            "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
-        }
-    """
+#         credentials = {
+#             "oss_access_key_id": "<Your AccessKeyID>",
+#             "oss_secret_access_key": "<Your AccessKeySecret>",
+#             "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
+#         }
+#     """
 
-    def __init__(self, bucket_name, prefix='', **credentials):
-        super().__init__(bucket_name, prefix, **credentials)
-        endpoint = credentials['oss_endpoint']
-        access_key_id = credentials['oss_access_key_id']
-        access_key_secret = credentials['oss_secret_access_key']
-        auth = oss2.Auth(access_key_id, access_key_secret)
+#     def __init__(self, bucket_name, prefix='', **credentials):
+#         super().__init__(bucket_name, prefix, **credentials)
+#         endpoint = credentials['oss_endpoint']
+#         access_key_id = credentials['oss_access_key_id']
+#         access_key_secret = credentials['oss_secret_access_key']
+#         auth = oss2.Auth(access_key_id, access_key_secret)
 
-        self._client = oss2.Bucket(auth, endpoint, bucket_name)
+#         self._client = oss2.Bucket(auth, endpoint, bucket_name)
 
-    def get_object(self, key, size, start=0, chunk_size=0, version=None):
-        logger.debug("OSS> Get Object from Aliyun OSS")
+#     def get_object(self, key, size, start=0, chunk_size=0, version=None):
+#         logger.debug("OSS> Get Object from Aliyun OSS")
 
-        if chunk_size:
-            end = start + chunk_size
-            # For OSS, if range end is greater than size, the full file will be downloaded for the last chunk.
-            if end > size:
-                end = size
+#         if chunk_size:
+#             end = start + chunk_size
+#             # For OSS, if range end is greater than size, the full file will be downloaded for the last chunk.
+#             if end > size:
+#                 end = size
 
-            logger.debug(
-                f'OSS> Downloading {key} with {end-start} bytes start from {start}')
+#             logger.debug(
+#                 f'OSS> Downloading {key} with {end-start} bytes start from {start}')
 
-            byte_range = (start, end-1)
-            result = self._client.get_object(key=key,
-                                             byte_range=byte_range
-                                             )
+#             byte_range = (start, end-1)
+#             result = self._client.get_object(key=key,
+#                                              byte_range=byte_range
+#                                              )
 
-        else:
-            logger.debug(
-                f'OSS> Downloading {key} with full size')
-            result = self._client.get_object(key=key)
+#         else:
+#             logger.debug(
+#                 f'OSS> Downloading {key} with full size')
+#             result = self._client.get_object(key=key)
 
-        body = result.read()
-        body_md5 = hashlib.md5(body)
+#         body = result.read()
+#         body_md5 = hashlib.md5(body)
 
-        # TODO whether to return md5 string, currently it's a hash object. This is used in job processor as well.
-        # content_md5 = base64.b64encode(body_md5.digest()).decode('utf-8')
-        return body, body_md5
+#         # TODO whether to return md5 string, currently it's a hash object. This is used in job processor as well.
+#         # content_md5 = base64.b64encode(body_md5.digest()).decode('utf-8')
+#         return body, body_md5
 
-    def _list_objects_without_version(self, latest_changes_only=False):
-        logger.debug(
-            f'OSS> list objects from OSS in bucket {self._bucket_name} without version info')
-        # TODO implement latest_changes_only.
-        job_list = []
+#     def _list_objects_without_version(self, latest_changes_only=False):
+#         logger.debug(
+#             f'OSS> list objects from OSS in bucket {self._bucket_name} without version info')
+#         # TODO implement latest_changes_only.
+#         job_list = []
 
-        marker = None
-        while True:
-            list_kwargs = {'max_keys': MAX_KEYS,
-                           'prefix': self._prefix, }
-            if marker:
-                list_kwargs['marker'] = marker
-            result = self._client.list_objects(**list_kwargs)
+#         marker = None
+#         while True:
+#             list_kwargs = {'max_keys': MAX_KEYS,
+#                            'prefix': self._prefix, }
+#             if marker:
+#                 list_kwargs['marker'] = marker
+#             result = self._client.list_objects(**list_kwargs)
 
-            job_list = [JobInfo(x.key, x.size, 'null')
-                        for x in result.object_list]
-            # logger.debug(
-            #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
+#             job_list = [JobInfo(x.key, x.size, 'null')
+#                         for x in result.object_list]
+#             # logger.debug(
+#             #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
 
-            if not result.is_truncated:  # At the end of the list
-                break
-            yield job_list
-            marker = result.next_marker
-        yield job_list
+#             if not result.is_truncated:  # At the end of the list
+#                 break
+#             yield job_list
+#             marker = result.next_marker
+#         yield job_list
 
-    def _list_objects_versions(self, latest_changes_only=False):
-        logger.debug(
-            f'OSS> List objects in bucket {self._bucket_name} with version info')
-        # TODO implement latest_changes_only.
-        job_list = []
+#     def _list_objects_versions(self, latest_changes_only=False):
+#         logger.debug(
+#             f'OSS> List objects in bucket {self._bucket_name} with version info')
+#         # TODO implement latest_changes_only.
+#         job_list = []
 
-        key_marker = None
-        while True:
-            list_kwargs = {'max_keys': MAX_KEYS,
-                           'prefix': self._prefix, }
-            if key_marker:
-                list_kwargs['key_marker'] = key_marker
-            result = self._client.list_object_versions(**list_kwargs)
+#         key_marker = None
+#         while True:
+#             list_kwargs = {'max_keys': MAX_KEYS,
+#                            'prefix': self._prefix, }
+#             if key_marker:
+#                 list_kwargs['key_marker'] = key_marker
+#             result = self._client.list_object_versions(**list_kwargs)
 
-            job_list = [JobInfo(x.key, x.size, x.versionid)
-                        for x in result.versions if x.is_latest]
+#             job_list = [JobInfo(x.key, x.size, x.versionid)
+#                         for x in result.versions if x.is_latest]
 
-            # logger.debug(
-            #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
-            if not result.is_truncated:  # At the end of the list
-                break
-            yield job_list
-            key_marker = result.next_key_marker
+#             # logger.debug(
+#             #     f'OSS> {str(len(job_list))} objects found in bucket {self._bucket_name} ')
+#             if not result.is_truncated:  # At the end of the list
+#                 break
+#             yield job_list
+#             key_marker = result.next_key_marker
 
-        yield job_list
+#         yield job_list
 
-    def list_objects(self, include_version=False, latest_changes_only=False):
-        """ List of objects from Aliyun OSS. """
-        if include_version:
-            return self._list_objects_versions(latest_changes_only=latest_changes_only)
-        else:
-            return self._list_objects_without_version(latest_changes_only=latest_changes_only)
+#     def list_objects(self, include_version=False, latest_changes_only=False):
+#         """ List of objects from Aliyun OSS. """
+#         if include_version:
+#             return self._list_objects_versions(latest_changes_only=latest_changes_only)
+#         else:
+#             return self._list_objects_without_version(latest_changes_only=latest_changes_only)
 
-    def head_object(self, key):
-        logger.debug("OSS> head Object")
-        # TODO check this.
-        head = self._client.head_object(key)
-        content_type = head.content_type
-        logger.warning(
-            'OSS> Only ContentType is currently supported by OSS.')
+#     def head_object(self, key):
+#         logger.debug("OSS> head Object")
+#         # TODO check this.
+#         head = self._client.head_object(key)
+#         content_type = head.content_type
+#         logger.warning(
+#             'OSS> Only ContentType is currently supported by OSS.')
 
-        return {'ContentType': content_type}
+#         return {'ContentType': content_type}
 
 
 class UploadClient():
     """ An abstract client to handle upload of object to cloud storage service """
 
-    def __init__(self, bucket_name, prefix="", **credentials):
+    def __init__(self, bucket_name, prefix='', **credentials):
         super().__init__()
         self._bucket_name = bucket_name
         self._prefix = prefix
@@ -465,11 +492,11 @@ class UploadClient():
         raise NotImplementedError(
             'list_multipart_uploads() must be implemented')
 
-    @property
+    @ property
     def prefix(self):
         return self._prefix
 
-    @property
+    @ property
     def bucket_name(self):
         return self._bucket_name
 
@@ -707,29 +734,36 @@ class ClientManager():
         pass
 
     @classmethod
-    def create_download_client(cls, bucket_name, prefix='', region_name='', credentials={}, source_type='Amazon_S3'):
+    def create_download_client(cls, bucket_name, prefix='', region_name='', credentials={}, source_type='Amazon_S3', no_auth=False):
         source = Source(source_type)
+
+        config_kwargs = {
+            'max_pool_connections': MAX_POOL_CONNECTION,
+            'retries': {'max_attempts': MAX_ATTEMPTS}
+        }
+
+        if no_auth:
+            config_kwargs[signature_version] = UNSIGNED
+
+        # Aliyun OSS S3 SDK requires addressing_style to be virtual (not default config)
         if source == Source.ALIYUN_OSS:
-            credentials['oss_access_key_id'] = credentials.pop('access_key_id')
-            credentials['oss_secret_access_key'] = credentials.pop(
-                'secret_access_key')
-            credentials['oss_endpoint'] = source.get_endpoint_url(
+            config_kwargs['s3'] = {'addressing_style': 'virtual'}
+        s3_config = Config(**config_kwargs)
+
+        if credentials and not no_auth:
+            if credentials.get('access_key_id'):
+                credentials['aws_access_key_id'] = credentials.pop(
+                    'access_key_id')
+                credentials['aws_secret_access_key'] = credentials.pop(
+                    'secret_access_key')
+
+            # For GCS S3 SDK, region name is 'auto'
+            credentials['region_name'] = 'auto' if source == Source.GOOGLE_GCS else region_name
+            credentials['endpoint_url'] = source.get_endpoint_url(
                 region_name)
 
-            client = AliOSSDownloadClient(
-                bucket_name=bucket_name, prefix=prefix, **credentials)
-        else:  # for S3, Qiniu Kodo, Tencent COS
-            if credentials:
-                if credentials.get('access_key_id'):
-                    credentials['aws_access_key_id'] = credentials.pop(
-                        'access_key_id')
-                    credentials['aws_secret_access_key'] = credentials.pop(
-                        'secret_access_key')
-                credentials['region_name'] = region_name
-                credentials['endpoint_url'] = source.get_endpoint_url(
-                    region_name)
-            client = S3DownloadClient(
-                bucket_name=bucket_name, prefix=prefix, **credentials)
+        client = S3DownloadClient(
+            bucket_name, prefix, source, s3_config, **credentials)
         return client
 
     @classmethod
@@ -749,6 +783,7 @@ class Source(Enum):
     ALIYUN_OSS = 'Aliyun_OSS'
     TENCENT_COS = 'Tencent_COS'
     QINIU_KODO = 'Qiniu_Kodo'
+    GOOGLE_GCS = 'Google_GCS'
 
     def get_endpoint_url(self, region_name):
         ''' Helper func to get endpoint url based on region name '''
@@ -758,8 +793,10 @@ class Source(Enum):
             endpoint_url = 'https://cos.{}.myqcloud.com'.format(region_name)
         elif self == Source.ALIYUN_OSS:
             endpoint_url = 'https://oss-{}.aliyuncs.com'.format(region_name)
+        elif self == Source.GOOGLE_GCS:
+            endpoint_url = 'https://storage.googleapis.com'
         else:
             endpoint_url = None
 
-        logger.debug(f'Util> Endpoint url for {self.name} is {endpoint_url}')
+        logger.info(f'Util> Endpoint url for {self.name} is {endpoint_url}')
         return endpoint_url

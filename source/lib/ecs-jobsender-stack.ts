@@ -41,6 +41,7 @@ export class EcsStack extends Construct {
                 // TABLE_QUEUE_NAME: props.tableName,
                 SQS_QUEUE_NAME: props.job.queueName,
                 SSM_PARAMETER_CREDENTIALS: props.job.credParamName,
+                REGION_NAME: props.job.regionName,
                 SRC_BUCKET_NAME: props.job.srcBucketName,
                 SRC_BUCKET_PREFIX: props.job.srcPrefix,
                 DEST_BUCKET_NAME: props.job.destBucketName,

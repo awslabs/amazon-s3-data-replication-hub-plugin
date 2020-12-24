@@ -35,6 +35,7 @@ export interface JobDetails {
   readonly tableName: string,
   readonly queueName: string,
   readonly credParamName: string,
+  readonly regionName: string,
 }
 
 /***
@@ -58,7 +59,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       description: 'Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS',
       type: 'String',
       default: 'Amazon_S3',
-      allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS']
+      allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS', 'Google_GCS']
     })
 
     const srcBucketName = new cdk.CfnParameter(this, 'srcBucketName', {
@@ -111,8 +112,14 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     // The region credential (not the same account as Lambda) setting in SSM Parameter Store
     const credentialsParameterStore = new cdk.CfnParameter(this, 'credentialsParameterStore', {
-      description: 'The Parameter Store used to keep AK/SK credentials',
-      default: 'drh-credentials',
+      description: 'The Parameter Store used to keep AK/SK credentials. Leave it blank if you are accessing open buckets with no-sign-request',
+      default: '',
+      type: 'String'
+    })
+
+    const regionName = new cdk.CfnParameter(this, 'regionName', {
+      description: 'The Region Name',
+      default: '',
       type: 'String'
     })
 
@@ -176,7 +183,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           },
           {
             Label: { default: 'Source' },
-            Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId]
+            Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId, enableS3Event.logicalId]
           },
           {
             Label: { default: 'Destination' },
@@ -187,8 +194,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
             Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId]
           },
           {
-            Label: { default: 'Credentials' },
-            Parameters: [credentialsParameterStore.logicalId]
+            Label: { default: 'More Info about the other account' },
+            Parameters: [regionName.logicalId, credentialsParameterStore.logicalId]
           },
           {
             Label: { default: 'Notification' },
@@ -196,7 +203,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           },
           {
             Label: { default: 'Advanced Options' },
-            Parameters: [enableS3Event.logicalId, lambdaMemory.logicalId, multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId]
+            Parameters: [lambdaMemory.logicalId, multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId]
           }
         ],
         ParameterLabels: {
@@ -229,6 +236,9 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
           },
           [ecsSubnets.logicalId]: {
             Default: 'Subnet IDs to run Fargate task'
+          },
+          [regionName.logicalId]: {
+            Default: 'Region Name'
           },
           [credentialsParameterStore.logicalId]: {
             Default: 'Parameter Store for Credentials'
@@ -370,6 +380,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
         DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
         STORAGE_CLASS: destStorageClass.valueAsString,
         SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
+        REGION_NAME: regionName.valueAsString,
         JOB_TYPE: jobType.valueAsString,
         SOURCE_TYPE: sourceType.valueAsString,
         MULTIPART_THRESHOLD: multipartThreshold.valueAsString,
@@ -412,6 +423,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       queueName: sqsQueue.queueName,
       tableName: ddbFileList.tableName,
       credParamName: credentialsParameterStore.valueAsString,
+      regionName: regionName.valueAsString,
       srcBucketName: srcBucketName.valueAsString,
       srcPrefix: srcBucketPrefix.valueAsString,
       destBucketName: destBucketName.valueAsString,
