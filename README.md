@@ -75,7 +75,7 @@ The following are the all allowed parameters for deployment:
 
 | Parameter                 | Default          | Description                                                                                                               |
 |---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
-| sourceType                | Amazon_S3        | Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                 |
+| sourceType                | Amazon_S3        | Choose type of source storage, including Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS, Google_GCS.                      |
 | jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
 | srcBucketName             | <requires input> | Source bucket name.                                                                                                       |
 | srcBucketPrefix           | ''               | Source bucket object prefix. The plugin will only copy keys with the certain prefix.                                      |

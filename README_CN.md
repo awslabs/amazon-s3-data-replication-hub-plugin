@@ -69,7 +69,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 | 参数                       | 默认值            | 说明                                                                                                               |
 |---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
-| sourceType                | Amazon_S3        | 选择源存储类型，例如Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS                                 |
+| sourceType                | Amazon_S3        | 选择源存储类型，包括Amazon_S3，Aliyun_OSS，Qiniu_Kodo， Tencent_COS，Google_GCS。                                 |
 | jobType                   | GET              | 如果源存储桶不在当前帐户中，请选择GET。 否则，选择PUT                                              |
 | srcBucketName             | 需要指定          | 源存储桶名称                                                                                                       |
 | srcBucketPrefix           | ''               | 源存储桶对象前缀。 插件只会复制具有特定前缀的对象.                                        |
