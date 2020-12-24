@@ -743,7 +743,7 @@ class ClientManager():
         }
 
         if no_auth:
-            config_kwargs[signature_version] = UNSIGNED
+            config_kwargs['signature_version'] = UNSIGNED
 
         # Aliyun OSS S3 SDK requires addressing_style to be virtual (not default config)
         if source == Source.ALIYUN_OSS:
