@@ -30,10 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add support of accessing s3 with no-sign-request
 
-## [1.1.0] - 2020-12-06
+## [1.1.0] - 2020-12-21
 
 ### Changed
 - Use custom provider to handling stack events
 
 ### Added
 - Add support of triggering replication base on S3 Event.
+
+## [1.2.0] - 2020-12-24
+
+### Fixed
+- Fix wrong metric name in Lambda-NETWORK widget
+
+### Changed
+- Use S3 Native SDK to access and get objects from Aliyun OSS
+- Region name is now one of the stack parameters. Aligned with ECR plugin.
+
+### Added
+- Add support of replicating from Google Cloud Storage to Amazon S3 (Global)
