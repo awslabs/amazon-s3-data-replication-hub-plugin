@@ -15,7 +15,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 - [x] 用于从腾讯云COS复制到Amazon S3
 - [x] 用于从七牛云Kodo复制到Amazon S3
 - [ ] 用于从华为云OBS复制到Amazon S3
-- [ ] 用于从Google Cloud Storage复制到Amazon S3(海外)
+- [x] 用于从Google Cloud Storage复制到Amazon S3(海外)
 - [x] 支持元数据信息的复制
 - [x] 支持单次全量复制
 - [x] 支持增量复制
