@@ -12,11 +12,12 @@ S3 replication plugin. Each of the replication plugin can run independently.
 
 The following are the planned features of this plugin.
 
-- [x] Amazon S3 object replication between AWS Standard partition and AWS CN partition
+- [x] Amazon S3 object replication between AWS Global partition and AWS CN partition
 - [x] Replication from Aliyun OSS to Amazon S3
 - [x] Replication from Tencent COS to Amazon S3
 - [x] Replication from Qiniu Kodo to Amazon S3
 - [ ] Replication from Huawei Cloud OBS to Amazon S3
+- [x] Replication from Google Cloud Storage to Amazon S3 (Global)
 - [x] Support replication with Metadata
 - [x] Support One-time replication
 - [x] Support Incremental replication
@@ -52,13 +53,12 @@ Things to know about the deployment of this plugin:
 
 You will need to provide `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read or write bucket in S3 from another partition or in other cloud storage service. And a Parameter Store is used to store the credentials in a secure manner.
 
-Please create a parameter in **Parameter Store** from **AWS Systems Manager**, you can use default name `drh-credentials` (optional), select **SecureString** as its type, and put a **Value** following below format.
+Please create a parameter in **Parameter Store** from **AWS Systems Manager**, select **SecureString** as its type, and put a **Value** following below format.
 
 ```
 {
   "access_key_id": "<Your Access Key ID>",
-  "secret_access_key": "<Your Access Key Secret>",
-  "region_name": "<Your Region>"
+  "secret_access_key": "<Your Access Key Secret>"
 }
 ```
 
@@ -85,7 +85,8 @@ The following are the all allowed parameters for deployment:
 | ecsClusterName            | <requires input> | ECS Cluster Name to run ECS task                                                                                          |
 | ecsVpcId                  | <requires input> | VPC ID to run ECS task, e.g. vpc-bef13dc7                                                                                 |
 | ecsSubnets                | <requires input> | Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32  |
-| credentialsParameterStore | drh-credentials  | The Parameter Name used to keep credentials in Parameter Store.                                                           |
+| credentialsParameterStore | ''               | The Parameter Name used to keep credentials in Parameter Store. Leave it blank if you are replicating from open buckets.  |
+| regionName                | ''               | The Region Name, e.g. eu-west-1.  For Google GCS, this is optional.                                                       |
 | alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
 | enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default to No.    |
 | lambdaMemory              | 256              | Lambda Memory, default to 256 MB.                                                                                         |

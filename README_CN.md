@@ -15,6 +15,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 - [x] 用于从腾讯云COS复制到Amazon S3
 - [x] 用于从七牛云Kodo复制到Amazon S3
 - [ ] 用于从华为云OBS复制到Amazon S3
+- [ ] 用于从Google Cloud Storage复制到Amazon S3(海外)
 - [x] 支持元数据信息的复制
 - [x] 支持单次全量复制
 - [x] 支持增量复制
@@ -46,13 +47,12 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 您需要提供“AccessKeyID”和“SecretAccessKey”（即“AK/SK”）凭据，才能从其他分区S3或其他云存储服务中读取或写入存储桶。 凭据会以安全方式存储于参数存储区。
 
-请在**AWS Systems Manager** 的**参数存储区**创建一个参数，您可以使用默认名称`drh-credentials`（可选），选择 **SecureString** 作为其类型，然后按照以下格式提供相应的**值**。
+请在**AWS Systems Manager** 的**参数存储区**创建一个参数，选择 **SecureString** 作为其类型，然后按照以下格式提供相应的**值**。
 
 ```
 {
   "access_key_id": "<Your Access Key ID>",
-  "secret_access_key": "<Your Access Key Secret>",
-  "region_name": "<Your Region>"
+  "secret_access_key": "<Your Access Key Secret>"
 }
 ```
 
@@ -75,17 +75,18 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 | srcBucketPrefix           | ''               | 源存储桶对象前缀。 插件只会复制具有特定前缀的对象.                                        |
 | destBucketName            | 需要指定          | 目标存储桶名称                                                                                                  |
 | destBucketPrefix          | ''               | 目标存储桶前缀。插件将上传到指定的前缀                                                      |
-| destStorageClass          | STANDARD       | 目标存储类型，可选的值有 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
+| destStorageClass          | STANDARD         | 目标存储类型，可选的值有 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
 | ecsClusterName            | 需要指定          | 用于运行ECS任务的ECS集群名称                                                                                          |
 | ecsVpcId                  | 需要指定          | 用于运行ECS任务的VPC ID，例如 vpc-bef13dc7                                                                                  |
 | ecsSubnets                | 需要指定          | 用于运行ECS任务的子网ID。 请提供至少两个以逗号分隔的子网，例如 子网97bfc4cd，子网7ad7de32   |
-| credentialsParameterStore | drh-credentials  | 用于将凭据保存在参数存储中的参数名称                                                           |
+| credentialsParameterStore | ''               | 用于将凭据保存在参数存储中的参数名称， 如果是源是公开的存储桶，可以放空。                                                           |
+| regionName                | ''               | region名称，例如cn-west-1，如果源是Google Cloud Storage, 可以放空。                                                           |
 | alarmEmail                | 需要指定           | 警报电子邮件。 错误将发送到此电子邮件                                                                          |
 | enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用                                    |
 | lambdaMemory              | 256              | Lambda内存， 默认为 256 MB                                                                                      |
 | multipartThreshold        | 10               | 分段上传的阀值（单位： MB）默认为10 MB                                                             |
 | chunkSize                 | 5                | 分片大小，默认为5 MB                                                                  |
-| maxThreads                |10                | Lambda分段上传的线程数                                                              |
+| maxThreads                | 10               | Lambda分段上传的线程数                                                              |
 
 
 ### 用AWS Cloudformation方式部署
