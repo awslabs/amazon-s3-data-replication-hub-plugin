@@ -40,9 +40,7 @@ log_level = str(os.environ.get('LOG_LEVEL')).upper()
 if log_level not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
     log_level = 'INFO'
 
-# logging.basicConfig(level=log_level)
 logger = logging.getLogger()
-# logger.setLevel(logging.INFO)
 logger.setLevel(log_level)
 
 no_auth = False
@@ -71,8 +69,6 @@ src_region, des_region = '', region_name
 if job_type == 'GET':
     src_region, des_region = des_region, src_region
 
-    # if src_credentials:
-    #     src_region = src_credentials
 src_client = ClientManager.create_download_client(
     src_bucket_name, src_bucket_prefix, src_region, src_credentials, source_type, no_auth)
 des_client = ClientManager.create_upload_client(
@@ -105,6 +101,9 @@ def lambda_handler(event, context):
         job = json.loads(trigger_body)
         logger.info(json.dumps(job, default=str))
 
+        # Store a list of objects to be transferred
+        job_list = []
+
         # First message is a test message only, no need to process.
         if 'Event' in job:
             if job['Event'] == 's3:TestEvent':
@@ -129,11 +128,13 @@ def lambda_handler(event, context):
                     else:
                         version = 'null'
 
-                    jobinfo = JobInfo(
-                        key=key,
-                        size=size,
-                        version=version,
-                        storage_class=default_storage_class)
+                    job_list.append(
+                        JobInfo(
+                            key=key,
+                            size=size,
+                            version=version,
+                            storage_class=default_storage_class)
+                    )
                 else:
                     logger.warning(
                         f'Wrong sqs job: {json.dumps(job, default=str)}')
@@ -145,22 +146,28 @@ def lambda_handler(event, context):
                     f'Wrong sqs job: {json.dumps(job, default=str)}')
                 logger.warning('Try to handle next message')
                 raise WrongRecordFormat
+            else:
+                job['storage_class'] = default_storage_class
+                job_list.append(JobInfo(**job))
 
-            job['storage_class'] = default_storage_class
-            jobinfo = JobInfo(**job)
+        # If not empty list.
+        if job_list:
+            logger.info(job_list)
 
-        logger.info(jobinfo)
+            config = JobConfig(include_version=include_version,
+                               job_timeout=job_timeout,
+                               multipart_threshold=multipart_threshold,
+                               chunk_size=chunk_size,
+                               max_threads=max_threads)
+            db = DBService(table_queue_name)
 
-        config = JobConfig(include_version=include_version,
-                           job_timeout=job_timeout,
-                           multipart_threshold=multipart_threshold,
-                           chunk_size=chunk_size,
-                           max_threads=max_threads)
-        db = DBService(table_queue_name)
-        migrator = JobMigrator(src_client, des_client,
-                               config, db, jobinfo)
+            for job in job_list:
+                migrator = JobMigrator(src_client, des_client,
+                                       config, db, job)
 
-        migrator.start_migration()
+                migrator.start_migration()
+        else:
+            logger.info('No Objects to be transferred.')
 
     return {
         'statusCode': 200,
