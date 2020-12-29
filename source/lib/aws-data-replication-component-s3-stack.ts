@@ -17,6 +17,9 @@ import { EcsStack, EcsTaskProps } from "./ecs-jobsender-stack";
 import { DashboardStack, DBProps } from "./dashboard-stack";
 import { StackEventHandler, EventProps } from "./stack-event-handler";
 
+
+const { VERSION } = process.env;
+
 /**
  * cfn-nag suppression rule interface
  */
@@ -56,7 +59,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     })
 
     const sourceType = new cdk.CfnParameter(this, 'sourceType', {
-      description: 'Choose type of source storage, for example Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS',
+      description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
       type: 'String',
       default: 'Amazon_S3',
       allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS', 'Google_GCS']
@@ -112,13 +115,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     // The region credential (not the same account as Lambda) setting in SSM Parameter Store
     const credentialsParameterStore = new cdk.CfnParameter(this, 'credentialsParameterStore', {
-      description: 'The Parameter Store used to keep AK/SK credentials. Leave it blank if you are accessing open buckets with no-sign-request',
+      description: 'The Parameter Store used to keep AK/SK credentials for another account. Leave it blank if you are accessing open buckets with no-sign-request',
       default: '',
       type: 'String'
     })
 
     const regionName = new cdk.CfnParameter(this, 'regionName', {
-      description: 'The Region Name',
+      description: 'The Region Name. This is the region of the bucket in another account or cloud storage',
       default: '',
       type: 'String'
     })
@@ -171,8 +174,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       allowedValues: ['5', '10', '20', '50'],
     })
 
-
-    this.templateOptions.description = 'Data Replication Hub - S3 Plugin Cloudformation Template';
+    this.templateOptions.description = `(SO80002) - Data Replication Hub - S3 Plugin - Template version ${VERSION}`;
 
     this.templateOptions.metadata = {
       'AWS::CloudFormation::Interface': {
@@ -194,7 +196,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
             Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId]
           },
           {
-            Label: { default: 'More Info about the other account' },
+            Label: { default: 'Extra Information about another account or cloud storage' },
             Parameters: [regionName.logicalId, credentialsParameterStore.logicalId]
           },
           {
