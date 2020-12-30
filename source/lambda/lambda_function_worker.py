@@ -221,7 +221,7 @@ def process_events(event_message, event_table):
                     {'key': key, 'size': size, 'version': version})
         else:
             logger.warning(
-                f'Cannot find S3 Object info. unknown message format: {json.dumps(job, default=str)}')
+                f'Cannot find S3 Object info. unknown message format: {json.dumps(record, default=str)}')
             logger.warning('Try to handle next message')
             raise WrongRecordFormat
 
