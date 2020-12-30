@@ -94,32 +94,45 @@ def put_s3_notification(props):
     job_type = props['job_type']
     stack_name = props['stack_name']
 
-    if job_type == 'PUT' and enable_s3_event == 'Yes':
+    if job_type == 'PUT' and enable_s3_event != 'No':
 
-        response = s3.put_bucket_notification_configuration(
-            Bucket=bucket_name,
-            NotificationConfiguration={
-                'QueueConfigurations': [
-                    {
-                        'Id': 'Data Replication Hub Notification - {}'.format(stack_name),
-                        'QueueArn': queue_arn,
-                        'Events': [
-                            's3:ObjectCreated:*'
-                        ],
-                        'Filter': {
-                            'Key': {
-                                'FilterRules': [
-                                    {
-                                        'Name': 'prefix',
-                                        'Value': prefix
-                                    },
-                                ]
+        # Check event type
+        if enable_s3_event == 'Delete_Only':
+            events = [
+                's3:ObjectRemoved:Delete',
+            ]
+        elif enable_s3_event == 'Create_And_Delete':
+            events = [
+                's3:ObjectCreated:*',
+                's3:ObjectRemoved:Delete',
+            ]
+        else:
+            events = ['s3:ObjectCreated:*']
+        try:
+            response = s3.put_bucket_notification_configuration(
+                Bucket=bucket_name,
+                NotificationConfiguration={
+                    'QueueConfigurations': [
+                        {
+                            'Id': 'Data Replication Hub Notification - {}'.format(stack_name),
+                            'QueueArn': queue_arn,
+                            'Events': events,
+                            'Filter': {
+                                'Key': {
+                                    'FilterRules': [
+                                        {
+                                            'Name': 'prefix',
+                                            'Value': prefix
+                                        },
+                                    ]
+                                }
                             }
-                        }
-                    },
-                ],
-            },
-        )
-        print(response)
+                        },
+                    ],
+                },
+            )
+            print(response)
+        except Exception as e:
+            print(f'Failed to Add notification configuration - Error: {e}')
     else:
         print('No need to add S3 bucket notitication')

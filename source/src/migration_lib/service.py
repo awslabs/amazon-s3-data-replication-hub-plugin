@@ -5,6 +5,7 @@ import time
 from pathlib import Path, PurePosixPath
 
 import boto3
+from boto3.dynamodb.conditions import Key, Attr
 
 from migration_lib.config import QUEUE_BATCH_SIZE
 from migration_lib.client import JobInfo
@@ -115,6 +116,71 @@ class DBService():
             logger.error(
                 f'Fail to query DDB for versionId {des_bucket}- {str(e)}')
         return ver_list
+
+    def check_sequencer(self, key, sequencer):
+        ''' Returns True if this event should be handled, otherwise False 
+
+        The sequencer in the event message provides a way to determine the sequence of events. 
+        A event message should only be handled if the current sequencer has a greater hexadecimal value.
+
+        More info: Check https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html
+
+        If there is no existing record for the key. A record will be created in event table, and True is returned.. 
+
+        If existing record has smaller hexadecimal value, the record will be updated with new sequencer, and True is returned.
+
+        If existing record has bigger hexadecimal value, nothing will happen, and False is returned.
+        '''
+        logger.info(
+            f'DynamoDB> Validate sequencer for key {key} in Event Table')
+
+        try:
+            response = self._table.query(
+                KeyConditionExpression=Key('objectKey').eq(key)
+            )
+
+            logger.debug(f'DynamoDB> Query Response {response}')
+            items = response['Items']
+            logger.debug(f'DynamoDB> Returned Item {items}')
+
+            if items:  # if item found.
+                seq = items[0]['sequencer']
+                logger.debug(
+                    f'DynamoDB> Key {key} found in event Table with sequence {seq}')
+                old_seq = int(seq, 16)
+                new_seq = int(sequencer, 16)
+                logger.debug(
+                    f'DynamoDB> Comparing new {new_seq} to old {old_seq}')
+                if new_seq <= old_seq:
+                    logger.debug(
+                        f'DynamoDB > Existing sequencer is bigger, event should be ignored')
+                    return False
+
+                else:
+                    logger.debug(
+                        f'DynamoDB > Existing sequencer is smaller. Update {key} with new sequencer {sequencer}')
+                    self._table.update_item(
+                        Key={
+                            'objectKey': key,
+                        },
+                        UpdateExpression='SET sequencer = :val1',
+                        ExpressionAttributeValues={
+                            ':val1': sequencer
+                        }
+                    )
+            else:
+                logger.debug(
+                    f'key {key} not found, create new event record with sequencer {sequencer}')
+                self._table.put_item(
+                    Item={
+                        'objectKey':  key,
+                        'sequencer': sequencer,
+                    }
+                )
+        except Exception as e:
+            logger.error(
+                f'DynamoDB> Exception on {key}- {str(e)}')
+        return True
 
 
 class SQSService():
