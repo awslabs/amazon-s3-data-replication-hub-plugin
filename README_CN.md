@@ -19,6 +19,8 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 - [x] 支持元数据信息的复制
 - [x] 支持单次全量复制
 - [x] 支持增量复制
+- [x] 支持增量复制
+- [x] 支持基于S3 事件触发复制
 
 ## 架构图
 
@@ -82,7 +84,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 | credentialsParameterStore | ''               | 用于将凭据保存在参数存储中的参数名称， 如果是源是公开的存储桶，可以放空。                                                           |
 | regionName                | ''               | region名称，例如cn-west-1，如果源是Google Cloud Storage, 可以放空。                                                           |
 | alarmEmail                | 需要指定           | 警报电子邮件。 错误将发送到此电子邮件                                                                          |
-| enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用                                    |
+| enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用。<br> 允许的值包括No, Create_Only, Delete_Only, Create_And_Delete。<br> 注意： 目前还不支持Delete Marker的事件。                       |
 | lambdaMemory              | 256              | Lambda内存， 默认为 256 MB                                                                                      |
 | multipartThreshold        | 10               | 分段上传的阀值（单位： MB）默认为10 MB                                                             |
 | chunkSize                 | 5                | 分片大小，默认为5 MB                                                                  |
@@ -139,6 +141,8 @@ cdk deploy --parameters srcBucketName=<source-bucket-name> \
 --parameters alarmEmail=xxxxx@example.com \
 --parameters jobType=GET \
 --parameters sourceType=Amazon_S3 \
+--parameters credentialsParameterStore=drh-credentials \
+--parameters regionName=cn-north-1 \
 --parameters ecsClusterName=test \
 --parameters ecsVpcId=vpc-bef13dc7 \
 --parameters ecsSubnets=subnet-97bfc4cd,subnet-7ad7de32

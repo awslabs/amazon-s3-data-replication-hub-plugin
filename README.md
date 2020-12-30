@@ -21,6 +21,7 @@ The following are the planned features of this plugin.
 - [x] Support replication with Metadata
 - [x] Support One-time replication
 - [x] Support Incremental replication
+- [x] Support S3 Events to trigger replication
 
 ## Architect
 
@@ -88,11 +89,11 @@ The following are the all allowed parameters for deployment:
 | credentialsParameterStore | ''               | The Parameter Name used to keep credentials in Parameter Store. Leave it blank if you are replicating from open buckets.  |
 | regionName                | ''               | The Region Name, e.g. eu-west-1.  For Google GCS, this is optional.                                                       |
 | alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
-| enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default to No.    |
+| enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default value is No. <br>Allow values: No, Create_Only, Delete_Only, Create_And_Delete. <br>Note that Delete Marker Event is not support yet.     |
 | lambdaMemory              | 256              | Lambda Memory, default to 256 MB.                                                                                         |
 | multipartThreshold        | 10               | Threshold Size for multipart upload in MB, default to 10 (MB)                                                             |
 | chunkSize                 | 5                | Chunk Size for multipart upload in MB, default to 5 (MB)                                                                  |
-| maxThreads                |10                | Max Theads to run multipart upload in lambda, default to 10                                                               |
+| maxThreads                | 10               | Max Theads to run multipart upload in lambda, default to 10                                                               |
 
 ### Deploy via AWS Cloudformation
 
@@ -144,6 +145,8 @@ cdk deploy --parameters srcBucketName=<source-bucket-name> \
 --parameters alarmEmail=xxxxx@example.com \
 --parameters jobType=GET \
 --parameters sourceType=Amazon_S3 \
+--parameters credentialsParameterStore=drh-credentials \
+--parameters regionName=cn-north-1 \
 --parameters ecsClusterName=test \
 --parameters ecsVpcId=vpc-bef13dc7 \
 --parameters ecsSubnets=subnet-97bfc4cd,subnet-7ad7de32
