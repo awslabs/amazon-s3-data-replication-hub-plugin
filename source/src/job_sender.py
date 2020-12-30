@@ -13,7 +13,7 @@ log_level = str(os.environ.get('LOG_LEVEL')).upper()
 if log_level not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
     log_level = 'WARNING'
 
-logging.basicConfig(level=log_level)
+logging.basicConfig(format='%(levelname)s:%(message)s', level=log_level)
 logger = logging.getLogger()
 logger.info("The log level is %s", log_level)
 

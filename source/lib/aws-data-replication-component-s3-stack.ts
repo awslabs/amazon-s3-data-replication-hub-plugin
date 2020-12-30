@@ -309,6 +309,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       ),
     });
 
+
+
     const eventTable = new ddb.Table(this, 'S3EventTable', {
       partitionKey: { name: 'objectKey', type: ddb.AttributeType.STRING },
       billingMode: ddb.BillingMode.PAY_PER_REQUEST,
@@ -318,7 +320,24 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const cfnEventTable = eventTable.node.defaultChild as ddb.CfnTable;
     cfnEventTable.cfnOptions.condition = useS3Event
 
+    const eventTableName = cdk.Fn.conditionIf(useS3Event.logicalId, eventTable.tableName, 'NA').toString();
+    const eventTableArn = cdk.Fn.conditionIf(useS3Event.logicalId, eventTable.tableArn, jobTable.tableArn).toString();
 
+    const eventTableRWPolicy = new iam.PolicyStatement({
+      actions: ["dynamodb:BatchGetItem",
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem"
+      ],
+      effect: iam.Effect.ALLOW,
+      resources: [eventTableArn]
+    })
 
     // Get bucket
     // PUT - Source bucket in current account and destination in other account
@@ -398,7 +417,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       // tracing: lambda.Tracing.ACTIVE,
       environment: {
         JOB_TABLE_NAME: jobTable.tableName,
-        EVENT_TABLE_NAME: eventTable.tableName,
+        EVENT_TABLE_NAME: eventTableName,
         SRC_BUCKET_NAME: srcBucketName.valueAsString,
         SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
         DEST_BUCKET_NAME: destBucketName.valueAsString,
@@ -417,11 +436,13 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
 
     ssmCredentialsParam.grantRead(handler);
     jobTable.grantReadWriteData(handler);
-    eventTable.grantReadWriteData(handler);
+    // eventTable.grantReadWriteData(handler);
     s3InCurrentAccount.grantReadWrite(handler);
     handler.addEventSource(new SqsEventSource(sqsQueue, {
       batchSize: 1
     }));
+
+    handler.addToRolePolicy(eventTableRWPolicy)
 
     // Setup Alarm for queue - DLQ
     const alarmDLQ = new cw.Alarm(this, 'SQSDLQAlarm', {
