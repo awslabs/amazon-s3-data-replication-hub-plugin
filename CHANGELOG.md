@@ -49,3 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add support of replicating from Google Cloud Storage to Amazon S3 (Global)
+
+## [1.3.0] - 2020-12-30
+
+### Changed
+- Regroup the cloudformation parameters
+
+### Added
+- Add support of S3 Delete Event
