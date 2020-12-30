@@ -89,7 +89,7 @@ The following are the all allowed parameters for deployment:
 | credentialsParameterStore | ''               | The Parameter Name used to keep credentials in Parameter Store. Leave it blank if you are replicating from open buckets.  |
 | regionName                | ''               | The Region Name, e.g. eu-west-1.  For Google GCS, this is optional.                                                       |
 | alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
-| enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default value is No. <br>Allow values: No, Create_Only, Delete_Only, Create_And_Delete. <br>Note that Delete Marker Event is not support yet.     |
+| enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default value is No. <br>Allow options: 'No', 'Create_Only', 'Delete_Only', 'Create_And_Delete'. <br>Note that Delete Marker Event is not support yet.     |
 | lambdaMemory              | 256              | Lambda Memory, default to 256 MB.                                                                                         |
 | multipartThreshold        | 10               | Threshold Size for multipart upload in MB, default to 10 (MB)                                                             |
 | chunkSize                 | 5                | Chunk Size for multipart upload in MB, default to 5 (MB)                                                                  |

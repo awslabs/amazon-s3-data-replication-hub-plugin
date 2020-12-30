@@ -77,14 +77,14 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 | srcBucketPrefix           | ''               | 源存储桶对象前缀。 插件只会复制具有特定前缀的对象.                                        |
 | destBucketName            | 需要指定          | 目标存储桶名称                                                                                                  |
 | destBucketPrefix          | ''               | 目标存储桶前缀。插件将上传到指定的前缀                                                      |
-| destStorageClass          | STANDARD         | 目标存储类型，可选的值有 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
+| destStorageClass          | STANDARD         | 目标存储类型，可选的值有: 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
 | ecsClusterName            | 需要指定          | 用于运行ECS任务的ECS集群名称                                                                                          |
 | ecsVpcId                  | 需要指定          | 用于运行ECS任务的VPC ID，例如 vpc-bef13dc7                                                                                  |
 | ecsSubnets                | 需要指定          | 用于运行ECS任务的子网ID。 请提供至少两个以逗号分隔的子网，例如 子网97bfc4cd，子网7ad7de32   |
 | credentialsParameterStore | ''               | 用于将凭据保存在参数存储中的参数名称， 如果是源是公开的存储桶，可以放空。                                                           |
 | regionName                | ''               | region名称，例如cn-west-1，如果源是Google Cloud Storage, 可以放空。                                                           |
 | alarmEmail                | 需要指定           | 警报电子邮件。 错误将发送到此电子邮件                                                                          |
-| enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用。<br> 允许的值包括No, Create_Only, Delete_Only, Create_And_Delete。<br> 注意： 目前还不支持Delete Marker的事件。                       |
+| enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用。<br> 可选的值有: 'No', 'Create_Only', 'Delete_Only', 'Create_And_Delete'。<br> 注意： 目前还不支持Delete Marker的事件。                       |
 | lambdaMemory              | 256              | Lambda内存， 默认为 256 MB                                                                                      |
 | multipartThreshold        | 10               | 分段上传的阀值（单位： MB）默认为10 MB                                                             |
 | chunkSize                 | 5                | 分片大小，默认为5 MB                                                                  |
