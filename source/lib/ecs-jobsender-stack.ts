@@ -38,7 +38,7 @@ export class EcsStack extends Construct {
             image: ecs.ContainerImage.fromEcrRepository(repo),
             environment: {
                 AWS_DEFAULT_REGION: Aws.REGION,
-                // TABLE_QUEUE_NAME: props.tableName,
+                JOB_TABLE_NAME: props.job.jobTableName,
                 SQS_QUEUE_NAME: props.job.queueName,
                 SSM_PARAMETER_CREDENTIALS: props.job.credParamName,
                 REGION_NAME: props.job.regionName,

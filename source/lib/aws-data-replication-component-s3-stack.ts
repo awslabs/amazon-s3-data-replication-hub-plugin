@@ -35,7 +35,7 @@ export interface JobDetails {
   readonly destPrefix: string,
   readonly jobType: string,
   readonly sourceType: string,
-  readonly tableName: string,
+  readonly jobTableName: string,
   readonly queueName: string,
   readonly credParamName: string,
   readonly regionName: string,
@@ -143,7 +143,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
       default: 'No',
       type: 'String',
-      allowedValues: ['Yes', 'No']
+      allowedValues: ['No', 'Create_Only', 'Delete_Only', 'Create_And_Delete']
     })
 
     const lambdaMemory = new cdk.CfnParameter(this, 'lambdaMemory', {
@@ -277,26 +277,48 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     });
 
     // Setup DynamoDB
-    const ddbFileList = new ddb.Table(this, 'S3MigrationTable', {
+    const jobTable = new ddb.Table(this, 'S3MigrationTable', {
       partitionKey: { name: 'objectKey', type: ddb.AttributeType.STRING },
       billingMode: ddb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY
     })
 
-    ddbFileList.addGlobalSecondaryIndex({
+    jobTable.addGlobalSecondaryIndex({
       partitionKey: { name: 'desBucket', type: ddb.AttributeType.STRING },
       indexName: 'desBucket-index',
       projectionType: ddb.ProjectionType.INCLUDE,
       nonKeyAttributes: ['desKey', 'versionId']
     })
 
-    const cfnDdb = ddbFileList.node.defaultChild as ddb.CfnTable;
-    this.addCfnNagSuppressRules(cfnDdb, [
+    const cfnJobTable = jobTable.node.defaultChild as ddb.CfnTable;
+    this.addCfnNagSuppressRules(cfnJobTable, [
       {
         id: 'W74',
         reason: 'No need to use encryption'
       }
     ]);
+
+    const useS3Event = new cdk.CfnCondition(this, 'UseS3Event', {
+      expression: cdk.Fn.conditionAnd(
+        // job Type is PUT
+        cdk.Fn.conditionEquals('PUT', jobType.valueAsString),
+        // Source Type is Amazon S3 - Optional
+        cdk.Fn.conditionEquals('Amazon_S3', sourceType.valueAsString),
+        // Enable S3 Event is Yes
+        cdk.Fn.conditionNot(cdk.Fn.conditionEquals('No', enableS3Event.valueAsString)),
+      ),
+    });
+
+    const eventTable = new ddb.Table(this, 'S3EventTable', {
+      partitionKey: { name: 'objectKey', type: ddb.AttributeType.STRING },
+      billingMode: ddb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY
+    })
+
+    const cfnEventTable = eventTable.node.defaultChild as ddb.CfnTable;
+    cfnEventTable.cfnOptions.condition = useS3Event
+
+
 
     // Get bucket
     // PUT - Source bucket in current account and destination in other account
@@ -375,7 +397,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       timeout: cdk.Duration.minutes(15),
       // tracing: lambda.Tracing.ACTIVE,
       environment: {
-        TABLE_QUEUE_NAME: ddbFileList.tableName,
+        JOB_TABLE_NAME: jobTable.tableName,
+        EVENT_TABLE_NAME: eventTable.tableName,
         SRC_BUCKET_NAME: srcBucketName.valueAsString,
         SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
         DEST_BUCKET_NAME: destBucketName.valueAsString,
@@ -393,7 +416,8 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     })
 
     ssmCredentialsParam.grantRead(handler);
-    ddbFileList.grantReadWriteData(handler);
+    jobTable.grantReadWriteData(handler);
+    eventTable.grantReadWriteData(handler);
     s3InCurrentAccount.grantReadWrite(handler);
     handler.addEventSource(new SqsEventSource(sqsQueue, {
       batchSize: 1
@@ -423,7 +447,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     // Setup Fargate Task
     const jobDetails: JobDetails = {
       queueName: sqsQueue.queueName,
-      tableName: ddbFileList.tableName,
+      jobTableName: jobTable.tableName,
       credParamName: credentialsParameterStore.valueAsString,
       regionName: regionName.valueAsString,
       srcBucketName: srcBucketName.valueAsString,
@@ -444,7 +468,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
     const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
 
     ssmCredentialsParam.grantRead(ecsStack.taskDefinition.taskRole)
-    ddbFileList.grantReadData(ecsStack.taskDefinition.taskRole);
+    jobTable.grantReadData(ecsStack.taskDefinition.taskRole);
     sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
     s3InCurrentAccount.grantReadWrite(ecsStack.taskDefinition.taskRole);
 
