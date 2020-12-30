@@ -49,15 +49,6 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // 'PUT': Destination Bucket is not in current account.
-    // 'GET': Source bucket is not in current account.
-    const jobType = new cdk.CfnParameter(this, 'jobType', {
-      description: 'Choose GET if source bucket is not in current account. Otherwise, choose PUT',
-      type: 'String',
-      default: 'GET',
-      allowedValues: ['PUT', 'GET']
-    })
-
     const sourceType = new cdk.CfnParameter(this, 'sourceType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
       type: 'String',
@@ -113,6 +104,21 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       type: 'List<AWS::EC2::Subnet::Id>'
     })
 
+    // 'PUT': Destination Bucket is not in current account.
+    // 'GET': Source bucket is not in current account.
+    const jobType = new cdk.CfnParameter(this, 'jobType', {
+      description: 'Choose PUT if source bucket is in current account. Otherwise, choose GET',
+      type: 'String',
+      default: 'GET',
+      allowedValues: ['PUT', 'GET']
+    })
+
+    const regionName = new cdk.CfnParameter(this, 'regionName', {
+      description: 'Region Name. If Job Type is GET, use source region name, otherwise use destination region name.',
+      default: '',
+      type: 'String'
+    })
+
     // The region credential (not the same account as Lambda) setting in SSM Parameter Store
     const credentialsParameterStore = new cdk.CfnParameter(this, 'credentialsParameterStore', {
       description: 'The Parameter Store used to keep AK/SK credentials for another account. Leave it blank if you are accessing open buckets with no-sign-request',
@@ -120,11 +126,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       type: 'String'
     })
 
-    const regionName = new cdk.CfnParameter(this, 'regionName', {
-      description: 'The Region Name. This is the region of the bucket in another account or cloud storage',
-      default: '',
-      type: 'String'
-    })
+
 
     const alarmEmail = new cdk.CfnParameter(this, 'alarmEmail', {
       allowedPattern: '\\w[-\\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\\.)+[A-Za-z]{2,14}',
@@ -180,28 +182,24 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       'AWS::CloudFormation::Interface': {
         ParameterGroups: [
           {
-            Label: { default: 'General' },
-            Parameters: [sourceType.logicalId, jobType.logicalId]
+            Label: { default: 'Source Type' },
+            Parameters: [sourceType.logicalId]
           },
           {
-            Label: { default: 'Source' },
+            Label: { default: 'Source Information' },
             Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId, enableS3Event.logicalId]
           },
           {
-            Label: { default: 'Destination' },
+            Label: { default: 'Destination Information' },
             Parameters: [destBucketName.logicalId, destBucketPrefix.logicalId, destStorageClass.logicalId]
           },
           {
-            Label: { default: 'ECS Cluster' },
+            Label: { default: 'Extra Information' },
+            Parameters: [jobType.logicalId, regionName.logicalId, credentialsParameterStore.logicalId, alarmEmail.logicalId]
+          },
+          {
+            Label: { default: 'ECS Cluster Information' },
             Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId]
-          },
-          {
-            Label: { default: 'Extra Information about another account or cloud storage' },
-            Parameters: [regionName.logicalId, credentialsParameterStore.logicalId]
-          },
-          {
-            Label: { default: 'Notification' },
-            Parameters: [alarmEmail.logicalId]
           },
           {
             Label: { default: 'Advanced Options' },
@@ -240,10 +238,10 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
             Default: 'Subnet IDs to run Fargate task'
           },
           [regionName.logicalId]: {
-            Default: 'Region Name'
+            Default: 'Region Name for another account or cloud storage'
           },
           [credentialsParameterStore.logicalId]: {
-            Default: 'Parameter Store for Credentials'
+            Default: 'Credentials Parameter for another account or cloud storage'
           },
           [alarmEmail.logicalId]: {
             default: 'Alarm Email'
