@@ -59,10 +59,10 @@ docker push $domain/$IMAGE_REPO_NAME:$IMAGE_TAG
 echo "Replace the docker image arn in cloud formation template"
 cd $template_dist_dir
 echo "arn prefix is arn:$partition:ecr:$1:$2"
-replace="s/arn:aws:ecr:us-west-2:347283850106/arn:$partition:ecr:$1:$2/g"
+replace="s/arn:aws:ecr:us-west-2:627627941158/arn:$partition:ecr:$1:$2/g"
 sed -i '' -e $replace $template_dist_dir/*.template
 echo "uri prefix is $2.dkr.ecr.$1"
-replace="s/347283850106.dkr.ecr.us-west-2/$2.dkr.ecr.$1/g"
+replace="s/627627941158.dkr.ecr.us-west-2/$2.dkr.ecr.$1/g"
 sed -i '' -e $replace $template_dist_dir/*.template
 echo "replace tag"
 replace="s/s3-replication-jobsender:latest/s3-replication-jobsender:$IMAGE_TAG/g"
