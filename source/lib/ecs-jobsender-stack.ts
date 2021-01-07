@@ -5,11 +5,12 @@ import * as ecs from '@aws-cdk/aws-ecs';
 import * as ec2 from '@aws-cdk/aws-ec2';
 import * as ecr from '@aws-cdk/aws-ecr';
 
-import { JobDetails } from './aws-data-replication-component-s3-stack';
-
+export interface Env {
+    [key: string]: any;
+}
 
 export interface EcsTaskProps {
-    readonly job: JobDetails,
+    readonly env: Env,
     readonly ecsVpcId: string,
     readonly ecsSubnetIds: string[],
     readonly ecsClusterName: string,
@@ -36,19 +37,7 @@ export class EcsStack extends Construct {
         });
         this.taskDefinition.addContainer('DefaultContainer', {
             image: ecs.ContainerImage.fromEcrRepository(repo),
-            environment: {
-                AWS_DEFAULT_REGION: Aws.REGION,
-                JOB_TABLE_NAME: props.job.jobTableName,
-                SQS_QUEUE_NAME: props.job.queueName,
-                SSM_PARAMETER_CREDENTIALS: props.job.credParamName,
-                REGION_NAME: props.job.regionName,
-                SRC_BUCKET_NAME: props.job.srcBucketName,
-                SRC_BUCKET_PREFIX: props.job.srcPrefix,
-                DEST_BUCKET_NAME: props.job.destBucketName,
-                DEST_BUCKET_PREFIX: props.job.destPrefix,
-                JOB_TYPE: props.job.jobType,
-                SOURCE_TYPE: props.job.sourceType,
-            },
+            environment: props.env,
             logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender' })
         });
 

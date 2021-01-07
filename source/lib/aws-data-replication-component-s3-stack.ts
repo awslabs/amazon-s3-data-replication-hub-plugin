@@ -28,19 +28,6 @@ interface CfnNagSuppressRule {
   readonly reason: string;
 }
 
-export interface JobDetails {
-  readonly srcBucketName: string,
-  readonly srcPrefix: string,
-  readonly destBucketName: string,
-  readonly destPrefix: string,
-  readonly jobType: string,
-  readonly sourceType: string,
-  readonly jobTableName: string,
-  readonly queueName: string,
-  readonly credParamName: string,
-  readonly regionName: string,
-}
-
 /***
  * BEFORE DEPLOY CDK, please setup a "drh-credentials" secure parameter in ssm parameter store MANUALLY!
  */
@@ -176,7 +163,7 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       allowedValues: ['5', '10', '20', '50'],
     })
 
-    this.templateOptions.description = `(SO80002) - Data Replication Hub - S3 Plugin - Template version ${VERSION}`;
+    this.templateOptions.description = `(SO8002) - Data Replication Hub - S3 Plugin - Template version ${VERSION}`;
 
     this.templateOptions.metadata = {
       'AWS::CloudFormation::Interface': {
@@ -229,19 +216,19 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
             default: 'Destination Storage Class'
           },
           [ecsClusterName.logicalId]: {
-            Default: 'ECS Cluster Name to run Fargate task'
+            Default: 'ECS Cluster Name'
           },
           [ecsVpcId.logicalId]: {
-            Default: 'VPC ID to run Fargate task'
+            Default: 'Cluster VPC ID'
           },
           [ecsSubnets.logicalId]: {
-            Default: 'Subnet IDs to run Fargate task'
+            Default: 'Subnet IDs'
           },
           [regionName.logicalId]: {
-            Default: 'Region Name for another account or cloud storage'
+            Default: 'Region Name'
           },
           [credentialsParameterStore.logicalId]: {
-            Default: 'Credentials Parameter for another account or cloud storage'
+            Default: 'Credentials Parameter Name'
           },
           [alarmEmail.logicalId]: {
             default: 'Alarm Email'
@@ -462,24 +449,22 @@ export class AwsDataReplicationComponentS3Stack extends cdk.Stack {
       }
     ]);
 
-
-    // Setup Fargate Task
-    const jobDetails: JobDetails = {
-      queueName: sqsQueue.queueName,
-      jobTableName: jobTable.tableName,
-      credParamName: credentialsParameterStore.valueAsString,
-      regionName: regionName.valueAsString,
-      srcBucketName: srcBucketName.valueAsString,
-      srcPrefix: srcBucketPrefix.valueAsString,
-      destBucketName: destBucketName.valueAsString,
-      destPrefix: destBucketPrefix.valueAsString,
-      // storageClass: destStorageClass.valueAsString,
-      jobType: jobType.valueAsString,
-      sourceType: sourceType.valueAsString,
+    const env = {
+      AWS_DEFAULT_REGION: cdk.Aws.REGION,
+      JOB_TABLE_NAME: jobTable.tableName,
+      SQS_QUEUE_NAME: sqsQueue.queueName,
+      SSM_PARAMETER_CREDENTIALS: credentialsParameterStore.valueAsString,
+      REGION_NAME: regionName.valueAsString,
+      SRC_BUCKET_NAME: srcBucketName.valueAsString,
+      SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
+      DEST_BUCKET_NAME: destBucketName.valueAsString,
+      DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
+      JOB_TYPE: jobType.valueAsString,
+      SOURCE_TYPE: sourceType.valueAsString,
     }
 
     const ecsProps: EcsTaskProps = {
-      job: jobDetails,
+      env: env,
       ecsVpcId: ecsVpcId.valueAsString,
       ecsSubnetIds: ecsSubnets.valueAsList,
       ecsClusterName: ecsClusterName.valueAsString,
