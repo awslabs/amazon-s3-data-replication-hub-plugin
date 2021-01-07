@@ -3,6 +3,18 @@
 
 # AWS Data Replication Hub - S3 Plugin
 
+## Table of contents
+* [Introduction](#introduction)
+* [Architect](#architect)
+* [Deployment](#deployment)
+  * [Before Deployment](#before-deployment)
+  * [Available Parameters](#available-parameters)
+  * [Deploy via AWS Cloudformation](#deploy-via-aws-cloudformation)
+  * [Deploy via AWS CDK](#deploy-via-aws-cdk)
+* [FAQ](#faq)
+
+## Introduction
+
 _This AWS Date Replication Hub - S3 Plugin is based on 
 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) contributed by
 [huangzbaws@](https://github.com/huangzbaws)._
@@ -77,23 +89,24 @@ The following are the all allowed parameters for deployment:
 | Parameter                 | Default          | Description                                                                                                               |
 |---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
 | sourceType                | Amazon_S3        | Choose type of source storage, including Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS, Google_GCS.                      |
-| jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
 | srcBucketName             | <requires input> | Source bucket name.                                                                                                       |
 | srcBucketPrefix           | ''               | Source bucket object prefix. The plugin will only copy keys with the certain prefix.                                      |
+| enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default value is No. <br>Allow options: 'No', 'Create_Only', 'Delete_Only', 'Create_And_Delete'. <br>Note that Delete Marker Event is not support yet.     |
 | destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
 | destBucketPrefix          | ''               | Destination bucket prefix. The plugin will upload to certain prefix.                                                      |
 | destStorageClass          | STANDARD         | Destination Object Storage Class.  Allowed options: 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
+| jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
+| regionName                | ''               | Region Name, if Job Type is GET, use source region name, otherwise use destination region name.                           |
+| credentialsParameterStore | ''               | The Parameter Name used to keep credentials in Parameter Store. Leave it blank if you are replicating from open buckets.  |
 | ecsClusterName            | <requires input> | ECS Cluster Name to run ECS task                                                                                          |
 | ecsVpcId                  | <requires input> | VPC ID to run ECS task, e.g. vpc-bef13dc7                                                                                 |
 | ecsSubnets                | <requires input> | Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32  |
-| credentialsParameterStore | ''               | The Parameter Name used to keep credentials in Parameter Store. Leave it blank if you are replicating from open buckets.  |
-| regionName                | ''               | The Region Name, e.g. eu-west-1.  For Google GCS, this is optional.                                                       |
 | alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
-| enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default value is No. <br>Allow options: 'No', 'Create_Only', 'Delete_Only', 'Create_And_Delete'. <br>Note that Delete Marker Event is not support yet.     |
 | lambdaMemory              | 256              | Lambda Memory, default to 256 MB.                                                                                         |
 | multipartThreshold        | 10               | Threshold Size for multipart upload in MB, default to 10 (MB)                                                             |
 | chunkSize                 | 5                | Chunk Size for multipart upload in MB, default to 5 (MB)                                                                  |
 | maxThreads                | 10               | Max Theads to run multipart upload in lambda, default to 10                                                               |
+
 
 ### Deploy via AWS Cloudformation
 
@@ -153,3 +166,8 @@ cdk deploy --parameters srcBucketName=<source-bucket-name> \
 ```
 
 > Note: You can simply run `cdk destroy` if the replication task is no longer required. This command will remove the stack created by this plugin from your AWS account.
+
+
+## FAQ
+
+To be updated.

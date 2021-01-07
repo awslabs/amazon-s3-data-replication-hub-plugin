@@ -3,6 +3,18 @@
 
 # AWS Data Replication Hub - S3插件
 
+## 目录
+* [简介](#简介)
+* [方案架构](#方案架构)
+* [部署](#部署)
+  * [准备工作](#准备工作)
+  * [可用参数](#可用参数)
+  * [通过AWS Cloudformation实施部署](#通过AWS-Cloudformation实施部署)
+  * [通过AWS CDK实施部署](#通过AWS-CDK实施部署)
+* [常问问题](#常问问题)
+
+## 简介
+
 _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://github.com/huangzbaws) 的
 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) 基础上开发的。_
 
@@ -22,7 +34,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 - [x] 支持增量复制
 - [x] 支持基于S3 事件触发复制
 
-## 架构图
+## 方案架构
 
 ![S3 Plugin Architect](s3-plugin-architect.png)
 
@@ -43,7 +55,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 - 部署预计用时3-5分钟
 - 一旦部署完成，复制任务就会马上开始
 
-###  部署前准备
+### 准备工作
 
 - 配置 **凭据**
 
@@ -72,26 +84,26 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 | 参数                       | 默认值            | 说明                                                                                                               |
 |---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
 | sourceType                | Amazon_S3        | 选择源存储类型，包括Amazon_S3，Aliyun_OSS，Qiniu_Kodo， Tencent_COS，Google_GCS。                                 |
-| jobType                   | GET              | 如果源存储桶不在当前帐户中，请选择GET。 否则，选择PUT                                              |
 | srcBucketName             | 需要指定          | 源存储桶名称                                                                                                       |
 | srcBucketPrefix           | ''               | 源存储桶对象前缀。 插件只会复制具有特定前缀的对象.                                        |
+| enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用。<br> 可选的值有: 'No', 'Create_Only', 'Delete_Only', 'Create_And_Delete'。<br> 注意： 目前还不支持Delete Marker的事件。                       |
 | destBucketName            | 需要指定          | 目标存储桶名称                                                                                                  |
 | destBucketPrefix          | ''               | 目标存储桶前缀。插件将上传到指定的前缀                                                      |
 | destStorageClass          | STANDARD         | 目标存储类型，可选的值有: 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
+| jobType                   | GET              | 如果源存储桶不在当前帐户中，请选择GET。 否则，选择PUT                                              |
+| regionName                | ''               | region名称，如果Job Type选择GET，那么使用源存储桶所在的egion, 否则就是目标桶所在的region。                                                           |
+| credentialsParameterStore | ''               | 用于将凭据保存在参数存储中的参数名称， 如果是源是公开的存储桶，可以放空。                                                           |
 | ecsClusterName            | 需要指定          | 用于运行ECS任务的ECS集群名称                                                                                          |
 | ecsVpcId                  | 需要指定          | 用于运行ECS任务的VPC ID，例如 vpc-bef13dc7                                                                                  |
 | ecsSubnets                | 需要指定          | 用于运行ECS任务的子网ID。 请提供至少两个以逗号分隔的子网，例如 子网97bfc4cd，子网7ad7de32   |
-| credentialsParameterStore | ''               | 用于将凭据保存在参数存储中的参数名称， 如果是源是公开的存储桶，可以放空。                                                           |
-| regionName                | ''               | region名称，例如cn-west-1，如果源是Google Cloud Storage, 可以放空。                                                           |
 | alarmEmail                | 需要指定           | 警报电子邮件。 错误将发送到此电子邮件                                                                          |
-| enableS3Event             | No               | 是否支持S3事件自动触发复制， 此功能仅在源存储桶是当前账号的情况下有效，默认不启用。<br> 可选的值有: 'No', 'Create_Only', 'Delete_Only', 'Create_And_Delete'。<br> 注意： 目前还不支持Delete Marker的事件。                       |
 | lambdaMemory              | 256              | Lambda内存， 默认为 256 MB                                                                                      |
 | multipartThreshold        | 10               | 分段上传的阀值（单位： MB）默认为10 MB                                                             |
 | chunkSize                 | 5                | 分片大小，默认为5 MB                                                                  |
 | maxThreads                | 10               | Lambda分段上传的线程数                                                              |
 
 
-### 用AWS Cloudformation方式部署
+### 通过AWS Cloudformation实施部署
 
 请按照以下步骤通过AWS Cloudformation部署此插件。
 
@@ -117,7 +129,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 > 注意：如果不再需要复制任务，则可以从CloudFormation控制台中删除堆栈。
 
-### 用AWS CDK方式进行部署
+### 通过AWS CDK实施部署
 
 如果要使用AWS CDK部署此插件，请确保满足以下先决条件：
 
@@ -149,3 +161,8 @@ cdk deploy --parameters srcBucketName=<source-bucket-name> \
 ```
 
 > 注意：如果不再需要复制任务，则可以简单地运行“cdk destroy”。 此命令将从您的AWS账户中删除本插件所创建的堆栈。
+
+
+## 常问问题
+
+待更新.
