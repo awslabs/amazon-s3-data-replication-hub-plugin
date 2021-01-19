@@ -757,10 +757,14 @@ class ClientManager():
                 credentials['aws_secret_access_key'] = credentials.pop(
                     'secret_access_key')
 
-            # For GCS S3 SDK, region name is 'auto'
+        # For GCS S3 SDK, region name is 'auto'
+        if region_name:
             credentials['region_name'] = 'auto' if source == Source.GOOGLE_GCS else region_name
-            credentials['endpoint_url'] = source.get_endpoint_url(
-                region_name)
+
+        endpoint_url = source.get_endpoint_url(
+            region_name)
+        if endpoint_url:
+            credentials['endpoint_url'] = endpoint_url
 
         client = S3DownloadClient(
             bucket_name, prefix, source, s3_config, **credentials)
