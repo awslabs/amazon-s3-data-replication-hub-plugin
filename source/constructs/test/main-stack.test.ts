@@ -1,7 +1,7 @@
 // import { expect as expectCDK, matchTemplate, MatchStyle } from '@aws-cdk/assert';
 import * as cdk from '@aws-cdk/core';
 import '@aws-cdk/assert/jest';
-import * as AwsDataReplicationComponentS3 from '../lib/aws-data-replication-component-s3-stack';
+import * as AwsDataReplicationComponentS3 from '../lib/main-stack';
 
 test('Empty Stack', () => {
     const app = new cdk.App();

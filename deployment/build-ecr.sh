@@ -40,13 +40,12 @@ echo "--------------------------------------------------------------------------
 echo "[Build] Build Docker Image"
 echo "------------------------------------------------------------------------------"
 echo Building the docker image...
-cd $source_dir
+cd $source_dir/custom-resources
 IMAGE_REPO_NAME=s3-replication-jobsender
 IMAGE_TAG=$3
-docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG src/
+docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG -f ecr/Dockerfile .                                                                                                                                                                                                             
 docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $domain/$IMAGE_REPO_NAME:$IMAGE_TAG 
-
-
+ 
 
 echo "------------------------------------------------------------------------------"
 echo "[Push] Push Docker Image"

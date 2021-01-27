@@ -14,7 +14,8 @@ ENV JOB_TYPE GET
 ENV SOURCE_TYPE S3
 ENV AWS_DEFAULT_REGION us-east-1
 
-COPY . .
+COPY common ./common
+COPY script .
 RUN pip install boto3
-RUN pip install -r requirements.txt
+RUN pip install -e common
 CMD ["python", "job_sender.py"]

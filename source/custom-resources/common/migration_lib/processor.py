@@ -81,7 +81,7 @@ def job_processor(upload_id, index_list, partnumber_list, job, src_client: Downl
                 retryTime += 1
                 try:
                     logger.info(
-                        f'----->Uploading {len(getBody)} Bytes {des_bucket}/{des_key} - {partnumber}/{total}')
+                        f'----->Uploading {len(getBody)} Bytes {src_bucket}/{src_key} - {partnumber}/{total}')
 
                     des_client.upload_part(
                         des_key, getBody, chunkdata_md5, partnumber, upload_id)

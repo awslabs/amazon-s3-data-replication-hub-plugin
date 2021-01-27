@@ -18,12 +18,7 @@ from migration_lib.service import DBService
 from migration_lib.client import ClientManager, JobInfo
 from migration_lib.config import JobConfig
 
-log_level = str(os.environ.get('LOG_LEVEL')).upper()
-if log_level not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
-    log_level = 'INFO'
-
-logger = logging.getLogger()
-logger.setLevel(log_level)
+logger = get_lambda_logger()
 
 
 def lambda_handler(event, context):
@@ -226,6 +221,20 @@ def process_events(event_message, event_table):
             raise WrongRecordFormat
 
     return transfer_list, delete_list
+
+
+def get_log_level():
+    log_level = str(os.environ.get('LOG_LEVEL')).upper()
+    if log_level not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+        log_level = 'WARNING'
+    return log_level
+
+
+def get_lambda_logger():
+    log_level = get_log_level()
+    logger = logging.getLogger()
+    logger.setLevel(log_level)
+    return logger
 
 
 class TimeoutOrMaxRetry(Exception):

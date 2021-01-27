@@ -232,24 +232,16 @@ class SQSService():
         job_list = []
         response = self._sqs.receive_message(
             QueueUrl=self._sqs_queue_url,
-            # AttributeNames=[
-            #     'SentTimestamp'
-            # ],
-            MaxNumberOfMessages=1,
+            MaxNumberOfMessages=max_messages,
             MessageAttributeNames=[
                 'All'
             ],
             VisibilityTimeout=0,
-            # WaitTimeSeconds=0
         )
 
-        messages = response['Messages']
-        for message in messages:
-            body = message['Body']
-            job_list.append(json.loads(body))
-            logger.info(f'SQS> Received message: {body}')
+        messages = response.get('Message', {})
 
-        return json.loads(body)
+        return messages
 
     def is_empty(self):
         """ Return true if the queue is empty """

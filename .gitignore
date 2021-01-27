@@ -1,9 +1,9 @@
-source/*.js
-source/*/*.js
+source/constructs/*.js
+source/constructs/*/*.js
 !jest.config.js
 *.d.ts
 node_modules
-package-lock.json
+
 
 # CDK asset staging directory
 .cdk.staging
@@ -29,3 +29,4 @@ staging
 global-s3-assets
 regional-s3-assets
 viperlight
+

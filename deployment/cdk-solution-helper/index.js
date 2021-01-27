@@ -98,6 +98,41 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     };
   });
 
+  // Clean-up nested template stack dependencies
+  const nestedStacks = Object.keys(resources).filter(function (key) {
+    return resources[key].Type === 'AWS::CloudFormation::Stack'
+  });
+  nestedStacks.forEach(function (f) {
+    const fn = template.Resources[f];
+    fn.Properties.TemplateURL = {
+      'Fn::Join': [
+        '',
+        [
+          'https://s3.',
+          {
+            'Ref': 'AWS::Region'
+          },
+          '.',
+          {
+            'Ref': 'AWS::URLSuffix'
+          },
+          '/',
+          `%%BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/${fn.Metadata.nestedTemplateName}`
+        ]
+      ]
+    };
+    const params = fn.Properties.Parameters ? fn.Properties.Parameters : {};
+    const nestedStackParameters = Object.keys(params).filter(function (key) {
+      if (key.search(/[\w]*AssetParameters/g) > -1) {
+        return true;
+      }
+      return false;
+    });
+    nestedStackParameters.forEach(function (stkParam) {
+      fn.Properties.Parameters[stkParam] = undefined;
+    });
+  });
+
   const policy = Object.keys(resources).filter(function (key) {
     return resources[key].Type === "AWS::IAM::Policy";
   });
