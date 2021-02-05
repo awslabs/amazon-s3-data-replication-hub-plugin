@@ -7,9 +7,14 @@ import { CommonStack, CommonProps } from "./common-resources";
 import { EcsStack, EcsTaskProps } from "./ecs-finder-stack";
 import { Ec2WorkerStack, Ec2WorkerProps } from "./ec2-worker-stack";
 import { LambdaWorkerStack, LambdaWorkerProps } from "./lambda-worker-stack";
-
+import { DashboardStack, DBProps } from "./dashboard-stack";
 
 const { VERSION } = process.env;
+
+export const enum RunType {
+  EC2 = "EC2",
+  LAMBDA = "Lambda"
+}
 
 /**
  * cfn-nag suppression rule interface
@@ -30,8 +35,28 @@ export function addCfnNagSuppressRules(resource: CfnResource, rules: CfnNagSuppr
  * Main Stack
  */
 export class AwsDataReplicationComponentS3Stack extends Stack {
+  private paramGroups: any[] = [];
+  private paramLabels: any = {};
+
+  private addToParamGroups(label: string, ...param: string[]) {
+    this.paramGroups.push({
+      Label: { default: label },
+      Parameters: param
+
+    });
+  };
+
+  private addToParamLabels(label: string, param: string) {
+    this.paramLabels[param] = {
+      default: label
+    }
+  }
+
+
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
+
+    const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
     const sourceType = new CfnParameter(this, 'sourceType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
@@ -39,35 +64,34 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       default: 'Amazon_S3',
       allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS', 'Google_GCS']
     })
-
-    const runType = new CfnParameter(this, 'runType', {
-      description: 'Choose where to run the replication, either EC2 (BBR Enabled) or Lambda',
-      type: 'String',
-      default: 'EC2',
-      allowedValues: ['EC2', 'Lambda']
-    })
+    this.addToParamLabels('Source Type', sourceType.logicalId)
 
     const srcBucketName = new CfnParameter(this, 'srcBucketName', {
       description: 'Source Bucket Name',
       type: 'String'
     })
+    this.addToParamLabels('Source Bucket Name', srcBucketName.logicalId)
 
     const srcBucketPrefix = new CfnParameter(this, 'srcBucketPrefix', {
       description: 'Source Bucket Object Prefix',
       default: '',
       type: 'String'
     })
+    this.addToParamLabels('Source Bucket Prefix', srcBucketPrefix.logicalId)
 
     const destBucketName = new CfnParameter(this, 'destBucketName', {
       description: 'Destination Bucket Name',
       type: 'String'
     })
+    this.addToParamLabels('Destination Bucket Name', destBucketName.logicalId)
+
 
     const destBucketPrefix = new CfnParameter(this, 'destBucketPrefix', {
       description: 'Destination Bucket Object Prefix',
       default: '',
       type: 'String'
     })
+    this.addToParamLabels('Destination Bucket Prefix', destBucketPrefix.logicalId)
 
     // 'STANDARD'|'REDUCED_REDUNDANCY'|'STANDARD_IA'|'ONEZONE_IA'|'INTELLIGENT_TIERING'|'GLACIER'|'DEEP_ARCHIVE'|'OUTPOSTS',
     const destStorageClass = new CfnParameter(this, 'destStorageClass', {
@@ -76,12 +100,14 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       type: 'String',
       allowedValues: ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING']
     })
+    this.addToParamLabels('Destination Storage Class', destStorageClass.logicalId)
 
     const ecsClusterName = new CfnParameter(this, 'ecsClusterName', {
       description: 'ECS Cluster Name to run ECS task',
       default: '',
       type: 'String'
     })
+    this.addToParamLabels('ECS Cluster Name', ecsClusterName.logicalId)
 
     const ecsVpcId = new CfnParameter(this, 'ecsVpcId', {
       description: 'VPC ID to run ECS task, e.g. vpc-bef13dc7',
@@ -89,19 +115,10 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       type: 'AWS::EC2::VPC::Id'
     })
 
-    // const ecsSubnets = new CfnParameter(this, 'ecsSubnets', {
-    //   description: 'Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32',
-    //   default: '',
-    //   type: 'List<AWS::EC2::Subnet::Id>'
-    // })
-    const ecsSubnetA = new CfnParameter(this, 'ecsSubnetA', {
-      description: 'Subnet IDs to run ECS task.',
-      type: 'AWS::EC2::Subnet::Id'
-    })
-
-    const ecsSubnetB = new CfnParameter(this, 'ecsSubnetB', {
-      description: 'Subnet IDs to run ECS task.',
-      type: 'AWS::EC2::Subnet::Id'
+    const ecsSubnets = new CfnParameter(this, 'ecsSubnets', {
+      description: 'Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32',
+      default: '',
+      type: 'List<AWS::EC2::Subnet::Id>'
     })
 
     // 'PUT': Destination Bucket is not in current account.
@@ -112,12 +129,14 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       default: 'GET',
       allowedValues: ['PUT', 'GET']
     })
+    this.addToParamLabels('Job Type', jobType.logicalId)
 
     const regionName = new CfnParameter(this, 'regionName', {
       description: 'Region Name. If Job Type is GET, use source region name, otherwise use destination region name.',
       default: '',
       type: 'String'
     })
+    this.addToParamLabels('Region Name', regionName.logicalId)
 
     // The region credential (not the same account as Lambda) setting in SSM Parameter Store
     const credentialsParameterStore = new CfnParameter(this, 'credentialsParameterStore', {
@@ -125,6 +144,7 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       default: '',
       type: 'String'
     })
+    this.addToParamLabels('Credentials Parameter Name', credentialsParameterStore.logicalId)
 
 
 
@@ -133,6 +153,7 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       type: 'String',
       description: 'Errors will be sent to this email.'
     })
+    this.addToParamLabels('Alarm Email', alarmEmail.logicalId)
 
     // const includeMetadata = new CfnParameter(this, 'includeMetadata', {
     //   description: 'Including metadata',
@@ -147,13 +168,8 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       type: 'String',
       allowedValues: ['No', 'Create_Only', 'Delete_Only', 'Create_And_Delete']
     })
+    this.addToParamLabels('Enable S3 Event', enableS3Event.logicalId)
 
-    const lambdaMemory = new CfnParameter(this, 'lambdaMemory', {
-      description: 'Lambda Memory, default to 256 MB',
-      default: '256',
-      type: 'Number',
-      allowedValues: ['128', '256', '512', '1024']
-    })
 
     const multipartThreshold = new CfnParameter(this, 'multipartThreshold', {
       description: 'Threshold Size for multipart upload in MB, default to 10 (MB)',
@@ -166,7 +182,7 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       description: 'Chunk Size for multipart upload in MB, default to 5 (MB)',
       default: '5',
       type: 'String',
-      allowedValues: ['1', '2', '5', '10', '20']
+      allowedValues: ['5', '10', '20']
     })
 
     const maxThreads = new CfnParameter(this, 'maxThreads', {
@@ -176,99 +192,72 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       allowedValues: ['5', '10', '20', '50'],
     })
 
+
+    this.addToParamGroups('General Information', sourceType.logicalId)
+    this.addToParamGroups('Source Information', srcBucketName.logicalId, srcBucketPrefix.logicalId, enableS3Event.logicalId)
+    this.addToParamGroups('Destination Information', destBucketName.logicalId, destBucketPrefix.logicalId, destStorageClass.logicalId)
+    this.addToParamGroups('Extra Information', jobType.logicalId, regionName.logicalId, credentialsParameterStore.logicalId, alarmEmail.logicalId)
+    this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId)
+    // this.addToParamGroups('Advanced Options', multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId)
+
+    let lambdaMemory: CfnParameter | undefined
+    let keyName: CfnParameter | undefined
+    let maxCapacity: CfnParameter | undefined
+    let minCapacity: CfnParameter | undefined
+    let desiredCapacity: CfnParameter | undefined
+
+    if (runType === RunType.LAMBDA) {
+      lambdaMemory = new CfnParameter(this, 'lambdaMemory', {
+        description: 'Lambda Memory, default to 256 MB',
+        default: '256',
+        type: 'Number',
+        allowedValues: ['128', '256', '512', '1024']
+      })
+      this.addToParamLabels('Lambda Memory', lambdaMemory.logicalId)
+      this.addToParamGroups('Advanced Options', multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId, lambdaMemory.logicalId)
+
+    } else {
+
+      // keyName = new CfnParameter(this, 'keyName', {
+      //   description: 'EC2 Key Name',
+      //   // default: '',
+      //   type: 'AWS::EC2::KeyPair::KeyName',
+      //   // type: 'String',
+      // })
+      // this.addToParamLabels('Key Name', keyName.logicalId)
+
+      maxCapacity = new CfnParameter(this, 'maxCapacity', {
+        description: 'Maximum Capacity for Auto Scaling Group',
+        default: '20',
+        type: 'Number',
+      })
+      this.addToParamLabels('Maximum Capacity', maxCapacity.logicalId)
+
+      minCapacity = new CfnParameter(this, 'minCapacity', {
+        description: 'Minimum Capacity for Auto Scaling Group',
+        default: '1',
+        type: 'Number',
+      })
+      this.addToParamLabels('Minimum Capacity', minCapacity.logicalId)
+
+      desiredCapacity = new CfnParameter(this, 'desiredCapacity', {
+        description: 'Desired Capacity for Auto Scaling Group',
+        default: '1',
+        type: 'Number',
+      })
+      this.addToParamLabels('Desired Capacity', desiredCapacity.logicalId)
+
+      this.addToParamGroups('Advanced Options', multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId,
+        maxCapacity.logicalId, minCapacity.logicalId, desiredCapacity.logicalId)
+
+    }
+
     this.templateOptions.description = `(SO8002) - Data Replication Hub - S3 Plugin - Template version ${VERSION}`;
 
     this.templateOptions.metadata = {
       'AWS::CloudFormation::Interface': {
-        ParameterGroups: [
-          {
-            Label: { default: 'General Information' },
-            Parameters: [sourceType.logicalId, runType.logicalId]
-          },
-          {
-            Label: { default: 'Source Information' },
-            Parameters: [srcBucketName.logicalId, srcBucketPrefix.logicalId, enableS3Event.logicalId]
-          },
-          {
-            Label: { default: 'Destination Information' },
-            Parameters: [destBucketName.logicalId, destBucketPrefix.logicalId, destStorageClass.logicalId]
-          },
-          {
-            Label: { default: 'Extra Information' },
-            Parameters: [jobType.logicalId, regionName.logicalId, credentialsParameterStore.logicalId, alarmEmail.logicalId]
-          },
-          {
-            Label: { default: 'ECS Cluster Information' },
-            Parameters: [ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnetA.logicalId, ecsSubnetB.logicalId]
-          },
-          {
-            Label: { default: 'Advanced Options' },
-            Parameters: [lambdaMemory.logicalId, multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId]
-          }
-        ],
-        ParameterLabels: {
-          [sourceType.logicalId]: {
-            default: 'Source Type'
-          },
-          [runType.logicalId]: {
-            default: 'Run Type'
-          },
-          [jobType.logicalId]: {
-            default: 'Job Type'
-          },
-          [srcBucketName.logicalId]: {
-            default: 'Source Bucket Name'
-          },
-          [srcBucketPrefix.logicalId]: {
-            default: 'Source Bucket Prefix'
-          },
-          [destBucketName.logicalId]: {
-            default: 'Destination Bucket Name'
-          },
-          [destBucketPrefix.logicalId]: {
-            default: 'Destination Bucket Prefix'
-          },
-          [destStorageClass.logicalId]: {
-            default: 'Destination Storage Class'
-          },
-          [ecsClusterName.logicalId]: {
-            Default: 'ECS Cluster Name'
-          },
-          [ecsVpcId.logicalId]: {
-            Default: 'Cluster VPC ID'
-          },
-          [ecsSubnetA.logicalId]: {
-            Default: 'Subnet ID A'
-          },
-          [ecsSubnetB.logicalId]: {
-            Default: 'Subnet ID B'
-          },
-          [regionName.logicalId]: {
-            Default: 'Region Name'
-          },
-          [credentialsParameterStore.logicalId]: {
-            Default: 'Credentials Parameter Name'
-          },
-          [alarmEmail.logicalId]: {
-            default: 'Alarm Email'
-          },
-          [enableS3Event.logicalId]: {
-            default: 'Enable S3 Event'
-          },
-          [lambdaMemory.logicalId]: {
-            default: 'Lambda Memory'
-          },
-          [multipartThreshold.logicalId]: {
-            default: 'Multipart Threshold'
-          },
-          [chunkSize.logicalId]: {
-            default: 'Chunk Size'
-          },
-          [maxThreads.logicalId]: {
-            default: 'Max Threads'
-          },
-
-        }
+        ParameterGroups: this.paramGroups,
+        ParameterLabels: this.paramLabels,
       }
     }
 
@@ -294,7 +283,7 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
     const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
       vpcId: ecsVpcId.valueAsString,
       availabilityZones: Fn.getAzs(),
-      publicSubnetIds: [ecsSubnetA.valueAsString, ecsSubnetB.valueAsString]
+      publicSubnetIds: ecsSubnets.valueAsList
     })
 
     // Start Common Stack
@@ -326,7 +315,7 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
     const ecsProps: EcsTaskProps = {
       env: finderEnv,
       vpc: vpc,
-      ecsSubnetIds: [ecsSubnetA.valueAsString, ecsSubnetB.valueAsString], // TODO: To remove this.
+      ecsSubnetIds: ecsSubnets.valueAsList, // TODO: To remove this.
       ecsClusterName: ecsClusterName.valueAsString,
     }
     const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
@@ -337,17 +326,17 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
     s3InCurrentAccount.grantReadWrite(ecsStack.taskDefinition.taskRole);
 
     // Start Worker - EC2 or Lambda
-    const useEC2 = new CfnCondition(this, 'useEC2', {
-      expression: Fn.conditionEquals('EC2', runType),
-    });
+    // const useEC2 = new CfnCondition(this, 'useEC2', {
+    //   expression: Fn.conditionEquals('EC2', runType),
+    // });
 
-    const useLambda = new CfnCondition(this, 'useLambda', {
-      expression: Fn.conditionEquals('Lambda', runType),
-    });
+    // const useLambda = new CfnCondition(this, 'useLambda', {
+    //   expression: Fn.conditionEquals('Lambda', runType),
+    // });
 
     const workerEnv = {
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
-      // EVENT_TABLE_NAME: commonStack.eventTableName,
+      EVENT_TABLE_NAME: commonStack.jobTable.tableName, // To be updated.
       SQS_QUEUE_NAME: commonStack.sqsQueue.queueName,
       SRC_BUCKET_NAME: srcBucketName.valueAsString,
       SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
@@ -364,40 +353,53 @@ export class AwsDataReplicationComponentS3Stack extends Stack {
       LOG_LEVEL: 'INFO',
     }
 
-    const ec2Props: Ec2WorkerProps = {
-      env: workerEnv,
-      vpc: vpc,
+    let asgName = undefined
+    let handler = undefined
+    if (runType === RunType.EC2) {
+      const ec2Props: Ec2WorkerProps = {
+        env: workerEnv,
+        vpc: vpc,
+        queue: commonStack.sqsQueue,
+        keyName: keyName?.valueAsString,
+        maxCapacity: maxCapacity?.valueAsNumber,
+        minCapacity: minCapacity?.valueAsNumber,
+        desiredCapacity: desiredCapacity?.valueAsNumber,
+      }
+
+      const ec2Stack = new Ec2WorkerStack(this, 'EC2WorkerStack', ec2Props)
+
+      credentialsParam.grantRead(ec2Stack.workerAsg.role)
+      commonStack.jobTable.grantReadWriteData(ec2Stack.workerAsg.role);
+      commonStack.sqsQueue.grantConsumeMessages(ec2Stack.workerAsg.role);
+      s3InCurrentAccount.grantReadWrite(ec2Stack.workerAsg.role);
+
+      asgName = ec2Stack.workerAsg.autoScalingGroupName
+    }
+    else {
+      // start Lambda stack
+      const lambdaProps: LambdaWorkerProps = {
+        env: workerEnv,
+        sqsQueue: commonStack.sqsQueue,
+        lambdaMemory: lambdaMemory?.valueAsNumber
+      }
+
+      const lambdaStack = new LambdaWorkerStack(this, 'LambdaWorkerStack', lambdaProps)
+      credentialsParam.grantRead(lambdaStack.handler);
+      commonStack.jobTable.grantReadWriteData(lambdaStack.handler);
+      // eventTable.grantReadWriteData(handler);
+      s3InCurrentAccount.grantReadWrite(lambdaStack.handler);
+
+      handler = lambdaStack.handler
     }
 
-    const ec2Stack = new Ec2WorkerStack(this, 'EC2WorkerStack', ec2Props)
-
-    ec2Stack.nestedStackResource?.addMetadata('nestedTemplateName', ec2Stack.templateFile.slice(0, -5));
-    if (ec2Stack.nestedStackResource) {
-      ec2Stack.nestedStackResource.cfnOptions.condition = useEC2
+    // Setup Cloudwatch Dashboard
+    const dbProps: DBProps = {
+      runType: runType,
+      queue: commonStack.sqsQueue,
+      asgName: asgName,
+      handler: handler,
     }
-
-    credentialsParam.grantRead(ec2Stack.workerAsg.role)
-    commonStack.jobTable.grantReadData(ec2Stack.workerAsg.role);
-    commonStack.sqsQueue.grantConsumeMessages(ec2Stack.workerAsg.role);
-    // s3InCurrentAccount.grantReadWrite(ec2Stack.workerAsg.role);
-
-    // start Lambda stack
-    const lambdaProps: LambdaWorkerProps = {
-      env: workerEnv,
-      sqsQueue: commonStack.sqsQueue,
-      lambdaMemory: lambdaMemory.valueAsNumber,
-    }
-
-    const lambdaStack = new LambdaWorkerStack(this, 'LambdaWorkerStack', lambdaProps)
-
-    lambdaStack.nestedStackResource?.addMetadata('nestedTemplateName', lambdaStack.templateFile.slice(0, -5));
-    if (lambdaStack.nestedStackResource) {
-      lambdaStack.nestedStackResource.cfnOptions.condition = useLambda
-    }
-    credentialsParam.grantRead(lambdaStack.handler);
-    commonStack.jobTable.grantReadWriteData(lambdaStack.handler);
-    // eventTable.grantReadWriteData(handler);
-    // s3InCurrentAccount.grantReadWrite(lambdaStack.handler);
+    new DashboardStack(this, 'DashboardStack', dbProps);
 
   }
 }

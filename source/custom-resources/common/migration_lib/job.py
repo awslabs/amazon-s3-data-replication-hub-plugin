@@ -203,7 +203,7 @@ class JobMigrator():
         des_prefix = self._des_client.prefix
 
         logger.info(
-            f"Migrator> Migrating from {src_bucket}/{src_prefix}/{self._job.key} to {des_bucket}/{des_prefix}/{self._job.key}")
+            f"Migrator> Migrating from {src_bucket} - {self._job.key} to {des_bucket} - {self._job.key}")
 
         extra_args = {}
         if self._config.include_metedata:
@@ -224,6 +224,12 @@ class JobMigrator():
 
         logger.debug(f'Migrator> Complete load into DB')
         self._db.log_job_end(src_bucket, self._job.key, etag, status)
+
+        if not status:
+            logger.info(
+                f'----->Transferred 1 file {src_bucket} - {self._job.key} successfully')
+
+        return status
 
     def _split(self, size, chunk_size, max_parts=MAX_PARTS):
         """ Split the file into parts, automatically adjust the chunk size as there is limit of maximum parts"""
@@ -342,7 +348,7 @@ def remove_prefix(key: str, prefix=''):
 
     for example remove_prefix('a/b/c/d', 'a/b') = 'c/d'
     '''
-    return key.replace(prefix+'/', '') if prefix else key
+    return key.replace(prefix+'/', '', 1) if prefix else key
 
 
 def append_prefix(key: str, prefix=''):

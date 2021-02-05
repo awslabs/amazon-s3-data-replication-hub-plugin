@@ -662,8 +662,8 @@ class S3UploadClient(UploadClient):
         logger.debug(
             f'S3> Complete multipart upload for {key} - upload ID - {upload_id}')
         # List all the parts.
-        past_list = self.list_parts(key, upload_id)
-        part_list_args = {"Parts": past_list}
+        part_list = self.list_parts(key, upload_id)
+        part_list_args = {"Parts": part_list}
         # logger.info(f'S3> part_list:  {part_list}')
 
         try:

@@ -24,12 +24,12 @@ S3 replication plugin. Each of the replication plugin can run independently.
 
 The following are the planned features of this plugin.
 
-- [x] Amazon S3 object replication between AWS Global partition and AWS CN partition
+- [x] Amazon S3 object replication between AWS Beijing and Ningxia China regions and any other regions
 - [x] Replication from Aliyun OSS to Amazon S3
 - [x] Replication from Tencent COS to Amazon S3
 - [x] Replication from Qiniu Kodo to Amazon S3
 - [ ] Replication from Huawei Cloud OBS to Amazon S3
-- [x] Replication from Google Cloud Storage to Amazon S3 (Global)
+- [x] Replication from Google Cloud Storage to Amazon S3 (All Regions other than China Regions)
 - [x] Support replication with Metadata
 - [x] Support One-time replication
 - [x] Support Incremental replication
@@ -116,11 +116,11 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
 1. Click the following button to launch the CloudFormation Stack in that region.
 
-    - For Standard Partition
+    - For all Regions other than China Regions
 
     [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
 
-    - For China Partition
+    - For Beijing and Ningxia China Regions
 
     [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
     

@@ -50,7 +50,7 @@ class DBService():
                     'extraInfo':  extra_args,
                     # 'startTime':  time.asctime(time.localtime(cur_time)),
                     'startTime': int(cur_time),
-                    'jobStatus':  'Started',
+                    'jobStatus':  'STARTED',
                     'tryTime': 1,
                     'versionId':  job.version,
                 }
@@ -226,7 +226,7 @@ class SQSService():
 
     def receive_jobs(self, max_messages=1):
         """ Receive messages from SQS queue """
-        logger.info(
+        logger.debug(
             f'SQS> Start receiving messages from queue: {self._sqs_queue_name}')
 
         job_list = []
@@ -236,12 +236,26 @@ class SQSService():
             MessageAttributeNames=[
                 'All'
             ],
-            VisibilityTimeout=0,
+            # VisibilityTimeout=10,
         )
 
-        messages = response.get('Message', {})
+        messages = response.get('Messages', {})
 
         return messages
+
+    def delete_job(self, handler):
+        """ Delete messages from Queue """
+        logger.debug(f'SQS> Delete Message with handler {handler}')
+        try:
+            self._sqs.delete_message(
+                QueueUrl=self._sqs_queue_url,
+                ReceiptHandle=handler,
+            )
+            return True
+        except Exception as e:
+            logger.error(
+                f'SQS> Fail to delete queue message with handler {handler}. Error : {str(e)}')
+            return False
 
     def is_empty(self):
         """ Return true if the queue is empty """

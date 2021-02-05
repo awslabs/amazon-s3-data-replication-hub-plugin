@@ -7,6 +7,7 @@ import * as ecr from '@aws-cdk/aws-ecr';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cr from "@aws-cdk/custom-resources";
+import { RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
 
 import * as path from 'path';
 
@@ -41,10 +42,11 @@ export class EcsStack extends Construct {
             memoryLimitMiB: props.memory ? props.memory : 1024 * 8,
             family: `${Aws.STACK_NAME}-S3ReplicationTask`,
         });
+
         this.taskDefinition.addContainer('DefaultContainer', {
             image: ecs.ContainerImage.fromEcrRepository(repo),
             environment: props.env,
-            logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender' })
+            logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender', logRetention: RetentionDays.TWO_WEEKS })
         });
 
 
@@ -86,10 +88,10 @@ export class EcsStack extends Construct {
             securityGroups: [this.securityGroup]
         }));
 
-        const onEventHandler = new lambda.Function(this, 'OnEventHandler', {
+        const onEventHandler = new lambda.Function(this, 'EventHandler', {
             runtime: lambda.Runtime.PYTHON_3_8,
             code: lambda.Code.fromAsset(path.join(__dirname, '../../custom-resources/lambda')),
-            handler: 'lambda_event_handler.lambda_handler',
+            handler: 'event_handler.lambda_handler',
             memorySize: 256,
             timeout: Duration.minutes(15),
         });

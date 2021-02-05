@@ -1,77 +1,145 @@
-import { Construct, Fn, Duration, Stack, Aws, CfnParameter, NestedStack, NestedStackProps } from '@aws-cdk/core';
+import { Construct, Duration, Tags, Aws, CfnMapping } from '@aws-cdk/core';
 import * as iam from '@aws-cdk/aws-iam';
+
 import * as ec2 from '@aws-cdk/aws-ec2';
 import * as s3a from '@aws-cdk/aws-s3-assets';
-import * as path from 'path';
 import * as asg from '@aws-cdk/aws-autoscaling';
+import * as sqs from '@aws-cdk/aws-sqs';
+import * as cw from '@aws-cdk/aws-cloudwatch';
+import * as path from 'path';
+
+import { RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
+import { DBNamespace } from './dashboard-stack';
 
 export interface Env {
     [key: string]: any;
 }
 
-export interface Ec2WorkerProps extends NestedStackProps {
+export interface Ec2WorkerProps {
     readonly env: Env,
     readonly vpc: ec2.IVpc,
+    readonly queue: sqs.Queue,
     readonly keyName?: string,
     readonly maxCapacity?: number,
     readonly minCapacity?: number,
     readonly desiredCapacity?: number,
 }
 
-export class Ec2WorkerStack extends NestedStack {
+
+/***
+ * EC2 Stack
+ */
+export class Ec2WorkerStack extends Construct {
 
     readonly workerAsg: asg.AutoScalingGroup
 
     constructor(scope: Construct, id: string, props: Ec2WorkerProps) {
         super(scope, id);
 
+        const instanceTypeTable = new CfnMapping(this, 'InstanceTypeTable', {
+            mapping: {
+                'aws': {
+                    instanceType: 't4g.micro',
+                },
+                'aws-cn': {
+                    instanceType: 'c6g.medium',
+                },
+            }
+        });
+
+        const instanceType = new ec2.InstanceType(instanceTypeTable.findInMap(Aws.PARTITION, 'instanceType'))
+
         const amznLinux = ec2.MachineImage.latestAmazonLinux({
             generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
             edition: ec2.AmazonLinuxEdition.STANDARD,
             storage: ec2.AmazonLinuxStorage.GENERAL_PURPOSE,
-            cpuType: ec2.AmazonLinuxCpuType.X86_64,
+            cpuType: ec2.AmazonLinuxCpuType.ARM_64,
         });
 
-        // For dev only
-        const ec2SG = new ec2.SecurityGroup(this, 'S3MigratorSG', {
+
+        const ec2SG = new ec2.SecurityGroup(this, 'S3RepSG', {
             vpc: props.vpc,
-            description: 'Allow ssh access to ec2 instances',
-            allowAllOutbound: true   // Can be set to false
+            description: 'Security Group for Data Replication Hub EC2 instances',
+            allowAllOutbound: true
         });
-        ec2SG.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'allow ssh access from the world');
+        // For dev only
+        // ec2SG.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow ssh access');
 
         this.workerAsg = new asg.AutoScalingGroup(this, 'S3RepWorkerASG', {
+            autoScalingGroupName: `${Aws.STACK_NAME}-Worker-ASG`,
             vpc: props.vpc,
-            instanceType: ec2.InstanceType.of(ec2.InstanceClass.C5, ec2.InstanceSize.LARGE),
+            instanceType: instanceType,
             machineImage: amznLinux,
-            maxCapacity: props.maxCapacity ? props.maxCapacity : 10,
+            maxCapacity: props.maxCapacity ? props.maxCapacity : 20,
             minCapacity: props.minCapacity ? props.minCapacity : 1,
             desiredCapacity: props.desiredCapacity ? props.desiredCapacity : 1,
             // spotPrice: "0.01",
             // healthCheck: autoscaling.HealthCheck.ec2(),
             securityGroup: ec2SG,
-            keyName: props.keyName ? props.keyName : 'ad-key',
+            keyName: props.keyName,
+            instanceMonitoring: asg.Monitoring.DETAILED,
+            // groupMetrics: [asg.GroupMetrics.all()]
+            groupMetrics: [new asg.GroupMetrics(asg.GroupMetric.DESIRED_CAPACITY, asg.GroupMetric.IN_SERVICE_INSTANCES)],
+
         });
+
+        Tags.of(this.workerAsg).add('Name', `${Aws.STACK_NAME}-Replication-Worker`, {})
+
 
         const asset = new s3a.Asset(this, 'Asset', {
             path: path.join(__dirname, '../../custom-resources'),
             exclude: ['build', 'dist', '*.egg-info', 'tests', 'ecr', 'lambda']
         });
 
-        // asg.userData.addS3DownloadCommand({
-        //     bucket: asset.bucket,
-        //     bucketKey: asset.s3ObjectKey,
-        // });
+        let assetUrl: string = asset.s3ObjectUrl
+
+        // Temporary workaround for Cloudformation Asset URL
+        const useAsset = this.node.tryGetContext('useAsset') || 'true'
+        if (useAsset === 'true') {
+            asset.grantRead(this.workerAsg)
+        }
+        else {
+            assetUrl = `s3://%%BUCKET_NAME%%-${Aws.REGION}/%%SOLUTION_NAME%%/%%VERSION%%/asset${asset.assetHash}.zip`
+            this.workerAsg.addToRolePolicy(new iam.PolicyStatement({
+                effect: iam.Effect.ALLOW,
+                resources: [
+                    `arn:aws:s3:::%%BUCKET_NAME%%-${Aws.REGION}/*`
+                ],
+                actions: [
+                    "s3:GetObject*",
+                ],
+            }));
+        }
+
+
+        // const logGroupName = `DRH/${Aws.STACK_NAME}-ec2-logs`
+        const ec2LG = new LogGroup(this, 'S3RepWorkerLogGroup', {
+            retention: RetentionDays.TWO_WEEKS,
+            // logGroupName: logGroupName,
+            // removalPolicy: RemovalPolicy.DESTROY
+        });
 
         this.workerAsg.userData.addCommands(
             'yum update -y',
-            'yum install -y amazon-cloudwatch-agent',
-            'yum install -y python3',
+            'cd /home/ec2-user/',
+            `aws s3 cp ${assetUrl} src.zip`,
+            'unzip src.zip && rm src.zip',
+
+            // Enable BBR
             'echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf',
             'echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf',
             'sysctl -p',
+            'echo `sysctl net.ipv4.tcp_congestion_control` > worker.log',
 
-            'cd /home/ec2-user/',
+            // Enable Cloudwatch Agent
+            'yum install -y amazon-cloudwatch-agent',
+            `sed -i  -e "s/##log group##/${ec2LG.logGroupName}/g" config/cw_agent_config.json`,
+            '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/config/cw_agent_config.json -s',
+
+            // Prepare the script to run
+            'yum install -y python3',
+            'python3 -m pip install boto3',
+            'python3 -m pip install -e common',
             `echo "export JOB_TABLE_NAME=${props.env.JOB_TABLE_NAME}" >> env.sh`,
             // `echo "export EVENT_TABLE_NAME=${props.env.EVENT_TABLE_NAME}" >> env.sh`,
             `echo "export SQS_QUEUE_NAME=${props.env.SQS_QUEUE_NAME}" >> env.sh`,
@@ -89,24 +157,74 @@ export class Ec2WorkerStack extends NestedStack {
             `echo "export MAX_THREADS=${props.env.MAX_THREADS}" >> env.sh`,
             `echo "export LOG_LEVEL=${props.env.LOG_LEVEL}" >> env.sh`,
             `echo "export AWS_DEFAULT_REGION=${Aws.REGION}" >> env.sh`,
-            'echo `sysctl net.ipv4.tcp_congestion_control` > worker.log',
-            `aws s3 cp s3://${asset.bucket.bucketName}/${asset.s3ObjectKey} src.zip`,
-            'unzip src.zip && rm src.zip',
-            'python3 -m pip install boto3',
-            'python3 -m pip install -e common',
+
+            // Create the script
             'echo "source /home/ec2-user/env.sh" >> start-worker.sh',
             'echo "nohup python3 /home/ec2-user/script/job_worker.py >> /home/ec2-user/worker.log 2>&1 &" >> start-worker.sh',
             'chmod +x start-worker.sh',
+            // Run the script
             './start-worker.sh',
         )
 
-        asset.grantRead(this.workerAsg)
+        const cwAgentPolicy = new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            resources: [
+                '*'
+            ],
+            actions: [
+                'cloudwatch:PutMetricData',
+                'ec2:DescribeVolumes',
+                'ec2:DescribeTags',
+                'logs:CreateLogGroup',
+                'logs:CreateLogStream',
+                'logs:PutLogEvents',
+                'logs:DescribeLogStreams',
+                'logs:DescribeLogGroups',
+            ],
+        })
 
-        this.workerAsg.scaleOnCpuUtilization('cpuScale', {
-            targetUtilizationPercent: 10,
-            cooldown: Duration.minutes(5),
-            estimatedInstanceWarmup: Duration.minutes(1),
-        });
+
+        this.workerAsg.addToRolePolicy(cwAgentPolicy)
+
+        const namespace = DBNamespace.NS_EC2
+
+        ec2LG.addMetricFilter('CompletedBytes', {
+            metricName: 'CompletedBytes',
+            metricNamespace: namespace,
+            metricValue: '$Bytes',
+            filterPattern: FilterPattern.literal('[level, p="----->Complete", Bytes, ...]')
+        })
+
+        ec2LG.addMetricFilter('Completed-Objects', {
+            metricName: 'CompletedObjects',
+            metricNamespace: namespace,
+            metricValue: '$n',
+            filterPattern: FilterPattern.literal('[level, p="----->Transferred", n, ...]')
+        })
+
+        const allMsg = new cw.MathExpression({
+            expression: "notvisible + visible",
+            usingMetrics: {
+                notvisible: props.queue.metricApproximateNumberOfMessagesNotVisible(),
+                visible: props.queue.metricApproximateNumberOfMessagesVisible(),
+            },
+            period: Duration.minutes(1),
+            label: "# of messages",
+        })
+
+        this.workerAsg.scaleOnMetric('ScaleOutSQS', {
+            metric: allMsg,
+            scalingSteps: [
+                { upper: 0, change: -10000 }, // Scale in when no messages to process
+                { lower: 100, change: +1 },
+                { lower: 500, change: +2 },
+                { lower: 2000, change: +5 },
+                { lower: 10000, change: +10 },
+            ],
+            adjustmentType: asg.AdjustmentType.CHANGE_IN_CAPACITY,
+        })
+
+
 
     }
 
