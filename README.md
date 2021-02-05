@@ -35,6 +35,18 @@ The following are the planned features of this plugin.
 - [x] Support Incremental replication
 - [x] Support S3 Events to trigger replication
 
+In version 2, we are introducing a new option of running the replication using EC2 with BBR Enabled instead of lambda. This is useful for cross-partition network transfer. And with our AWS Graviton2 instances (t4g.micro), you can save up to 80% comparing with the previous version. It's currently in alpha release, if you want to give it a try, please use below link:
+
+  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://drh-solution.s3-us-west-2.amazonaws.com/Aws-data-replication-component-s3/v2.0.0-alpha/DataReplicationHubS3Plugin-ec2.template)
+
+
+You will be asked for information to set up auto scaling group during deployment, such as maximum capacity, desired capacity etc.  You can start with certain number of desired instances rather than waiting for the auto scaling to scale out based on your scenerios. For example, set desired capacity parameter to 10 if there are more than 10000 objects.
+
+Please feel free to raise issues in Github.
+
+>Note: This is currently only available in all Regions other than China Regions.
+
+
 ## Architect
 
 ![S3 Plugin Architect](s3-plugin-architect.png)
