@@ -95,7 +95,8 @@ npm run build
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
-npx cdk synth --output=$staging_dist_dir --json=true > $staging_dist_dir/$2.template.json
+npx cdk synth -j --output=$staging_dist_dir -c runType=EC2 -c useAsset=false > $staging_dist_dir/DataReplicationHubS3Plugin-ec2.template.json
+# npx cdk synth -j --output=$staging_dist_dir -c runType=Lambda > $staging_dist_dir/DataReplicationHubS3Plugin-lambda.template.json
 
 # Remove unnecessary output files
 echo "cd $staging_dist_dir"

@@ -1,16 +1,23 @@
 import { Construct, Duration, Aws } from '@aws-cdk/core';
 
 import * as lambda from '@aws-cdk/aws-lambda';
-import * as logs from '@aws-cdk/aws-logs';
 import * as cw from '@aws-cdk/aws-cloudwatch';
 import * as sqs from '@aws-cdk/aws-sqs';
 
+import { RunType } from './main-stack';
+
+// Dashboard Name Space
+export const enum DBNamespace {
+    NS_EC2 = "DRH/EC2",
+    NS_LAMBDA = "DRH/Lambda"
+}
 
 export interface DBProps {
-    // readonly logGroups: logs.LogGroup,
-    readonly handler: lambda.Function
+    readonly runType: RunType,
     readonly queue: sqs.Queue
-    readonly queueDLQ: sqs.Queue
+    // readonly queueDLQ: sqs.Queue
+    readonly asgName?: string
+    readonly handler?: lambda.Function
 }
 
 export class DashboardStack extends Construct {
@@ -20,157 +27,264 @@ export class DashboardStack extends Construct {
     constructor(scope: Construct, id: string, props: DBProps) {
         super(scope, id);
 
-        // Setup Cloudwatch Dashboard
-        // Create Lambda logs filter to create network traffic metric
-        const lambdaFunctionLogs = new logs.LogGroup(this, 'props.handlerLogGroup', {
-            logGroupName: `/aws/lambda/${props.handler.functionName}`,
-            retention: logs.RetentionDays.TWO_WEEKS
-        });
+        const cwNamespace = props.runType === RunType.EC2 ? DBNamespace.NS_EC2 : DBNamespace.NS_LAMBDA
 
-        // // const cfnLambdaFunctionLogs = lambdaFunctionLogs.node.defaultChild as logs.CfnLogGroup;
-        // // cfnLambdaFunctionLogs.retentionInDays = logs.RetentionDays.TWO_WEEKS;
-
-        lambdaFunctionLogs.addMetricFilter('Completed-Bytes', {
-            metricName: 'Completed-Bytes',
-            metricNamespace: 's3_migrate',
-            metricValue: '$bytes',
-            filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Complete", bytes, key]')
+        const completedBytes = new cw.Metric({
+            namespace: cwNamespace,
+            metricName: 'CompletedBytes',
+            statistic: 'Sum',
+            period: Duration.minutes(1),
+            label: 'Completed(Bytes)'
         })
-        // lambdaFunctionLogs.addMetricFilter('Uploading-bytes', {
-        //     metricName: 'Uploading-bytes',
-        //     metricNamespace: 's3_migrate',
-        //     metricValue: '$bytes',
-        //     filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Uploading", bytes, key]')
-        // })
-        // lambdaFunctionLogs.addMetricFilter('Downloading-bytes', {
-        //     metricName: 'Downloading-bytes',
-        //     metricNamespace: 's3_migrate',
-        //     metricValue: '$bytes',
-        //     filterPattern: logs.FilterPattern.literal('[info, date, sn, p="----->Downloading", bytes, key]')
-        // })
-        lambdaFunctionLogs.addMetricFilter('MaxMemoryUsed', {
+
+        const completedObjects = new cw.Metric({
+            namespace: cwNamespace,
+            metricName: 'CompletedObjects',
+            statistic: 'Sum',
+            period: Duration.minutes(1),
+            label: 'Completed(Objects)'
+        })
+
+        const lambdaMemory = new cw.Metric({
+            namespace: cwNamespace,
             metricName: 'MaxMemoryUsed',
-            metricNamespace: 's3_migrate',
-            metricValue: '$memory',
-            filterPattern: logs.FilterPattern.literal('[head="REPORT", a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, memory, MB="MB", rest]')
+            statistic: 'Max',
+            period: Duration.minutes(1),
+            label: 'Max Memory Used'
         })
-        const lambdaMetricComplete = new cw.Metric({
-            namespace: 's3_migrate',
-            metricName: 'Completed-Bytes',
+
+        const asgDesired = new cw.Metric({
+            namespace: 'AWS/AutoScaling',
+            metricName: 'GroupDesiredCapacity',
+            dimensions: {
+                'AutoScalingGroupName': props.asgName
+            },
+            statistic: 'Max',
+            period: Duration.minutes(1),
+            label: 'Desired Capacity'
+        })
+
+        const asgInSvc = new cw.Metric({
+            namespace: 'AWS/AutoScaling',
+            metricName: 'GroupInServiceInstances',
+            dimensions: {
+                'AutoScalingGroupName': props.asgName
+            },
+            statistic: 'Max',
+            period: Duration.minutes(1),
+            label: 'In Service Instances'
+        })
+
+        // const asgMax = new cw.Metric({
+        //     namespace: 'AWS/AutoScaling',
+        //     metricName: 'GroupMaxSize',
+        //     dimensions: {
+        //         'AutoScalingGroupName': props.asgName
+        //     },
+        //     statistic: 'Max',
+        //     period: Duration.minutes(1),
+        //     label: 'Max Capacity'
+
+        // })
+        // const asgMin = new cw.Metric({
+        //     namespace: 'AWS/AutoScaling',
+        //     metricName: 'GroupMinSize',
+        //     dimensions: {
+        //         'AutoScalingGroupName': props.asgName
+        //     },
+        //     statistic: 'Max',
+        //     period: Duration.minutes(1),
+        //     label: 'Min Capacity'
+        // })
+
+
+        const asgNetworkIn = new cw.Metric({
+            namespace: 'AWS/EC2',
+            metricName: 'NetworkIn',
+            dimensions: {
+                'AutoScalingGroupName': props.asgName
+            },
             statistic: 'Sum',
             period: Duration.minutes(1)
         })
-        // const lambdaMetricUpload = new cw.Metric({
-        //     namespace: 's3_migrate',
-        //     metricName: 'Uploading-bytes',
+        const asgNetworkOut = new cw.Metric({
+            namespace: 'AWS/EC2',
+            metricName: 'NetworkOut',
+            dimensions: {
+                'AutoScalingGroupName': props.asgName
+            },
+            statistic: 'Sum',
+            period: Duration.minutes(1)
+        })
+
+        const asgCPU = new cw.Metric({
+            namespace: 'AWS/EC2',
+            metricName: 'CPUUtilization',
+            dimensions: {
+                'AutoScalingGroupName': props.asgName
+            },
+            statistic: 'Average',
+            period: Duration.minutes(1),
+            label: 'CPU %'
+        })
+
+        const asgMemory = new cw.Metric({
+            namespace: 'CWAgent',
+            metricName: 'mem_used_percent',
+            dimensions: {
+                'AutoScalingGroupName': props.asgName
+            },
+            statistic: 'Average',
+            period: Duration.minutes(1),
+            label: 'MEM %'
+        })
+
+        // const asgTcp = new cw.Metric({
+        //     namespace: 'CWAgent',
+        //     metricName: 'tcp_established',
+        //     dimensions: {
+        //         'AutoScalingGroupName': props.asgName
+        //     },
         //     statistic: 'Sum',
         //     period: Duration.minutes(1)
         // })
-        // const lambdaMetricDownload = new cw.Metric({
-        //     namespace: 's3_migrate',
-        //     metricName: 'Downloading-bytes',
-        //     statistic: 'Sum',
-        //     period: Duration.minutes(1)
-        // })
-        const lambdaMetricMaxMemoryUsed = new cw.Metric({
-            namespace: 's3_migrate',
-            metricName: 'MaxMemoryUsed',
-            statistic: 'Maximum',
-            period: Duration.minutes(1)
-        })
-        lambdaFunctionLogs.addMetricFilter('Error', {
-            metricName: 'ERROR-Logs',
-            metricNamespace: 's3_migrate',
-            metricValue: '1',
-            filterPattern: logs.FilterPattern.literal('"ERROR"')
-        })
-        lambdaFunctionLogs.addMetricFilter('WARNING', {
-            metricName: 'WARNING-Logs',
-            metricNamespace: 's3_migrate',
-            metricValue: '1',
-            filterPattern: logs.FilterPattern.literal('"WARNING"')
-        })
-        lambdaFunctionLogs.addMetricFilter('TIMEOUT', {
-            metricName: 'TIMEOUT-Logs',
-            metricNamespace: 's3_migrate',
-            metricValue: '1',
-            filterPattern: logs.FilterPattern.literal('"Task time out"')
-        })
-        const logMetricError = new cw.Metric({
-            namespace: 's3_migrate',
-            metricName: 'ERROR-Logs',
-            statistic: 'SUM',
-            period: Duration.minutes(1)
-        })
-        const logMetricWarning = new cw.Metric({
-            namespace: 's3_migrate',
-            metricName: 'WARNING-Logs',
-            statistic: 'Sum',
-            period: Duration.minutes(1)
-        })
-        const logMetricTimeout = new cw.Metric({
-            namespace: 's3_migrate',
-            metricName: 'TIMEOUT-Logs',
-            statistic: 'Sum',
-            period: Duration.minutes(1)
+
+
+
+        const asgDisk = new cw.Metric({
+            namespace: 'CWAgent',
+            metricName: 'disk_used_percent',
+            dimensions: {
+                'AutoScalingGroupName': props.asgName
+            },
+            statistic: 'Average',
+            period: Duration.minutes(1),
+            label: 'Disk %'
         })
 
-        // Dashboard to monitor SQS and Lambda
+
+
+        // Main Dashboard
         this.dashboard = new cw.Dashboard(this, 'S3Migration', {
             dashboardName: `${Aws.STACK_NAME}-Dashboard`
         });
 
         this.dashboard.addWidgets(
             new cw.GraphWidget({
-                title: 'Lambda-NETWORK',
-                left: [lambdaMetricComplete]
+                title: 'Network',
+                left: [completedBytes]
             }),
-            new cw.GraphWidget({
-                title: 'Lambda-concurrent',
-                left: [props.handler.metric('ConcurrentExecutions', { period: Duration.minutes(1) })]
-            }),
-            new cw.GraphWidget({
-                title: 'Lambda-invocations/errors/throttles',
-                left: [
-                    props.handler.metricInvocations({ period: Duration.minutes(1) }),
-                    props.handler.metricErrors({ period: Duration.minutes(1) }),
-                    props.handler.metricThrottles({ period: Duration.minutes(1) })
-                ]
-            }),
-            new cw.GraphWidget({
-                title: 'Lambda-duration',
-                left: [props.handler.metricDuration({ period: Duration.minutes(1) })]
-            })
-        )
 
-        this.dashboard.addWidgets(
             new cw.GraphWidget({
-                title: 'Lambda_MaxMemoryUsed(MB)',
-                left: [lambdaMetricMaxMemoryUsed]
+                title: 'Transferred Objects',
+                left: [completedObjects]
             }),
+
             new cw.GraphWidget({
-                title: 'ERROR/WARNING Logs',
-                left: [logMetricError],
-                right: [logMetricWarning, logMetricTimeout]
-            }),
-            new cw.GraphWidget({
-                title: 'SQS-Jobs',
+                title: 'Running/Waiting Jobs History',
                 left: [
-                    props.queue.metricApproximateNumberOfMessagesVisible({ period: Duration.minutes(1) }),
-                    props.queue.metricApproximateNumberOfMessagesNotVisible({ period: Duration.minutes(1) })
+                    props.queue.metricApproximateNumberOfMessagesVisible({
+                        period: Duration.minutes(1),
+                        label: 'Waiting Jobs'
+                    }),
+                    props.queue.metricApproximateNumberOfMessagesNotVisible({
+                        period: Duration.minutes(1),
+                        label: 'Running Jobs'
+                    })
                 ]
             }),
+
+
             new cw.SingleValueWidget({
-                title: 'Running/Waiting and Dead Jobs',
+                title: 'Running/Waiting Jobs',
                 metrics: [
-                    props.queue.metricApproximateNumberOfMessagesNotVisible({ period: Duration.minutes(1) }),
-                    props.queue.metricApproximateNumberOfMessagesVisible({ period: Duration.minutes(1) }),
-                    props.queueDLQ.metricApproximateNumberOfMessagesNotVisible({ period: Duration.minutes(1) }),
-                    props.queueDLQ.metricApproximateNumberOfMessagesVisible({ period: Duration.minutes(1) })
+                    props.queue.metricApproximateNumberOfMessagesVisible({
+                        period: Duration.minutes(1),
+                        label: 'Waiting Jobs'
+                    }),
+                    props.queue.metricApproximateNumberOfMessagesNotVisible({
+                        period: Duration.minutes(1),
+                        label: 'Running Jobs'
+                    })
                 ],
                 height: 6
             })
         )
+
+        if (props.handler) {
+
+            this.dashboard.addWidgets(
+                new cw.GraphWidget({
+                    title: 'Max Memory Used(MB)',
+                    left: [lambdaMemory]
+                }),
+
+                new cw.GraphWidget({
+                    title: 'Concurrency',
+                    left: [props.handler.metric('ConcurrentExecutions', {
+                        period: Duration.minutes(1),
+                        statistic: 'Max'
+                    }),]
+                }),
+                new cw.GraphWidget({
+                    title: 'Invocations / Errors',
+                    left: [
+                        props.handler.metricInvocations({
+                            period: Duration.minutes(1),
+                            statistic: 'Sum'
+                        }),
+                        props.handler.metricErrors({
+                            period: Duration.minutes(1),
+                            statistic: 'Sum'
+                        }),
+                        // props.handler.metricThrottles({ period: Duration.minutes(1) })
+                    ]
+                }),
+                new cw.GraphWidget({
+                    title: 'Duration (Average)',
+                    left: [props.handler.metricDuration({ period: Duration.minutes(1) })]
+                })
+
+            )
+        }
+        else {
+
+            this.dashboard.addWidgets(
+                // new cw.GraphWidget({
+                //     title: 'Lambda_MaxMemoryUsed(MB)',
+                //     left: [lambdaMetricMaxMemoryUsed]
+                // }),
+                // new cw.GraphWidget({
+                //     title: 'ERROR/WARNING Logs',
+                //     left: [logMetricError],
+                //     right: [logMetricWarning, logMetricTimeout]
+                // }),
+
+                new cw.GraphWidget({
+                    title: 'Network In/Out',
+                    left: [asgNetworkIn, asgNetworkOut]
+                }),
+
+                new cw.GraphWidget({
+                    title: 'CPU Utilization (Average)',
+                    left: [asgCPU]
+                }),
+
+                new cw.GraphWidget({
+                    title: 'Memory / Disk (Average)',
+                    left: [asgMemory, asgDisk]
+                }),
+
+
+                new cw.GraphWidget({
+                    title: 'Desired / InService Instances',
+                    left: [asgDesired, asgInSvc]
+                }),
+
+
+            )
+
+        }
 
 
     }

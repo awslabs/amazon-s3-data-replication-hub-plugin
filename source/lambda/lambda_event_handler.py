@@ -2,7 +2,6 @@ import boto3
 import os
 import uuid
 ecs = boto3.client('ecs')
-s3 = boto3.client('s3')
 
 
 def lambda_handler(event, context):
@@ -24,9 +23,6 @@ def on_create(event):
     print('Run fargate task')
     run_fargate(props)
 
-    print('Add notification to s3 bucket')
-    put_s3_notification(props)
-
     physical_id = props['stack_name']
     return {'PhysicalResourceId': physical_id}
 
@@ -38,9 +34,6 @@ def on_update(event):
 
     print('Run fargate task')
     run_fargate(props)
-
-    print('Add notification to s3 bucket')
-    put_s3_notification(props)
 
 
 def on_delete(event):
@@ -83,56 +76,3 @@ def run_fargate(props):
             )
     except Exception as e:
         print(e)
-
-
-def put_s3_notification(props):
-    ''' create or update notification configurtion to S3 Bucket only if Enable S3 Event is required. '''
-    bucket_name = props['bucket_name']
-    queue_arn = props['queue_arn']
-    enable_s3_event = props['enable_s3_event']
-    prefix = props['prefix']
-    job_type = props['job_type']
-    stack_name = props['stack_name']
-
-    if job_type == 'PUT' and enable_s3_event != 'No':
-
-        # Check event type
-        if enable_s3_event == 'Delete_Only':
-            events = [
-                's3:ObjectRemoved:Delete',
-            ]
-        elif enable_s3_event == 'Create_And_Delete':
-            events = [
-                's3:ObjectCreated:*',
-                's3:ObjectRemoved:Delete',
-            ]
-        else:
-            events = ['s3:ObjectCreated:*']
-        try:
-            response = s3.put_bucket_notification_configuration(
-                Bucket=bucket_name,
-                NotificationConfiguration={
-                    'QueueConfigurations': [
-                        {
-                            'Id': 'Data Replication Hub Notification - {}'.format(stack_name),
-                            'QueueArn': queue_arn,
-                            'Events': events,
-                            'Filter': {
-                                'Key': {
-                                    'FilterRules': [
-                                        {
-                                            'Name': 'prefix',
-                                            'Value': prefix
-                                        },
-                                    ]
-                                }
-                            }
-                        },
-                    ],
-                },
-            )
-            print(response)
-        except Exception as e:
-            print(f'Failed to Add notification configuration - Error: {e}')
-    else:
-        print('No need to add S3 bucket notitication')

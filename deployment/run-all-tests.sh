@@ -11,9 +11,10 @@
 # script continuing to execute despite an error being thrown.
 
 # Save the current working directory
-source_dir=$PWD
+source_dir=../source
 
 # Test the CDK project
+cd $source_dir
 npm install
 npm run test -- -u
 if [ "$?" = "1" ]; then
@@ -31,4 +32,4 @@ fi
 # fi
 
 # Return to the source/ level
-cd $source_dir
+# cd $source_dir
