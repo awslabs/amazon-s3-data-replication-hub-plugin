@@ -1,8 +1,8 @@
 {
-  "name": "aws-data-replication-component-s3",
+  "name": "data-replication-component-s3",
   "version": "0.1.0",
   "bin": {
-    "aws-data-replication-component-s3": "bin/aws-data-replication-component-s3.js"
+    "data-replication-component-s3": "bin/main-stack.js"
   },
   "scripts": {
     "build": "tsc",

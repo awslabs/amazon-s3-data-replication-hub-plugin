@@ -102,7 +102,7 @@ npx cdk synth -j --output=$staging_dist_dir -c runType=EC2 -c useAsset=false > $
 echo "cd $staging_dist_dir"
 cd $staging_dist_dir
 echo "rm tree.json manifest.json cdk.out"
-rm tree.json manifest.json cdk.out AwsDataReplicationComponentS3Stack.template.json
+rm tree.json manifest.json cdk.out DataReplicationComponentS3Stack.template.json
 
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Template artifacts"
