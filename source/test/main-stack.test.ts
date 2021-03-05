@@ -6,7 +6,7 @@ import * as main from '../lib/main-stack';
 test('Empty Stack', () => {
     const app = new cdk.App();
     // WHEN
-    const stack = new main.DataReplicationComponentS3Stack(app, 'MyTestStack');
+    const stack = new main.DataTransferS3Stack(app, 'MyTestStack');
     // THEN
     // expectCDK(stack).to(matchTemplate({
     //   "Resources": {}

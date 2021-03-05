@@ -7,6 +7,7 @@ import { CommonStack, CommonProps } from "./common-resources";
 import { EcsStack, EcsTaskProps } from "./ecs-finder-stack";
 import { Ec2WorkerStack, Ec2WorkerProps } from "./ec2-worker-stack";
 import { DashboardStack, DBProps } from "./dashboard-stack";
+import { EventStack, EventProps } from "./event-stack";
 
 const { VERSION } = process.env;
 
@@ -33,7 +34,7 @@ export function addCfnNagSuppressRules(resource: CfnResource, rules: CfnNagSuppr
 /***
  * Main Stack
  */
-export class DataReplicationComponentS3Stack extends Stack {
+export class DataTransferS3Stack extends Stack {
   private paramGroups: any[] = [];
   private paramLabels: any = {};
 
@@ -57,36 +58,36 @@ export class DataReplicationComponentS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
-    const sourceType = new CfnParameter(this, 'sourceType', {
+    const srcType = new CfnParameter(this, 'srcType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
       type: 'String',
       default: 'Amazon_S3',
       allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS', 'Google_GCS']
     })
-    this.addToParamLabels('Source Type', sourceType.logicalId)
+    this.addToParamLabels('Source Type', srcType.logicalId)
 
-    const srcBucketName = new CfnParameter(this, 'srcBucketName', {
+    const srcBucket = new CfnParameter(this, 'srcBucket', {
       description: 'Source Bucket Name',
       type: 'String'
     })
-    this.addToParamLabels('Source Bucket Name', srcBucketName.logicalId)
+    this.addToParamLabels('Source Bucket', srcBucket.logicalId)
 
-    const srcBucketPrefix = new CfnParameter(this, 'srcBucketPrefix', {
-      description: 'Source Bucket Object Prefix',
+    const srcPrefix = new CfnParameter(this, 'srcPrefix', {
+      description: 'Source Prefix',
       default: '',
       type: 'String'
     })
-    this.addToParamLabels('Source Bucket Prefix', srcBucketPrefix.logicalId)
+    this.addToParamLabels('Source Prefix', srcPrefix.logicalId)
 
-    const srcRegionName = new CfnParameter(this, 'srcRegionName', {
-      description: 'Source Bucket Region Name',
+    const srcRegion = new CfnParameter(this, 'srcRegion', {
+      description: 'Source Region Name',
       default: '',
       type: 'String'
     })
-    this.addToParamLabels('Source Region Name', srcRegionName.logicalId)
+    this.addToParamLabels('Source Region', srcRegion.logicalId)
 
     const srcInCurrentAccount = new CfnParameter(this, 'srcInCurrentAccount', {
-      description: 'Source Bucket in current account?',
+      description: 'Source Bucket in current account? If not, you should provide a credential with read access',
       default: 'false',
       type: 'String',
       allowedValues: ['true', 'false']
@@ -94,37 +95,37 @@ export class DataReplicationComponentS3Stack extends Stack {
     this.addToParamLabels('Source In Current Account', srcInCurrentAccount.logicalId)
 
     const srcCredentials = new CfnParameter(this, 'srcCredentials', {
-      description: 'The Parameter Store used to keep AK/SK credentials for Source Bucket.',
+      description: 'The Parameter Store used to keep AK/SK credentials for Source Bucket. Leave blank for open data',
       default: '',
       type: 'String'
     })
     this.addToParamLabels('Source Credentials Parameter', srcCredentials.logicalId)
 
 
-    const destBucketName = new CfnParameter(this, 'destBucketName', {
+    const destBucket = new CfnParameter(this, 'destBucket', {
       description: 'Destination Bucket Name',
       type: 'String'
     })
-    this.addToParamLabels('Destination Bucket Name', destBucketName.logicalId)
+    this.addToParamLabels('Destination Bucket', destBucket.logicalId)
 
 
-    const destBucketPrefix = new CfnParameter(this, 'destBucketPrefix', {
-      description: 'Destination Bucket Object Prefix',
+    const destPrefix = new CfnParameter(this, 'destPrefix', {
+      description: 'Destination Prefix',
       default: '',
       type: 'String'
     })
-    this.addToParamLabels('Destination Bucket Prefix', destBucketPrefix.logicalId)
+    this.addToParamLabels('Destination Prefix', destPrefix.logicalId)
 
 
-    const destRegionName = new CfnParameter(this, 'destRegionName', {
-      description: 'Destination Bucket Region Name',
+    const destRegion = new CfnParameter(this, 'destRegion', {
+      description: 'Destination Region Name',
       default: '',
       type: 'String'
     })
-    this.addToParamLabels('Destination Region Name', destRegionName.logicalId)
+    this.addToParamLabels('Destination Region', destRegion.logicalId)
 
     const destInCurrentAccount = new CfnParameter(this, 'destInCurrentAccount', {
-      description: 'Destination Bucket in current account?',
+      description: 'Destination Bucket in current account? If not, you should provide a credential with read and write access',
       default: 'true',
       type: 'String',
       allowedValues: ['true', 'false']
@@ -167,33 +168,6 @@ export class DataReplicationComponentS3Stack extends Stack {
       type: 'List<AWS::EC2::Subnet::Id>'
     })
 
-    // 'PUT': Destination Bucket is not in current account.
-    // 'GET': Source bucket is not in current account.
-    // const jobType = new CfnParameter(this, 'jobType', {
-    //   description: 'Choose PUT if source bucket is in current account. Otherwise, choose GET',
-    //   type: 'String',
-    //   default: 'GET',
-    //   allowedValues: ['PUT', 'GET']
-    // })
-    // this.addToParamLabels('Job Type', jobType.logicalId)
-
-    // const regionName = new CfnParameter(this, 'regionName', {
-    //   description: 'Region Name. If Job Type is GET, use source region name, otherwise use destination region name.',
-    //   default: '',
-    //   type: 'String'
-    // })
-    // this.addToParamLabels('Region Name', regionName.logicalId)
-
-    // The region credential (not the same account as Lambda) setting in SSM Parameter Store
-    // const credentialsParameterStore = new CfnParameter(this, 'credentialsParameterStore', {
-    //   description: 'The Parameter Store used to keep AK/SK credentials for another account. Leave it blank if you are accessing open buckets with no-sign-request',
-    //   default: '',
-    //   type: 'String'
-    // })
-    // this.addToParamLabels('Credentials Parameter Name', credentialsParameterStore.logicalId)
-
-
-
     const alarmEmail = new CfnParameter(this, 'alarmEmail', {
       allowedPattern: '\\w[-\\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\\.)+[A-Za-z]{2,14}',
       type: 'String',
@@ -208,69 +182,75 @@ export class DataReplicationComponentS3Stack extends Stack {
     //   allowedValues: ['TRUE', 'FALSE']
     // })
 
-    const enableS3Event = new CfnParameter(this, 'enableS3Event', {
+    const srcEvent = new CfnParameter(this, 'srcEvent', {
       description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
       default: 'No',
       type: 'String',
-      allowedValues: ['No', 'Create_Only', 'Delete_Only', 'Create_And_Delete']
+      allowedValues: ['No', 'Create', 'CreateAndDelete']
+      // allowedValues: ['No', 's3:ObjectCreated:*', 's3:ObjectRemoved:*', 's3:ObjectCreated:*,s3:ObjectRemoved:*']
     })
-    this.addToParamLabels('Enable S3 Event', enableS3Event.logicalId)
+    this.addToParamLabels('Enable S3 Event', srcEvent.logicalId)
+    // const srcEvent = new CfnParameter(this, 'srcEvent', {
+    //   description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
+    //   default: '',
+    //   type: 'CommaDelimitedList',
+    //   allowedValues: ['', 'Create', 'Delete', 'Create,Delete', 'Delete,Create']
+    // })
+    // this.addToParamLabels('Source Bucket Notification', srcEvent.logicalId)
 
 
-    const multipartThreshold = new CfnParameter(this, 'multipartThreshold', {
-      description: 'Threshold Size for multipart upload in MB, default to 10 (MB)',
-      default: '10',
+    // const multipartThreshold = new CfnParameter(this, 'multipartThreshold', {
+    //   description: 'Threshold Size for multipart upload in MB, default to 10 (MB)',
+    //   default: '10',
+    //   type: 'String',
+    //   allowedValues: ['10', '15', '20', '50', '100'],
+    // })
+
+    // const chunkSize = new CfnParameter(this, 'chunkSize', {
+    //   description: 'Chunk Size for multipart upload in MB, default to 5 (MB)',
+    //   default: '5',
+    //   type: 'String',
+    //   allowedValues: ['5', '10', '20']
+    // })
+
+    const finderDepth = new CfnParameter(this, 'finderDepth', {
+      description: 'The depth of sub folders to compare in parallel. 0 means comparing all objects together with no parallelism.',
+      default: '0',
       type: 'String',
-      allowedValues: ['10', '15', '20', '50', '100'],
     })
-
-    const chunkSize = new CfnParameter(this, 'chunkSize', {
-      description: 'Chunk Size for multipart upload in MB, default to 5 (MB)',
-      default: '5',
+    const finderNumber = new CfnParameter(this, 'finderNumber', {
+      description: 'The number of finder threads to run in parallel',
+      default: '1',
       type: 'String',
-      allowedValues: ['5', '10', '20']
     })
-
-    const maxThreads = new CfnParameter(this, 'maxThreads', {
-      description: 'Max Theads to run multipart upload in lambda, default to 10',
-      default: '10',
+    const workerNumber = new CfnParameter(this, 'workerNumber', {
+      description: 'The number of worker threads to run in parallel in one instance',
+      default: '4',
       type: 'String',
-      allowedValues: ['5', '10', '20', '50'],
     })
 
 
-    this.addToParamGroups('General Information', sourceType.logicalId)
-    this.addToParamGroups('Source Information', srcBucketName.logicalId, srcBucketPrefix.logicalId, srcCredentials.logicalId, srcInCurrentAccount.logicalId, enableS3Event.logicalId)
-    this.addToParamGroups('Destination Information', destBucketName.logicalId, destBucketPrefix.logicalId, destCredentials.logicalId, destInCurrentAccount.logicalId, destStorageClass.logicalId)
-    // this.addToParamGroups('Extra Information', jobType.logicalId, regionName.logicalId, credentialsParameterStore.logicalId, alarmEmail.logicalId)
+    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId)
+    this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId)
+    this.addToParamGroups('Notification Information', alarmEmail.logicalId)
     this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId)
-    // this.addToParamGroups('Advanced Options', multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId)
 
-    let lambdaMemory: CfnParameter | undefined
-    let keyName: CfnParameter | undefined
+    // let lambdaMemory: CfnParameter | undefined
     let maxCapacity: CfnParameter | undefined
     let minCapacity: CfnParameter | undefined
     let desiredCapacity: CfnParameter | undefined
 
     if (runType === RunType.LAMBDA) {
-      lambdaMemory = new CfnParameter(this, 'lambdaMemory', {
-        description: 'Lambda Memory, default to 256 MB',
-        default: '256',
-        type: 'Number',
-        allowedValues: ['128', '256', '512', '1024']
-      })
-      this.addToParamLabels('Lambda Memory', lambdaMemory.logicalId)
-      this.addToParamGroups('Advanced Options', multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId, lambdaMemory.logicalId)
+      // lambdaMemory = new CfnParameter(this, 'lambdaMemory', {
+      //   description: 'Lambda Memory, default to 256 MB',
+      //   default: '256',
+      //   type: 'Number',
+      //   allowedValues: ['128', '256', '512', '1024']
+      // })
+      // this.addToParamLabels('Lambda Memory', lambdaMemory.logicalId)
+      // this.addToParamGroups('Advanced Options', lambdaMemory.logicalId)
 
     } else {
-
-      // keyName = new CfnParameter(this, 'keyName', {
-      //   description: 'EC2 Key Name',
-      //   // default: '',
-      //   type: 'AWS::EC2::KeyPair::KeyName',
-      //   // type: 'String',
-      // })
-      // this.addToParamLabels('Key Name', keyName.logicalId)
 
       maxCapacity = new CfnParameter(this, 'maxCapacity', {
         description: 'Maximum Capacity for Auto Scaling Group',
@@ -293,7 +273,7 @@ export class DataReplicationComponentS3Stack extends Stack {
       })
       this.addToParamLabels('Desired Capacity', desiredCapacity.logicalId)
 
-      this.addToParamGroups('Advanced Options', multipartThreshold.logicalId, chunkSize.logicalId, maxThreads.logicalId,
+      this.addToParamGroups('Advanced Options', finderDepth.logicalId, finderNumber.logicalId, workerNumber.logicalId,
         maxCapacity.logicalId, minCapacity.logicalId, desiredCapacity.logicalId)
 
     }
@@ -327,9 +307,9 @@ export class DataReplicationComponentS3Stack extends Stack {
     //   expression: Fn.conditionEquals('YES', srcInCurrentAccount),
     // });
 
-    // const bucketName = Fn.conditionIf(isSrc.logicalId, destBucketName.valueAsString, srcBucketName.valueAsString).toString();
-    const srcBucket = s3.Bucket.fromBucketName(this, `SrcBucket`, srcBucketName.valueAsString);
-    const destBucket = s3.Bucket.fromBucketName(this, `DestBucket`, destBucketName.valueAsString);
+    // const bucketName = Fn.conditionIf(isSrc.logicalId, destBucket.valueAsString, srcBucket.valueAsString).toString();
+    const srcIBucket = s3.Bucket.fromBucketName(this, `SrcBucket`, srcBucket.valueAsString);
+    const destIBucket = s3.Bucket.fromBucketName(this, `DestBucket`, destBucket.valueAsString);
 
     // Get VPC
     const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
@@ -350,19 +330,21 @@ export class DataReplicationComponentS3Stack extends Stack {
       AWS_DEFAULT_REGION: Aws.REGION,
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
       JOB_QUEUE_NAME: commonStack.sqsQueue.queueName,
-      SOURCE_TYPE: sourceType.valueAsString,
-
-      SRC_BUCKET_NAME: srcBucketName.valueAsString,
-      SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
-      SRC_REGION: srcRegionName.valueAsString,
+      SOURCE_TYPE: srcType.valueAsString,
+      SRC_BUCKET: srcBucket.valueAsString,
+      SRC_PREFIX: srcPrefix.valueAsString,
+      SRC_REGION: srcRegion.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
 
-      DEST_BUCKET_NAME: destBucketName.valueAsString,
-      DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-      DEST_REGION: destRegionName.valueAsString,
+      DEST_BUCKET: destBucket.valueAsString,
+      DEST_PREFIX: destPrefix.valueAsString,
+      DEST_REGION: destRegion.valueAsString,
       DEST_CREDENTIALS: destCredentials.valueAsString,
       DEST_IN_CURRENT_ACCOUNT: destInCurrentAccount.valueAsString,
+
+      FINDER_DEPTH: finderDepth.valueAsString,
+      FINDER_NUMBER: finderNumber.valueAsString,
 
     }
 
@@ -376,8 +358,9 @@ export class DataReplicationComponentS3Stack extends Stack {
 
     srcCred.grantRead(ecsStack.taskDefinition.taskRole)
     destCred.grantRead(ecsStack.taskDefinition.taskRole)
-    srcBucket.grantRead(ecsStack.taskDefinition.taskRole);
-    destBucket.grantRead(ecsStack.taskDefinition.taskRole);
+    // For finder, read of source and destination
+    srcIBucket.grantRead(ecsStack.taskDefinition.taskRole);
+    destIBucket.grantRead(ecsStack.taskDefinition.taskRole);
 
     commonStack.jobTable.grantReadData(ecsStack.taskDefinition.taskRole);
     commonStack.sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
@@ -385,19 +368,24 @@ export class DataReplicationComponentS3Stack extends Stack {
     const workerEnv = {
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
       JOB_QUEUE_NAME: commonStack.sqsQueue.queueName,
-      SOURCE_TYPE: sourceType.valueAsString,
+      SOURCE_TYPE: srcType.valueAsString,
 
-      SRC_BUCKET_NAME: srcBucketName.valueAsString,
-      SRC_BUCKET_PREFIX: srcBucketPrefix.valueAsString,
-      SRC_REGION: srcRegionName.valueAsString,
+      SRC_BUCKET: srcBucket.valueAsString,
+      SRC_PREFIX: srcPrefix.valueAsString,
+      SRC_REGION: srcRegion.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
 
-      DEST_BUCKET_NAME: destBucketName.valueAsString,
-      DEST_BUCKET_PREFIX: destBucketPrefix.valueAsString,
-      DEST_REGION: destRegionName.valueAsString,
+      DEST_BUCKET: destBucket.valueAsString,
+      DEST_PREFIX: destPrefix.valueAsString,
+      DEST_REGION: destRegion.valueAsString,
       DEST_CREDENTIALS: destCredentials.valueAsString,
       DEST_IN_CURRENT_ACCOUNT: destInCurrentAccount.valueAsString,
+      DEST_STORAGE_CLASS: destStorageClass.valueAsString,
+
+      FINDER_DEPTH: finderDepth.valueAsString,
+      FINDER_NUMBER: finderNumber.valueAsString,
+      WORKER_NUMBER: workerNumber.valueAsString,
 
     }
 
@@ -408,7 +396,6 @@ export class DataReplicationComponentS3Stack extends Stack {
         env: workerEnv,
         vpc: vpc,
         queue: commonStack.sqsQueue,
-        keyName: keyName?.valueAsString,
         maxCapacity: maxCapacity?.valueAsNumber,
         minCapacity: minCapacity?.valueAsNumber,
         desiredCapacity: desiredCapacity?.valueAsNumber,
@@ -418,8 +405,10 @@ export class DataReplicationComponentS3Stack extends Stack {
 
       srcCred.grantRead(ec2Stack.workerAsg.role)
       destCred.grantRead(ec2Stack.workerAsg.role)
-      srcBucket.grantReadWrite(ec2Stack.workerAsg.role);
-      destBucket.grantReadWrite(ecsStack.taskDefinition.taskRole);
+
+      // For worker, read of source and read+write of destination
+      srcIBucket.grantRead(ec2Stack.workerAsg.role);
+      destIBucket.grantReadWrite(ec2Stack.workerAsg.role);
       commonStack.jobTable.grantReadWriteData(ec2Stack.workerAsg.role);
       commonStack.sqsQueue.grantConsumeMessages(ec2Stack.workerAsg.role);
 
@@ -438,6 +427,34 @@ export class DataReplicationComponentS3Stack extends Stack {
       handler: handler,
     }
     new DashboardStack(this, 'DashboardStack', dbProps);
+
+
+
+    // Set up event stack
+    const eventProps: EventProps = {
+      events: srcEvent.valueAsString,
+      bucket: srcIBucket,
+      prefix: srcPrefix.valueAsString,
+      queue: commonStack.sqsQueue,
+    }
+    const eventStack = new EventStack(this, 'EventStack', eventProps)
+    eventStack.nestedStackResource?.addMetadata('nestedTemplateName', eventStack.templateFile.slice(0, -5));
+    eventStack.nestedStackResource?.overrideLogicalId('EventStack')
+
+    const useS3Event = new CfnCondition(this, 'UseS3Event', {
+      expression: Fn.conditionAnd(
+        // source in current account
+        Fn.conditionEquals('true', srcInCurrentAccount.valueAsString),
+        // Source Type is Amazon S3 - Optional
+        Fn.conditionEquals('Amazon_S3', srcType.valueAsString),
+        // Enable S3 Event is Yes
+        Fn.conditionNot(Fn.conditionEquals('No', srcEvent.valueAsString)),
+      ),
+    });
+
+    if (eventStack.nestedStackResource) {
+      eventStack.nestedStackResource.cfnOptions.condition = useS3Event
+    }
 
   }
 }

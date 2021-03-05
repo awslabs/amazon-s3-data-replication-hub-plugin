@@ -1,4 +1,4 @@
-import { Construct, Fn, Duration, Aws, CfnOutput, CustomResource, Stack } from '@aws-cdk/core';
+import { Construct, Fn, Duration, Aws, CfnMapping, CfnOutput, CustomResource, Stack } from '@aws-cdk/core';
 import * as events from '@aws-cdk/aws-events';
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as ecs from '@aws-cdk/aws-ecs';
@@ -33,11 +33,25 @@ export class EcsStack extends Construct {
     constructor(scope: Construct, id: string, props: EcsTaskProps) {
         super(scope, id);
 
-        // 7. Setup JobSender ECS Task
-        const ecrRepositoryArn = 'arn:aws:ecr:us-west-2:627627941158:repository/s3-replication-cli'
-        // const repo = ecr.Repository.fromRepositoryName(this, 'JobSenderRepo', 's3-replication-jobsender')
-        const repo = ecr.Repository.fromRepositoryArn(this, 'JobSenderRepo', ecrRepositoryArn)
-        this.taskDefinition = new ecs.FargateTaskDefinition(this, 'JobSenderTaskDef', {
+        const repoTable = new CfnMapping(this, 'ECRRepoTable', {
+            mapping: {
+                'aws': {
+                    repoArn: 'arn:aws:ecr:us-west-2:627627941158:repository/s3-replication-cli',
+                },
+                'aws-cn': {
+                    repoArn: 'arn:aws-cn:ecr:cn-northwest-1:382903357634:repository/s3-replication-cli',
+                },
+            }
+        });
+
+        const ecrRepositoryArn = repoTable.findInMap(Aws.PARTITION, 'repoArn')
+
+        // const repo = ecr.Repository.fromRepositoryArn(this, 'JobFinderRepo', ecrRepositoryArn)
+        const repo = ecr.Repository.fromRepositoryAttributes(this, 'JobFinderRepo', {
+            repositoryArn: ecrRepositoryArn,
+            repositoryName: 's3-replication-cli'
+        })
+        this.taskDefinition = new ecs.FargateTaskDefinition(this, 'JobFinderTaskDef', {
             cpu: props.cpu ? props.cpu : 1024 * 4,
             memoryLimitMiB: props.memory ? props.memory : 1024 * 8,
             family: `${Aws.STACK_NAME}-S3ReplicationTask`,
@@ -49,17 +63,15 @@ export class EcsStack extends Construct {
             logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender', logRetention: RetentionDays.TWO_WEEKS })
         });
 
-
         // Get existing ecs cluster.
         // const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
         //     vpcId: props.ecsVpcId, //ecsVpcId.valueAsString,
         //     availabilityZones: Fn.getAzs(),
         //     publicSubnetIds: props.ecsSubnetIds, //ecsSubnets.valueAsList
-
         // })
 
         const cluster = ecs.Cluster.fromClusterAttributes(this, 'ECSCluster', {
-            clusterName: props.ecsClusterName, // ecsClusterName.valueAsString,
+            clusterName: props.ecsClusterName,
             vpc: props.vpc,
             securityGroups: []
         })
@@ -91,7 +103,7 @@ export class EcsStack extends Construct {
         const onEventHandler = new lambda.Function(this, 'EventHandler', {
             runtime: lambda.Runtime.PYTHON_3_8,
             code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
-            handler: 'event_handler.lambda_handler',
+            handler: 'lambda_event_handler.lambda_handler',
             memorySize: 256,
             timeout: Duration.minutes(15),
         });
@@ -137,7 +149,7 @@ export class EcsStack extends Construct {
             }
         });
 
-        ecsCr.node.addDependency(lambdaProvider)
+        ecsCr.node.addDependency(lambdaProvider, this.taskDefinition)
 
         new CfnOutput(this, 'TaskDefinitionName', {
             value: this.taskDefinition.family,

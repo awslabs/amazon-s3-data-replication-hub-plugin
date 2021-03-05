@@ -24,7 +24,7 @@ export class CommonStack extends Construct {
         super(scope, id);
 
         // Setup DynamoDB
-        this.jobTable = new ddb.Table(this, 'S3MigrationTable', {
+        this.jobTable = new ddb.Table(this, 'S3TransferTable', {
             partitionKey: { name: 'ObjectKey', type: ddb.AttributeType.STRING },
             billingMode: ddb.BillingMode.PAY_PER_REQUEST,
             removalPolicy: RemovalPolicy.DESTROY
@@ -44,14 +44,16 @@ export class CommonStack extends Construct {
                 reason: 'No need to use encryption'
             }
         ]);
+        cfnJobTable.overrideLogicalId('S3TransferTable')
 
         // Setup SQS
-        const sqsQueueDLQ = new sqs.Queue(this, 'S3MigrationQueueDLQ', {
-            visibilityTimeout: Duration.minutes(15),
+        const sqsQueueDLQ = new sqs.Queue(this, 'S3TransferQueueDLQ', {
+            visibilityTimeout: Duration.minutes(30),
             retentionPeriod: Duration.days(14),
         })
 
         const cfnSqsQueueDLQ = sqsQueueDLQ.node.defaultChild as sqs.CfnQueue;
+        cfnSqsQueueDLQ.overrideLogicalId('S3TransferQueueDLQ')
         addCfnNagSuppressRules(cfnSqsQueueDLQ, [
             {
                 id: 'W48',
@@ -59,8 +61,8 @@ export class CommonStack extends Construct {
             }
         ]);
 
-        this.sqsQueue = new sqs.Queue(this, 'S3MigrationQueue', {
-            visibilityTimeout: Duration.minutes(15),
+        this.sqsQueue = new sqs.Queue(this, 'S3TransferQueue', {
+            visibilityTimeout: Duration.minutes(30),
             retentionPeriod: Duration.days(14),
             deadLetterQueue: {
                 queue: sqsQueueDLQ,
@@ -75,6 +77,8 @@ export class CommonStack extends Construct {
                 reason: 'No need to use encryption'
             }
         ]);
+
+        cfnSqsQueue.overrideLogicalId('S3TransferQueue')
 
         // Setup Alarm for queue - DLQ
         const alarmDLQ = new cw.Alarm(this, 'SQSDLQAlarm', {
