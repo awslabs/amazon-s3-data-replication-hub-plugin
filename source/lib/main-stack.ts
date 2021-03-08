@@ -278,7 +278,7 @@ export class DataTransferS3Stack extends Stack {
 
     }
 
-    this.templateOptions.description = `(SO8002) - Data Replication Hub - S3 Plugin - Template version ${VERSION}`;
+    this.templateOptions.description = `(SO8002) - Data Transfer Hub - S3 Plugin - Template version ${VERSION}`;
 
     this.templateOptions.metadata = {
       'AWS::CloudFormation::Interface': {

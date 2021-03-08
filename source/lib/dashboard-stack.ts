@@ -37,12 +37,20 @@ export class DashboardStack extends Construct {
             label: 'Completed(Bytes)'
         })
 
-        const completedObjects = new cw.Metric({
+        const transferredObjects = new cw.Metric({
             namespace: cwNamespace,
-            metricName: 'CompletedObjects',
+            metricName: 'TransferredObjects',
             statistic: 'Sum',
             period: Duration.minutes(1),
-            label: 'Completed(Objects)'
+            label: 'Transferred(Objects)'
+        })
+
+        const failedObjects = new cw.Metric({
+            namespace: cwNamespace,
+            metricName: 'FailedObjects',
+            statistic: 'Sum',
+            period: Duration.minutes(1),
+            label: 'Failed(Objects)'
         })
 
         const lambdaMemory = new cw.Metric({
@@ -176,8 +184,8 @@ export class DashboardStack extends Construct {
             }),
 
             new cw.GraphWidget({
-                title: 'Transferred Objects',
-                left: [completedObjects]
+                title: 'Transferred/Failed Objects',
+                left: [transferredObjects, failedObjects]
             }),
 
             new cw.GraphWidget({

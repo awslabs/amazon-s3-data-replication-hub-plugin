@@ -48,7 +48,7 @@ export class CommonStack extends Construct {
 
         // Setup SQS
         const sqsQueueDLQ = new sqs.Queue(this, 'S3TransferQueueDLQ', {
-            visibilityTimeout: Duration.minutes(30),
+            visibilityTimeout: Duration.minutes(15),
             retentionPeriod: Duration.days(14),
         })
 

@@ -105,7 +105,6 @@ export class Ec2WorkerStack extends Construct {
             `tar zxvf drhcli_${cliRelease}_linux_${cliArch}.tar.gz`,
 
             // Prepare the environment variables
-
             `echo "export JOB_TABLE_NAME=${props.env.JOB_TABLE_NAME}" >> env.sh`,
             `echo "export JOB_QUEUE_NAME=${props.env.JOB_QUEUE_NAME}" >> env.sh`,
 
@@ -167,11 +166,18 @@ export class Ec2WorkerStack extends Construct {
             filterPattern: FilterPattern.literal('[data, time, p="----->Completed", Bytes, ...]')
         })
 
-        ec2LG.addMetricFilter('Completed-Objects', {
-            metricName: 'CompletedObjects',
+        ec2LG.addMetricFilter('Transferred-Objects', {
+            metricName: 'TransferredObjects',
             metricNamespace: namespace,
-            metricValue: '$n',
-            filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", n, ...]')
+            metricValue: '1',
+            filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="DONE"]')
+        })
+
+        ec2LG.addMetricFilter('Failed-Objects', {
+            metricName: 'FailedObjects',
+            metricNamespace: namespace,
+            metricValue: '1',
+            filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="ERROR"]')
         })
 
         const allMsg = new cw.MathExpression({

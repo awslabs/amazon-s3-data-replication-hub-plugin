@@ -54,7 +54,7 @@ export class EcsStack extends Construct {
         this.taskDefinition = new ecs.FargateTaskDefinition(this, 'JobFinderTaskDef', {
             cpu: props.cpu ? props.cpu : 1024 * 4,
             memoryLimitMiB: props.memory ? props.memory : 1024 * 8,
-            family: `${Aws.STACK_NAME}-S3ReplicationTask`,
+            family: `${Aws.STACK_NAME}-DTHFinderTask`,
         });
 
         this.taskDefinition.addContainer('DefaultContainer', {
@@ -79,13 +79,13 @@ export class EcsStack extends Construct {
         this.securityGroup = new ec2.SecurityGroup(this, 'SecurityGroup', {
             vpc: props.vpc,
             securityGroupName: `${Aws.STACK_NAME}-ECS-TASK-SG`,
-            description: `Security Group for running ${Aws.STACK_NAME}-S3ReplicationTask`,
+            description: `Security Group for running ${Aws.STACK_NAME}-DTHFinderTask`,
             allowAllOutbound: true
         });
 
         // 8. CloudWatch Rule. 
         // Schedule CRON event to trigger JobSender per hour
-        const trigger = new events.Rule(this, 'CronTriggerJobSender', {
+        const trigger = new events.Rule(this, 'DTHFinderSchedule', {
             schedule: events.Schedule.rate(Duration.hours(1)),
         })
 
