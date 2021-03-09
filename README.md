@@ -1,50 +1,79 @@
 
 [中文](./README_CN.md)
 
-# AWS Data Replication Hub - S3 Plugin
+# Data Transfer Hub - S3 Plugin
 
-_This AWS Date Replication Hub - S3 Plugin is based on 
-[amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) contributed by
-[huangzbaws@](https://github.com/huangzbaws)._
+## Table of contents
+* [Introduction](#introduction)
+* [New Features](#new-features)
+* [Architect](#architect)
+* [Deployment](#deployment)
+  * [Before Deployment](#before-deployment)
+  * [Deploy via AWS Cloudformation](#deploy-via-aws-cloudformation)
+  * [Deploy via AWS CDK](#deploy-via-aws-cdk)
+* [FAQ](#faq)
+  * [How to monitor](#how-to-monitor)
+  * [How to debug](#how-to-debug)
+  * [How to choose run type](#how-to-choose-run-type)
+* [Known Issues](#known-issues)
 
-[AWS Data Replication Hub](https://github.com/awslabs/aws-data-replication-hub) is a solution for replicating data from different sources into AWS. This project is for 
-S3 replication plugin. Each of the replication plugin can run independently. 
 
-The following are the planned features of this plugin.
+## Introduction
 
-- [x] Amazon S3 object replication between AWS Global partition and AWS CN partition
-- [x] Replication from Aliyun OSS to Amazon S3
-- [x] Replication from Tencent COS to Amazon S3
-- [x] Replication from Qiniu Kodo to Amazon S3
-- [ ] Replication from Huawei Cloud OBS to Amazon S3
-- [x] Replication from Google Cloud Storage to Amazon S3 (Global)
-- [x] Support replication with Metadata
-- [x] Support One-time replication
-- [x] Support Incremental replication
-- [x] Support S3 Events to trigger replication
+
+[Data Transfer Hub](https://github.com/awslabs/aws-data-replication-hub), a.k.a Data Replication Hub, is a solution for replicating data from different sources into AWS. This project is for S3 replication plugin. Each of the replication plugin can run independently. 
+
+_This Date Transfer Hub - S3 Plugin is based on [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) contributed by [huangzbaws@](https://github.com/huangzbaws)._
+
+The following are the features supported by this plugin.
+
+- Amazon S3 object replication between AWS Beijing and Ningxia China regions and any other regions
+- Replication from Aliyun OSS to Amazon S3
+- Replication from Tencent COS to Amazon S3
+- Replication from Qiniu Kodo to Amazon S3
+- Replication from Google Cloud Storage to Amazon S3 (All Regions other than China Regions)
+- Support replication with Metadata
+- Support One-time replication
+- Support Incremental replication
+- Support S3 Events to trigger replication
+
+
+## New Features
+
+In this new V2 release (v2.x.x), we are introducing a few **breaking changes** to this solution, including:
+
+- Rewrite the core logic of data transfer in Golang to improve the performance of concurrency. A command line tool is also provided. See [drhcli](https://github.com/daixba/drhcli) for more details. Essentially that means this plugin will use the command line tool to perform the relevent tasks.
+
+- Use Amazon EC2 and Auto Scaling Group to do the data transfer instead of Lambda. `t4g.micro` instance type is used for this solution to save cost. The pricing of this instance type is `$0.0084 per Hour` in US West (Oregon) region at the point of writing. Check out [EC2 Pricing](https://aws.amazon.com/ec2/pricing/on-demand/) to get the latest price. 
+
+- Amazon EC2 operating systems will by default have BBR (Bottleneck Bandwidth and RTT) enabled to improve network performance.
+
+- Support cross account deployment. Now you can deploy this solution in a different account against both source and destination.
+
+Note that, this new release is to provide an extra run type (EC2) to perform the data transfer. This doesn't necessarily mean the new run type (EC2) is better than the Lambda one in all circumstances. For example, you might have limitation of the number of EC2 instances can be started, and with the benefit of lambda concurrency (Default to 1000), you can complete the job more faster. But new EC2 run type will be suggested to use by default, especially when the network performance is very bad when using Lambda. If you want to deploy previous release, check out [Release v1.x.x](https://github.com/awslabs/amazon-s3-data-replication-hub-plugin/tree/r1).
+
+> Note the current version is v2.0.0-beta, please check out the [Known Issues](#known-issues) secion before using this new release. there could be some other issues too, please feel free to raise one in Github.
 
 ## Architect
 
 ![S3 Plugin Architect](s3-plugin-architect.png)
 
-An ECS Task running in AWS Fargate lists all the objects in source and destination buckets and determines what objects should be
-replicated, a message for each object to be replicated will be created in SQS. A *time-based CloudWatch rule* will trigger the ECS task to run every hour.
+A *JobFinder* ECS Task running in AWS Fargate lists all the objects in source and destination buckets and determines what objects should be replicated, a message for each object to be replicated will be created in SQS. A *time-based CloudWatch rule* will trigger the ECS task to run every hour. 
 
-The *JobWorker* Lambda function consumes the message in SQS and transfer the object from source bucket to destination 
-bucket.
+This plugin also supports S3 Event notification to trigger the replication (near real-time), only if the source bucket is in the same account (and region) as the one you deploy this plugin to. The event message will also be sent the same SQS queue.
 
-If an object or a part of an object failed to transfer, the lambda will try a few times. If it still failed after
-a few retries, the message will be put in `SQS Dead-Letter-Queue`. A CloudWatch alarm will be triggered and a subsequent email notification will be sent via SNS. Note that the ECS task in the next run will identify the failed objects or parts and the replication process will start again for them.
+The *JobWorker* either running in Lambda or EC2 consumes the message in SQS and transfer the object from source bucket to destination bucket.
 
-This plugin supports transfer large size file. It will divide it into small parts and leverage the 
-[multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
+If an object or a part of an object failed to transfer, the *JobWorker* will release the message in the Queue, and the object will be transferred again after the message is visible in the queue (Default visibility timeout is set to 15 minutes, extended for large objects).
+
+This plugin supports transfer large size file. It will divide it into small parts and leverage the [multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
 
 
 ## Deployment
 
 Things to know about the deployment of this plugin:
 
-- The deployment will automatically provision resources like lambda, dynamoDB table, ECS Task Definition in your AWS account, etc.
+- The deployment will automatically provision resources like lambda, dynamoDB table, ECS Task Definition, etc. in your AWS account.
 - The deployment will take approximately 3-5 minutes.
 - Once the deployment is completed, the data replication task will start right away.
 
@@ -52,7 +81,7 @@ Things to know about the deployment of this plugin:
 
 - Configure **credentials**
 
-You will need to provide `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read or write bucket in S3 from another partition or in other cloud storage service. And a Parameter Store is used to store the credentials in a secure manner.
+You will need to provide `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read or write bucket in S3 from or to another AWS account or other cloud storage service. And a Parameter Store is used to store the credentials in a secure manner.
 
 Please create a parameter in **Parameter Store** from **AWS Systems Manager**, select **SecureString** as its type, and put a **Value** following below format.
 
@@ -63,37 +92,14 @@ Please create a parameter in **Parameter Store** from **AWS Systems Manager**, s
 }
 ```
 
+> Note that if the AK/SK is for source bucket, **Read** access to bucket is required, if it's for destination bucket, **Read and Write** access to bucket is required.
+
 - Set up **ECS Cluster** and **VPC**
 
 The deployment of this plugin will launch an ECS Task running in Fargate in your AWS Account, hence you will need to set up an ECS Cluster and the VPC before the deployment if you haven't got any. 
 
 > Note: For ECS Cluster, you can choose **Networking only** type. For VPC, please make sure the VPC should have at least two subnets across two available zones.
 
-
-### Available Parameters
-
-The following are the all allowed parameters for deployment:
-
-| Parameter                 | Default          | Description                                                                                                               |
-|---------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------|
-| sourceType                | Amazon_S3        | Choose type of source storage, including Amazon_S3, Aliyun_OSS, Qiniu_Kodo, Tencent_COS, Google_GCS.                      |
-| jobType                   | GET              | Choose GET if source bucket is not in current account. Otherwise, choose PUT.                                             |
-| srcBucketName             | <requires input> | Source bucket name.                                                                                                       |
-| srcBucketPrefix           | ''               | Source bucket object prefix. The plugin will only copy keys with the certain prefix.                                      |
-| destBucketName            | <requires input> | Destination bucket name.                                                                                                  |
-| destBucketPrefix          | ''               | Destination bucket prefix. The plugin will upload to certain prefix.                                                      |
-| destStorageClass          | STANDARD         | Destination Object Storage Class.  Allowed options: 'STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'        |
-| ecsClusterName            | <requires input> | ECS Cluster Name to run ECS task                                                                                          |
-| ecsVpcId                  | <requires input> | VPC ID to run ECS task, e.g. vpc-bef13dc7                                                                                 |
-| ecsSubnets                | <requires input> | Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32  |
-| credentialsParameterStore | ''               | The Parameter Name used to keep credentials in Parameter Store. Leave it blank if you are replicating from open buckets.  |
-| regionName                | ''               | The Region Name, e.g. eu-west-1.  For Google GCS, this is optional.                                                       |
-| alarmEmail                | <requires input> | Alarm email. Errors will be sent to this email.                                                                           |
-| enableS3Event             | No               | Whether to enable S3 Event to trigger the replication. Only applicable if source is in Current account, default value is No. <br>Allow options: 'No', 'Create_Only', 'Delete_Only', 'Create_And_Delete'. <br>Note that Delete Marker Event is not support yet.     |
-| lambdaMemory              | 256              | Lambda Memory, default to 256 MB.                                                                                         |
-| multipartThreshold        | 10               | Threshold Size for multipart upload in MB, default to 10 (MB)                                                             |
-| chunkSize                 | 5                | Chunk Size for multipart upload in MB, default to 5 (MB)                                                                  |
-| maxThreads                | 10               | Max Theads to run multipart upload in lambda, default to 10                                                               |
 
 ### Deploy via AWS Cloudformation
 
@@ -103,13 +109,13 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
 1. Click the following button to launch the CloudFormation Stack in that region.
 
-    - For Standard Partition
+    - For all Regions other than China Regions
 
-    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
+    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/v2.0.0-beta/DataTransferS3Stack-ec2.template)
 
-    - For China Partition
+    - For Beijing and Ningxia China Regions
 
-    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DataReplicationS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/Aws-data-replication-component-s3/latest/Aws-data-replication-component-s3.template)
+    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/v2.0.0-beta/DataTransferS3Stack-ec2.template)
     
 1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 
@@ -127,7 +133,6 @@ If you want to use AWS CDK to deploy this plugin, please make sure you have met 
 
 * [AWS Command Line Interface](https://aws.amazon.com/cli/)
 * Node.js 12.x or later
-* Docker
 
 Under the project **source** folder, run below to compile TypeScript into JavaScript. 
 
@@ -140,16 +145,65 @@ npm install && npm run build
 Then you can run `cdk deploy` command to deploy the plugin. Please specify the parameter values accordingly, for example:
 
 ```
-cdk deploy --parameters srcBucketName=<source-bucket-name> \
---parameters destBucketName=<dest-bucket-name> \
---parameters alarmEmail=xxxxx@example.com \
---parameters jobType=GET \
---parameters sourceType=Amazon_S3 \
---parameters credentialsParameterStore=drh-credentials \
---parameters regionName=cn-north-1 \
---parameters ecsClusterName=test \
---parameters ecsVpcId=vpc-bef13dc7 \
---parameters ecsSubnets=subnet-97bfc4cd,subnet-7ad7de32
+cdk deploy \ 
+--parameters srcType=Amazon_S3 \
+--parameters srcBucket=src-bucket \
+--parameters srcRegion=us-west-2 \
+--parameters srcInCurrentAccount=true \
+--parameters srcEvent=CreateAndDelete \
+--parameters destBucket=dest-bucket \
+--parameters destRegion=cn-northwest-1 \
+--parameters destCredentials=cn \
+--parameters destInCurrentAccount=false \
+--parameters ecsClusterName=testcluster \
+--parameters ecsVpcId=vpc-92c418eb \
+--parameters ecsSubnets=subnet-07f0e94f,subnet-a996ddf3 \
+--parameters alarmEmail=xxx@example.com
 ```
 
 > Note: You can simply run `cdk destroy` if the replication task is no longer required. This command will remove the stack created by this plugin from your AWS account.
+
+
+## FAQ
+
+### How to monitor
+
+**Q**: After I deployed the solution, how can I monitor the progress?
+
+**A**: After deployment, there will be a cloudwatch dashboard created for you to mornitor the progress, metrics such as running/waiting jobs, network, transferred/failed objects will be logged in the dashboard. Below screenshot is an example:
+
+![Cloudwatch Dashboard Example](docs/dashboard.png)
+
+### How to debug
+
+**Q**: There seems to be something wrong, how to debug?
+
+**A**: When you deploy the stack, you will be asked to input the stack name (default is DTHS3Stack), most of the resources will be created with name prefix as the stack name.  For example, Queue name will be in a format of `<StackName>-S3TransferQueue-<random suffix>`.
+
+There will be two main log groups created by this plugin.
+
+- &lt;StackName&gt;-ECSStackJobFinderTaskDefDefaultContainerLogGroup-&lt;random suffix&gt;
+
+This is the log group for scheduled ECS Task. If there is no data transferred, you should check if something is wrong in the ECS task log. This is the first step.
+
+- &lt;StackName&gt;-EC2WorkerStackS3RepWorkerLogGroup-&lt;random suffix&gt;
+
+This is the log group for all EC2 instances, detailed transfer log can be found here.
+
+If you can't find anything helpful in the log group, please raise an issue in Github.
+
+### How to choose run type
+
+**Q**: Since there are two run types, EC2 and Lambda, How to choose?
+
+**A**: Generally speaking, EC2 is suggested to use for most cases. However, you should test both approach based on your scenerio before using any of them whenever possible. Cost should be very important too, you can do cost estimation base on your test result for both run type. If the network performance is very bad in Lambda, EC2 run type will save your cost a lot.
+
+
+## Known Issues
+
+In this new V2 release (v2.x.x), we are expecting below known issues:
+
+- Google GCS is not yet supported
+- Object Metadata (Such as Content Type etc.) is not yet supported
+
+If you have such requirement, please raise an issue in Github, we will prioritize our work accordingly.

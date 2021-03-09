@@ -6,7 +6,6 @@ To make changes to the solution, download or clone this repo, update the source 
 ## Prerequisites:
 * [AWS Command Line Interface](https://aws.amazon.com/cli/)
 * Node.js 12.x or later
-* Docker
 
 ## 1. Clone the repository
 
@@ -24,7 +23,6 @@ export REGION=aws-region-code # the AWS region to launch the solution (e.g. us-e
 export DIST_OUTPUT_BUCKET=my-bucket-name # bucket where customized code will reside
 export SOLUTION_NAME=my-solution-name # the solution name
 export VERSION=my-version # version number for the customized code
-export AWS_ACCOUNT_ID=my-account-id # AWS Account ID, (e.g. 123456789012)
 ```
 
 ## 4. Create an Amazon S3 Bucket
@@ -37,18 +35,10 @@ aws s3 mb s3://$DIST_OUTPUT_BUCKET-$REGION --region $REGION
 Build the distributable:
 ```bash
 chmod +x ./build-s3-dist.sh
-./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
+./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION $REGION
 ```
 
-## 6. Build custom ECR image
-
-Build and push to ECR repository:
-```bash
-chmod +x ./build-ecr.sh
-./build-ecr.sh $REGION $AWS_ACCOUNT_ID $VERSION
-```
-
-## 7. Deploy the distributable
+## 6. Deploy the distributable
 
 Deploy the distributable to the Amazon S3 bucket in your account:
 ```bash

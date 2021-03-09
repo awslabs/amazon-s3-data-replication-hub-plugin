@@ -34,8 +34,9 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     if (fn.Properties.Code.hasOwnProperty('S3Bucket')) {
       // Set the S3 key reference
       let artifactHash = Object.assign(fn.Properties.Code.S3Bucket.Ref);
-      artifactHash = artifactHash.replace('AssetParameters', '');
-      artifactHash = artifactHash.substring(0, artifactHash.indexOf('S3Bucket'));
+      // artifactHash = artifactHash.replace('AssetParameters', '');
+      let start = artifactHash.indexOf('AssetParameters') + 15
+      artifactHash = artifactHash.substring(start, artifactHash.indexOf('S3Bucket'));
       const assetPath = `asset${artifactHash}`;
       fn.Properties.Code.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${assetPath}.zip`;
       // Set the S3 bucket reference
@@ -69,8 +70,9 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     if (fn.Properties.Content.hasOwnProperty('S3Bucket')) {
       // Set the S3 key reference
       let artifactHash = Object.assign(fn.Properties.Content.S3Bucket.Ref);
-      artifactHash = artifactHash.replace('AssetParameters', '');
-      artifactHash = artifactHash.substring(0, artifactHash.indexOf('S3Bucket'));
+      // artifactHash = artifactHash.replace('AssetParameters', '');
+      let start = artifactHash.indexOf('AssetParameters') + 15
+      artifactHash = artifactHash.substring(start, artifactHash.indexOf('S3Bucket'));
       const assetPath = `asset${artifactHash}`;
       fn.Properties.Content.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${assetPath}.zip`;
       // Set the S3 bucket reference
@@ -96,6 +98,37 @@ fs.readdirSync(global_s3_assets).forEach(file => {
         ]
       }
     };
+  });
+
+  // Clean-up nested template stack dependencies
+  const nestedStacks = Object.keys(resources).filter(function (key) {
+    return resources[key].Type === 'AWS::CloudFormation::Stack'
+  });
+  nestedStacks.forEach(function (f) {
+    const fn = template.Resources[f];
+    fn.Properties.TemplateURL = {
+      'Fn::Join': [
+        '',
+        [
+          'https://s3.%%REGION%%.',
+          {
+            'Ref': 'AWS::URLSuffix'
+          },
+          '/',
+          `%%BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/${fn.Metadata.nestedTemplateName}`
+        ]
+      ]
+    };
+    const params = fn.Properties.Parameters ? fn.Properties.Parameters : {};
+    const nestedStackParameters = Object.keys(params).filter(function (key) {
+      if (key.search(/[\w]*AssetParameters/g) > -1) {
+        return true;
+      }
+      return false;
+    });
+    nestedStackParameters.forEach(function (stkParam) {
+      fn.Properties.Parameters[stkParam] = undefined;
+    });
   });
 
   const policy = Object.keys(resources).filter(function (key) {
