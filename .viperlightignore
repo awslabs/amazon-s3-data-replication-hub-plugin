@@ -1,8 +1,7 @@
 README.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
-setup.py
-client.py
 package-lock.json
-build-ecr.sh
-aws-data-replication-component-s3-stack*
+README_CN.md
+CUSTOM_BUILD.md
+ecs-finder-stack.ts
