@@ -40,13 +40,13 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 在此新的V2版本（v2.x.x）中，我们将对该解决方案进行了一些**重大更改**，其中包括：
 
--用Golang重写数据传输的核心逻辑，以提高并发性能。还提供了命令行工具。有关更多详细信息，请参见[drhcli](https://github.com/daixba/drhcli)。从本质上讲，这意味着该插件将使用命令行工具执行相关的任务。
+- 用Golang重写数据传输的核心逻辑，以提高并发性能。还提供了命令行工具。有关更多详细信息，请参见[drhcli](https://github.com/daixba/drhcli)。从本质上讲，这意味着该插件将使用命令行工具执行相关的任务。
 
--使用Amazon EC2和Auto Scaling Group代替Lambda进行数据传输。此解决方案使用`t4g.micro`实例类型以节省成本。在撰写本文时，此实例类型在US West (Oregon)区的价格为`每小时$0.0084`。请查看[EC2定价](https://aws.amazon.com/ec2/pricing/on-demand/)以获取最新价格。
+- 使用Amazon EC2和Auto Scaling Group代替Lambda进行数据传输。此解决方案使用`t4g.micro`实例类型以节省成本。在撰写本文时，此实例类型在US West (Oregon)区的价格为`每小时$0.0084`。请查看[EC2定价](https://aws.amazon.com/ec2/pricing/on-demand/)以获取最新价格。
 
--默认情况下，Amazon EC2操作系统将启用BBR（Bottleneck Bandwidth and RTT）以提高网络性能。
+- 默认情况下，Amazon EC2操作系统将启用BBR（Bottleneck Bandwidth and RTT）以提高网络性能。
 
--支持跨帐户部署。现在，您可以针对源和目标在另一个帐户中部署此解决方案。
+- 支持跨帐户部署。现在，您可以针对源和目标在另一个帐户中部署此解决方案。
 
 请注意，此新版本将提供额外的运行类型（EC2）以执行数据传输。这并不一定意味着新的运行类型（EC2）在所有情况下都比Lambda更好。例如，您可能对可以启动EC2实例的数量有所限制，并且可以使用lambda并发（默认为1000），可以更快地完成作业。但是建议默认使用新的EC2运行类型，尤其是在使用Lambda的网络性能非常差的情况下。如果要部署以前的版本，请查看[Release v1.x.x](https://github.com/awslabs/amazon-s3-data-replication-hub-plugin/tree/r1)。
 
