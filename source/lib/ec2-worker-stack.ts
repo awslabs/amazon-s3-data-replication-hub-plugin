@@ -66,7 +66,7 @@ export class Ec2WorkerStack extends Construct {
             instanceMonitoring: asg.Monitoring.DETAILED,
             // groupMetrics: [asg.GroupMetrics.all()]
             groupMetrics: [new asg.GroupMetrics(asg.GroupMetric.DESIRED_CAPACITY, asg.GroupMetric.IN_SERVICE_INSTANCES)],
-
+            cooldown: Duration.minutes(2),
         });
 
         Tags.of(this.workerAsg).add('Name', `${Aws.STACK_NAME}-Replication-Worker`, {})
