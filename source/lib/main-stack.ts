@@ -95,7 +95,7 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Source In Current Account', srcInCurrentAccount.logicalId)
 
     const srcCredentials = new CfnParameter(this, 'srcCredentials', {
-      description: 'The Parameter Store used to keep AK/SK credentials for Source Bucket. Leave blank for open data',
+      description: 'The Parameter Store used to keep AK/SK credentials for Source Bucket. Leave blank if source bucket is in current account or source is open data',
       default: '',
       type: 'String'
     })
@@ -133,7 +133,7 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Destination In Current Account', destInCurrentAccount.logicalId)
 
     const destCredentials = new CfnParameter(this, 'destCredentials', {
-      description: 'The Parameter Store used to keep AK/SK credentials for Destination Bucket.',
+      description: 'The Parameter Store used to keep AK/SK credentials for Destination Bucket. Leave blank if desination bucket is in current account',
       default: '',
       type: 'String'
     })
@@ -182,7 +182,7 @@ export class DataTransferS3Stack extends Stack {
       allowedValues: ['true', 'false']
     })
 
-    this.addToParamLabels('Include Metadata', alarmEmail.logicalId)
+    this.addToParamLabels('Include Metadata', includeMetadata.logicalId)
 
     const srcEvent = new CfnParameter(this, 'srcEvent', {
       description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
@@ -216,7 +216,7 @@ export class DataTransferS3Stack extends Stack {
     // })
 
     const finderDepth = new CfnParameter(this, 'finderDepth', {
-      description: 'The depth of sub folders to compare in parallel. 0 means comparing all objects together with no parallelism.',
+      description: 'The depth of sub folders to compare in parallel. 0 means comparing all objects in sequence',
       default: '0',
       type: 'String',
     })
@@ -226,7 +226,7 @@ export class DataTransferS3Stack extends Stack {
       type: 'String',
     })
     const workerNumber = new CfnParameter(this, 'workerNumber', {
-      description: 'The number of worker threads to run in parallel in one instance',
+      description: 'The number of worker threads to run in one worker node/instance',
       default: '4',
       type: 'String',
     })
