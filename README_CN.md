@@ -3,7 +3,7 @@
 
 # AWS Data Transfer Hub - S3插件
 
-## Table of contents
+## 目录
 * [介绍](#介绍)
 * [新功能](#新功能)
 * [架构](#架构)
@@ -38,7 +38,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 ## 新功能
 
-在此新的V2版本（v2.x.x）中，我们将对该解决方案进行了一些**重大更改**，其中包括：
+在此新的V2版本（v2.x.x）中，我们将对本插件进行了一些**重大更改**，其中包括：
 
 - 用Golang重写数据传输的核心逻辑，以提高并发性能。还提供了命令行工具。有关更多详细信息，请参见[drhcli](https://github.com/daixba/drhcli)。从本质上讲，这意味着该插件将使用命令行工具执行相关的任务。
 
@@ -46,7 +46,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 - 默认情况下，Amazon EC2操作系统将启用BBR（Bottleneck Bandwidth and RTT）以提高网络性能。
 
-- 支持跨帐户部署。现在，您可以在A账号中部署此解决方案，从B账号的S3桶里面拷贝数据到C账号的S3桶里面。
+- 支持跨帐户部署。现在，您可以在A账号中部署此方案，从B账号的S3桶里面拷贝数据到C账号的S3桶里面。
 
 请注意，此新版本将提供额外的运行类型（EC2）以执行数据传输。这并不一定意味着新的运行类型（EC2）在所有情况下都比Lambda更好。例如，您可能对可以启动EC2实例的数量有所限制，并且可以使用lambda并发（默认为1000），可以更快地完成作业。但是建议默认使用新的EC2运行类型，尤其是在使用Lambda的网络性能非常差的情况下。如果要部署以前的版本，请查看[Release v1.x.x](https://github.com/awslabs/amazon-s3-data-replication-hub-plugin/tree/r1)。
 
@@ -57,13 +57,13 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 在AWS Fargate中运行的*JobFinder* ECS任务列出了源存储桶和目标存储桶中的所有对象，并确定应复制哪些对象，将在SQS中为每个要复制的对象创建一条消息。 *基于时间的CloudWatch规则*将触发ECS任务每小时运行一次。
 
-该插件还支持S3事件通知，以（实时）触发复制，前提是源存储桶与部署此插件的用户位于相同的帐户（和区域）中。 事件消息也将发送到相同的SQS队列。
+此外，本插件也支持S3事件通知，以（实时）触发复制，前提是需要将此插件部署在与源存储桶相同的帐户（和区域）中。 事件消息也将发送到相同的SQS队列。
 
 在Lambda或EC2中运行的*JobWorker*会使用SQS中的消息，并将对象从源存储桶传输到目标存储桶。
 
 如果某个对象或对象的一部分传输失败，则*JobWorker*将在队列中释放该消息，并且该消息在队列中可见后将再次传输该对象（默认可见性超时设置为15分钟，大文件会自动延长)。经过几次尝试，如果传输依然失败，该消息就会被移到Dead Letter Queue并且触发Alarm提醒。
 
-该插件支持传输大文件。它将大文件分成多个小的部分并利用Amazon S3的[multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) 功能进行分段传输。
+该插件支持传输大文件。它将大文件分成多个小的部分并利用Amazon S3的[multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) 功能进行分段传输，支持断点续传。
 
 
 ## 部署
@@ -202,4 +202,4 @@ cdk deploy \
 
 - 尚不支持Google GCS的复制
 
-如果您有这样的要求，请在Github中提出问题，我们将相应地安排我们的工作。
+如果您发现有其他问题， 欢迎在Github Issue里提，我们会根据情况尽快进行Fix。
