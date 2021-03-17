@@ -66,7 +66,7 @@ export class CommonStack extends Construct {
             retentionPeriod: Duration.days(14),
             deadLetterQueue: {
                 queue: sqsQueueDLQ,
-                maxReceiveCount: 60
+                maxReceiveCount: 5
             }
         })
 

@@ -46,11 +46,10 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 - 默认情况下，Amazon EC2操作系统将启用BBR（Bottleneck Bandwidth and RTT）以提高网络性能。
 
-- 支持跨帐户部署。现在，您可以针对源和目标在另一个帐户中部署此解决方案。
+- 支持跨帐户部署。现在，您可以在A账号中部署此解决方案，从B账号的S3桶里面拷贝数据到C账号的S3桶里面。
 
 请注意，此新版本将提供额外的运行类型（EC2）以执行数据传输。这并不一定意味着新的运行类型（EC2）在所有情况下都比Lambda更好。例如，您可能对可以启动EC2实例的数量有所限制，并且可以使用lambda并发（默认为1000），可以更快地完成作业。但是建议默认使用新的EC2运行类型，尤其是在使用Lambda的网络性能非常差的情况下。如果要部署以前的版本，请查看[Release v1.x.x](https://github.com/awslabs/amazon-s3-data-replication-hub-plugin/tree/r1)。
 
-> 请注意，当前版本为v2.0.0-beta，在使用此新版本之前，请先查看[已知问题](#已知问题)部分。可能存在一些问题，请随时在Github中提出。
 
 ## 架构
 
@@ -62,7 +61,7 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 在Lambda或EC2中运行的*JobWorker*会使用SQS中的消息，并将对象从源存储桶传输到目标存储桶。
 
-如果某个对象或对象的一部分传输失败，则*JobWorker*将在队列中释放该消息，并且该消息在队列中可见后将再次传输该对象（默认可见性超时设置为15分钟，大文件会自动延长)。
+如果某个对象或对象的一部分传输失败，则*JobWorker*将在队列中释放该消息，并且该消息在队列中可见后将再次传输该对象（默认可见性超时设置为15分钟，大文件会自动延长)。经过几次尝试，如果传输依然失败，该消息就会被移到Dead Letter Queue并且触发Alarm提醒。
 
 该插件支持传输大文件。它将大文件分成多个小的部分并利用Amazon S3的[multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) 功能进行分段传输。
 
@@ -176,7 +175,7 @@ cdk deploy \
 
 **问题**：部署完后似乎没有正常运行，该如何调试？
 
-**回答**：部署堆栈时，将要求您输入堆栈名称（默认为DTHS3Stack），大多数资源将使用该堆栈名称作为前缀进行创建。 例如，SQS Queue名称将采用`<堆栈名>-S3TransferQueue-<random suffix>`的格式。
+**回答**：部署堆栈时，将要求您输入堆栈名称（默认为DTHS3Stack），大多数资源将使用该堆栈名称作为前缀进行创建。 例如，SQS Queue名称将采用`<堆栈名>-S3TransferQueue-<随机后缀>`的格式。
 
 此插件将创建两个主要的CloudWatch日志组。
 
@@ -202,6 +201,5 @@ cdk deploy \
 在此新的V2版本（v2.x.x）中，目前尚有如下已知问题：
 
 - 尚不支持Google GCS的复制
-- 尚不支持对象元数据（如Content Type等）的复制
 
 如果您有这样的要求，请在Github中提出问题，我们将相应地安排我们的工作。

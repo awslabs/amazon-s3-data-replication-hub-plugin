@@ -175,12 +175,14 @@ export class DataTransferS3Stack extends Stack {
     })
     this.addToParamLabels('Alarm Email', alarmEmail.logicalId)
 
-    // const includeMetadata = new CfnParameter(this, 'includeMetadata', {
-    //   description: 'Including metadata',
-    //   default: 'YES',
-    //   type: 'String',
-    //   allowedValues: ['TRUE', 'FALSE']
-    // })
+    const includeMetadata = new CfnParameter(this, 'includeMetadata', {
+      description: 'Add replication of object metadata, there will be additional API calls',
+      default: 'true',
+      type: 'String',
+      allowedValues: ['true', 'false']
+    })
+
+    this.addToParamLabels('Include Metadata', alarmEmail.logicalId)
 
     const srcEvent = new CfnParameter(this, 'srcEvent', {
       description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
@@ -273,7 +275,7 @@ export class DataTransferS3Stack extends Stack {
       })
       this.addToParamLabels('Desired Capacity', desiredCapacity.logicalId)
 
-      this.addToParamGroups('Advanced Options', finderDepth.logicalId, finderNumber.logicalId, workerNumber.logicalId,
+      this.addToParamGroups('Advanced Options', finderDepth.logicalId, finderNumber.logicalId, workerNumber.logicalId, includeMetadata.logicalId,
         maxCapacity.logicalId, minCapacity.logicalId, desiredCapacity.logicalId)
 
     }
@@ -353,6 +355,7 @@ export class DataTransferS3Stack extends Stack {
       vpc: vpc,
       ecsSubnetIds: ecsSubnets.valueAsList,
       ecsClusterName: ecsClusterName.valueAsString,
+      version: VERSION
     }
     const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
 
@@ -386,6 +389,7 @@ export class DataTransferS3Stack extends Stack {
       FINDER_DEPTH: finderDepth.valueAsString,
       FINDER_NUMBER: finderNumber.valueAsString,
       WORKER_NUMBER: workerNumber.valueAsString,
+      INCLUDE_METADATA: includeMetadata.valueAsString,
 
     }
 

@@ -21,6 +21,7 @@ export interface EcsTaskProps {
     // readonly ecsVpcId: string,
     readonly ecsSubnetIds: string[],
     readonly ecsClusterName: string,
+    readonly version?: string,
     readonly cpu?: number,
     readonly memory?: number,
 }
@@ -57,8 +58,9 @@ export class EcsStack extends Construct {
             family: `${Aws.STACK_NAME}-DTHFinderTask`,
         });
 
+
         this.taskDefinition.addContainer('DefaultContainer', {
-            image: ecs.ContainerImage.fromEcrRepository(repo),
+            image: ecs.ContainerImage.fromEcrRepository(repo, props.version),
             environment: props.env,
             logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender', logRetention: RetentionDays.TWO_WEEKS })
         });
