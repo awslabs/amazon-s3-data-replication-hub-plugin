@@ -48,11 +48,10 @@ In this new V2 release (v2.x.x), we are introducing a few **breaking changes** t
 
 - Amazon EC2 operating systems will by default have BBR (Bottleneck Bandwidth and RTT) enabled to improve network performance.
 
-- Support cross account deployment. Now you can deploy this solution in a different account against both source and destination.
+- Support cross account deployment. Now you can deploy this solution in account A, and then replicate data from bucket in account B to another bucket in Account C.
 
 Note that, this new release is to provide an extra run type (EC2) to perform the data transfer. This doesn't necessarily mean the new run type (EC2) is better than the Lambda one in all circumstances. For example, you might have limitation of the number of EC2 instances can be started, and with the benefit of lambda concurrency (Default to 1000), you can complete the job more faster. But new EC2 run type will be suggested to use by default, especially when the network performance is very bad when using Lambda. If you want to deploy previous release, check out [Release v1.x.x](https://github.com/awslabs/amazon-s3-data-replication-hub-plugin/tree/r1).
 
-> Note the current version is v2.0.0-beta, please check out the [Known Issues](#known-issues) secion before using this new release. there could be some other issues too, please feel free to raise one in Github.
 
 ## Architect
 
@@ -64,7 +63,7 @@ This plugin also supports S3 Event notification to trigger the replication (near
 
 The *JobWorker* either running in Lambda or EC2 consumes the message in SQS and transfer the object from source bucket to destination bucket.
 
-If an object or a part of an object failed to transfer, the *JobWorker* will release the message in the Queue, and the object will be transferred again after the message is visible in the queue (Default visibility timeout is set to 15 minutes, extended for large objects).
+If an object or a part of an object failed to transfer, the *JobWorker* will release the message in the Queue, and the object will be transferred again after the message is visible in the queue (Default visibility timeout is set to 15 minutes, extended for large objects). After a few retries, if the transfer still failed, the message will be sent to the Dead Letter Queue and an alarm will be triggered.
 
 This plugin supports transfer large size file. It will divide it into small parts and leverage the [multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
 
@@ -92,7 +91,7 @@ Please create a parameter in **Parameter Store** from **AWS Systems Manager**, s
 }
 ```
 
-> Note that if the AK/SK is for source bucket, **Read** access to bucket is required, if it's for destination bucket, **Read and Write** access to bucket is required.
+> Note that if the AK/SK is for source bucket, **READ** access to bucket is required, if it's for destination bucket, **READ** and **WRITE** access to bucket is required.
 
 - Set up **ECS Cluster** and **VPC**
 
@@ -111,11 +110,11 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
     - For all Regions other than China Regions
 
-    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/v2.0.0-beta/DataTransferS3Stack-ec2.template)
+    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
 
     - For Beijing and Ningxia China Regions
 
-    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/v2.0.0-beta/DataTransferS3Stack-ec2.template)
+    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
     
 1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 
@@ -203,7 +202,7 @@ If you can't find anything helpful in the log group, please raise an issue in Gi
 
 In this new V2 release (v2.x.x), we are expecting below known issues:
 
-- Google GCS is not yet supported
-- Object Metadata (Such as Content Type etc.) is not yet supported
+- Google GCS is not yet supported (If you have such requirement, you will need to use release v1.x.x)
+- The download of the command line tool in China regions might be unstable
 
 If you have such requirement, please raise an issue in Github, we will prioritize our work accordingly.

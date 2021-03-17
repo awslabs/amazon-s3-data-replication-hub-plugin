@@ -77,7 +77,7 @@ export class Ec2WorkerStack extends Construct {
             // removalPolicy: RemovalPolicy.DESTROY
         });
 
-        const cliRelease = "0.1.0"
+        const cliRelease = "1.0.0"
         const cliArch = "arm64"
 
         this.workerAsg.userData.addCommands(
@@ -99,7 +99,7 @@ export class Ec2WorkerStack extends Construct {
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
             // Get CLI
-            // 'cliRelease=0.1.0',
+            // 'cliRelease=1.0.0',
             // 'cliArch=arm64',
             `curl -LO "https://github.com/daixba/drhcli/releases/download/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"`,
             `tar zxvf drhcli_${cliRelease}_linux_${cliArch}.tar.gz`,
@@ -127,6 +127,7 @@ export class Ec2WorkerStack extends Construct {
             `echo "export FINDER_DEPTH=${props.env.FINDER_DEPTH}" >> env.sh`,
             `echo "export FINDER_NUMBER=${props.env.FINDER_NUMBER}" >> env.sh`,
             `echo "export WORKER_NUMBER=${props.env.WORKER_NUMBER}" >> env.sh`,
+            `echo "export INCLUDE_METADATA=${props.env.INCLUDE_METADATA}" >> env.sh`,
             `echo "export AWS_DEFAULT_REGION=${Aws.REGION}" >> env.sh`,
 
             // Create the script
