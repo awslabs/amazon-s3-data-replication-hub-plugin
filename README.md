@@ -203,6 +203,5 @@ If you can't find anything helpful in the log group, please raise an issue in Gi
 In this new V2 release (v2.x.x), we are expecting below known issues:
 
 - Google GCS is not yet supported (If you have such requirement, you will need to use release v1.x.x)
-- The download of the command line tool in China regions might be unstable
 
 If you have such requirement, please raise an issue in Github, we will prioritize our work accordingly.
