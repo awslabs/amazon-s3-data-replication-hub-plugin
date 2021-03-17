@@ -204,4 +204,4 @@ In this new V2 release (v2.x.x), we are expecting below known issues:
 
 - Google GCS is not yet supported (If you have such requirement, you will need to use release v1.x.x)
 
-If you have such requirement, please raise an issue in Github, we will prioritize our work accordingly.
+If you found any other issues, please raise one in Github Issue, we will work on the fix accordingly.
