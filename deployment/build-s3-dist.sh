@@ -135,7 +135,7 @@ fi
 cd $template_dist_dir
 # The cli release must be same as the one in the current stack.
 if [ -z "$5" ]; then
-    cliRelease=1.0.0
+    cliRelease=1.0.1
 else
     cliRelease=$5
 fi

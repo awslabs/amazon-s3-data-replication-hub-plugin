@@ -77,7 +77,7 @@ export class Ec2WorkerStack extends Construct {
             // removalPolicy: RemovalPolicy.DESTROY
         });
 
-        const cliRelease = "1.0.0"
+        const cliRelease = "1.0.1"
         const cliArch = "arm64"
 
         this.workerAsg.userData.addCommands(
@@ -99,7 +99,7 @@ export class Ec2WorkerStack extends Construct {
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
             // Get CLI
-            // 'cliRelease=1.0.0',
+            // 'cliRelease=1.0.1',
             // 'cliArch=arm64',
             `curl -LO "https://github.com/daixba/drhcli/releases/download/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"`,
             `tar zxvf drhcli_${cliRelease}_linux_${cliArch}.tar.gz`,
@@ -112,6 +112,7 @@ export class Ec2WorkerStack extends Construct {
             `echo "export SRC_BUCKET=${props.env.SRC_BUCKET}" >> env.sh`,
             `echo "export SRC_PREFIX=${props.env.SRC_PREFIX}" >> env.sh`,
             `echo "export SRC_REGION=${props.env.SRC_REGION}" >> env.sh`,
+            `echo "export SRC_ENDPOINT=${props.env.SRC_ENDPOINT}" >> env.sh`,
             `echo "export SRC_CREDENTIALS=${props.env.SRC_CREDENTIALS}" >> env.sh`,
             `echo "export SRC_IN_CURRENT_ACCOUNT=${props.env.SRC_IN_CURRENT_ACCOUNT}" >> env.sh`,
 
@@ -121,6 +122,7 @@ export class Ec2WorkerStack extends Construct {
             `echo "export DEST_CREDENTIALS=${props.env.DEST_CREDENTIALS}" >> env.sh`,
             `echo "export DEST_IN_CURRENT_ACCOUNT=${props.env.DEST_IN_CURRENT_ACCOUNT}" >> env.sh`,
             `echo "export DEST_STORAGE_CLASS=${props.env.DEST_STORAGE_CLASS}" >> env.sh`,
+            `echo "export DEST_ACL=${props.env.DEST_ACL}" >> env.sh`,
 
             // `echo "export MULTIPART_THRESHOLD=${props.env.MULTIPART_THRESHOLD}" >> env.sh`,
             // `echo "export CHUNK_SIZE=${props.env.CHUNK_SIZE}" >> env.sh`,
