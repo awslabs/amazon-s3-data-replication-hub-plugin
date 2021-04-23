@@ -15,10 +15,7 @@ export interface CommonProps {
 export class CommonStack extends Construct {
 
     readonly jobTable: ddb.Table
-    readonly eventTable: ddb.Table
     readonly sqsQueue: sqs.Queue
-    readonly eventTableName: string
-    readonly eventTableArn: string
 
     constructor(scope: Construct, id: string, props: CommonProps) {
         super(scope, id);

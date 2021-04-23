@@ -86,6 +86,13 @@ export class DataTransferS3Stack extends Stack {
     })
     this.addToParamLabels('Source Region', srcRegion.logicalId)
 
+    const srcEndpoint = new CfnParameter(this, 'srcEndpoint', {
+      description: 'Source Endpoint URL, leave blank unless you want to provide a custom Endpoint URL',
+      default: '',
+      type: 'String'
+    })
+    this.addToParamLabels('Source Endpoint URL', srcEndpoint.logicalId)
+
     const srcInCurrentAccount = new CfnParameter(this, 'srcInCurrentAccount', {
       description: 'Source Bucket in current account? If not, you should provide a credential with read access',
       default: 'false',
@@ -148,6 +155,20 @@ export class DataTransferS3Stack extends Stack {
       allowedValues: ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING']
     })
     this.addToParamLabels('Destination Storage Class', destStorageClass.logicalId)
+
+    const destAcl = new CfnParameter(this, 'destAcl', {
+      description: 'Destination Access Control List',
+      default: 'bucket-owner-full-control',
+      type: 'String',
+      allowedValues: ['private',
+        'public-read',
+        'public-read-write',
+        'authenticated-read',
+        'aws-exec-read',
+        'bucket-owner-read',
+        'bucket-owner-full-control']
+    })
+    this.addToParamLabels('Destination Access Control List', destAcl.logicalId)
 
     const ecsClusterName = new CfnParameter(this, 'ecsClusterName', {
       description: 'ECS Cluster Name to run ECS task',
@@ -376,6 +397,7 @@ export class DataTransferS3Stack extends Stack {
       SRC_BUCKET: srcBucket.valueAsString,
       SRC_PREFIX: srcPrefix.valueAsString,
       SRC_REGION: srcRegion.valueAsString,
+      SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
 
@@ -385,6 +407,7 @@ export class DataTransferS3Stack extends Stack {
       DEST_CREDENTIALS: destCredentials.valueAsString,
       DEST_IN_CURRENT_ACCOUNT: destInCurrentAccount.valueAsString,
       DEST_STORAGE_CLASS: destStorageClass.valueAsString,
+      DEST_ACL: destAcl.valueAsString,
 
       FINDER_DEPTH: finderDepth.valueAsString,
       FINDER_NUMBER: finderNumber.valueAsString,
