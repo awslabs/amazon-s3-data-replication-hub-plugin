@@ -253,8 +253,8 @@ export class DataTransferS3Stack extends Stack {
     })
 
 
-    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId)
-    this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId)
+    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId)
+    this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId, destAcl.logicalId)
     this.addToParamGroups('Notification Information', alarmEmail.logicalId)
     this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId)
 
