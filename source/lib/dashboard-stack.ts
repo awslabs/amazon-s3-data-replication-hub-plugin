@@ -8,15 +8,15 @@ import { RunType } from './main-stack';
 
 // Dashboard Name Space
 export const enum DBNamespace {
-    NS_EC2 = "DRH/EC2",
-    NS_LAMBDA = "DRH/Lambda"
+    NS_EC2 = "DTH/EC2",
+    NS_LAMBDA = "DTH/Lambda"
 }
 
 export interface DBProps {
     readonly runType: RunType,
     readonly queue: sqs.Queue
     // readonly queueDLQ: sqs.Queue
-    readonly asgName?: string
+    readonly asgName?: string,
     readonly handler?: lambda.Function
 }
 
@@ -30,27 +30,27 @@ export class DashboardStack extends Construct {
         const cwNamespace = props.runType === RunType.EC2 ? DBNamespace.NS_EC2 : DBNamespace.NS_LAMBDA
 
         const completedBytes = new cw.Metric({
-            namespace: cwNamespace,
-            metricName: 'CompletedBytes',
+            namespace: `${cwNamespace}-${Aws.STACK_NAME}`,
+            metricName: `CompletedBytes-${Aws.STACK_NAME}`,
             statistic: 'Sum',
             period: Duration.minutes(1),
             label: 'Completed(Bytes)'
         })
 
         const transferredObjects = new cw.Metric({
-            namespace: cwNamespace,
-            metricName: 'TransferredObjects',
+            namespace: `${cwNamespace}-${Aws.STACK_NAME}`,
+            metricName: `TransferredObjects-${Aws.STACK_NAME}`,
             statistic: 'Sum',
             period: Duration.minutes(1),
             label: 'Transferred(Objects)'
         })
 
         const failedObjects = new cw.Metric({
-            namespace: cwNamespace,
-            metricName: 'FailedObjects',
+            namespace: `${cwNamespace}-${Aws.STACK_NAME}`,
+            metricName: `FailedObjects-${Aws.STACK_NAME}`,
             statistic: 'Sum',
             period: Duration.minutes(1),
-            label: 'Failed(Objects)'
+            label: 'Failed(Objects)' 
         })
 
         const lambdaMemory = new cw.Metric({

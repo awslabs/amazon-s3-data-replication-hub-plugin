@@ -19,7 +19,7 @@ export interface Ec2WorkerProps {
     readonly queue: sqs.Queue,
     readonly maxCapacity?: number,
     readonly minCapacity?: number,
-    readonly desiredCapacity?: number,
+    readonly desiredCapacity?: number
 }
 
 
@@ -163,22 +163,22 @@ export class Ec2WorkerStack extends Construct {
         const namespace = DBNamespace.NS_EC2
 
         ec2LG.addMetricFilter('CompletedBytes', {
-            metricName: 'CompletedBytes',
-            metricNamespace: namespace,
+            metricName: `CompletedBytes-${Aws.STACK_NAME}`,
+            metricNamespace: `${namespace}-${Aws.STACK_NAME}`,
             metricValue: '$Bytes',
             filterPattern: FilterPattern.literal('[data, time, p="----->Completed", Bytes, ...]')
         })
 
         ec2LG.addMetricFilter('Transferred-Objects', {
-            metricName: 'TransferredObjects',
-            metricNamespace: namespace,
+            metricName: `TransferredObjects-${Aws.STACK_NAME}`,
+            metricNamespace: `${namespace}-${Aws.STACK_NAME}`,
             metricValue: '1',
             filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="DONE"]')
         })
 
         ec2LG.addMetricFilter('Failed-Objects', {
-            metricName: 'FailedObjects',
-            metricNamespace: namespace,
+            metricName: `FailedObjects-${Aws.STACK_NAME}`,
+            metricNamespace: `${namespace}-${Aws.STACK_NAME}`,
             metricValue: '1',
             filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="ERROR"]')
         })
