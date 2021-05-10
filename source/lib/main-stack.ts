@@ -425,7 +425,7 @@ export class DataTransferS3Stack extends Stack {
         queue: commonStack.sqsQueue,
         maxCapacity: maxCapacity?.valueAsNumber,
         minCapacity: minCapacity?.valueAsNumber,
-        desiredCapacity: desiredCapacity?.valueAsNumber
+        desiredCapacity: desiredCapacity?.valueAsNumber,
       }
 
       const ec2Stack = new Ec2WorkerStack(this, 'EC2WorkerStack', ec2Props)
@@ -451,7 +451,7 @@ export class DataTransferS3Stack extends Stack {
       runType: runType,
       queue: commonStack.sqsQueue,
       asgName: asgName,
-      handler: handler
+      handler: handler,
     }
     new DashboardStack(this, 'DashboardStack', dbProps);
 

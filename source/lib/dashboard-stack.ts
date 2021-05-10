@@ -16,7 +16,7 @@ export interface DBProps {
     readonly runType: RunType,
     readonly queue: sqs.Queue
     // readonly queueDLQ: sqs.Queue
-    readonly asgName?: string,
+    readonly asgName?: string
     readonly handler?: lambda.Function
 }
 
@@ -30,24 +30,24 @@ export class DashboardStack extends Construct {
         const cwNamespace = props.runType === RunType.EC2 ? DBNamespace.NS_EC2 : DBNamespace.NS_LAMBDA
 
         const completedBytes = new cw.Metric({
-            namespace: `${cwNamespace}-${Aws.STACK_NAME}`,
-            metricName: `CompletedBytes-${Aws.STACK_NAME}`,
+            namespace: `${Aws.STACK_NAME}`,
+            metricName: 'CompletedBytes',
             statistic: 'Sum',
             period: Duration.minutes(1),
             label: 'Completed(Bytes)'
         })
 
         const transferredObjects = new cw.Metric({
-            namespace: `${cwNamespace}-${Aws.STACK_NAME}`,
-            metricName: `TransferredObjects-${Aws.STACK_NAME}`,
+            namespace: `${Aws.STACK_NAME}`,
+            metricName: 'TransferredObjects',
             statistic: 'Sum',
             period: Duration.minutes(1),
             label: 'Transferred(Objects)'
         })
 
         const failedObjects = new cw.Metric({
-            namespace: `${cwNamespace}-${Aws.STACK_NAME}`,
-            metricName: `FailedObjects-${Aws.STACK_NAME}`,
+            namespace: `${Aws.STACK_NAME}`,
+            metricName: 'FailedObjects',
             statistic: 'Sum',
             period: Duration.minutes(1),
             label: 'Failed(Objects)' 
