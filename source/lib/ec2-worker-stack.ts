@@ -7,7 +7,6 @@ import * as sqs from '@aws-cdk/aws-sqs';
 import * as cw from '@aws-cdk/aws-cloudwatch';
 
 import { RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
-import { DBNamespace } from './dashboard-stack';
 
 export interface Env {
     [key: string]: any;
@@ -160,25 +159,23 @@ export class Ec2WorkerStack extends Construct {
 
         this.workerAsg.addToRolePolicy(cwAgentPolicy)
 
-        const namespace = DBNamespace.NS_EC2
-
         ec2LG.addMetricFilter('CompletedBytes', {
             metricName: 'CompletedBytes',
-            metricNamespace: namespace,
+            metricNamespace: `${Aws.STACK_NAME}`,
             metricValue: '$Bytes',
             filterPattern: FilterPattern.literal('[data, time, p="----->Completed", Bytes, ...]')
         })
 
         ec2LG.addMetricFilter('Transferred-Objects', {
             metricName: 'TransferredObjects',
-            metricNamespace: namespace,
+            metricNamespace: `${Aws.STACK_NAME}`,
             metricValue: '1',
             filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="DONE"]')
         })
 
         ec2LG.addMetricFilter('Failed-Objects', {
             metricName: 'FailedObjects',
-            metricNamespace: namespace,
+            metricNamespace: `${Aws.STACK_NAME}`,
             metricValue: '1',
             filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="ERROR"]')
         })
