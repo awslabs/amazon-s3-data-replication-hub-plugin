@@ -6,12 +6,6 @@ import * as sqs from '@aws-cdk/aws-sqs';
 
 import { RunType } from './main-stack';
 
-// Dashboard Name Space
-export const enum DBNamespace {
-    NS_EC2 = "DRH/EC2",
-    NS_LAMBDA = "DRH/Lambda"
-}
-
 export interface DBProps {
     readonly runType: RunType,
     readonly queue: sqs.Queue
@@ -27,10 +21,8 @@ export class DashboardStack extends Construct {
     constructor(scope: Construct, id: string, props: DBProps) {
         super(scope, id);
 
-        const cwNamespace = props.runType === RunType.EC2 ? DBNamespace.NS_EC2 : DBNamespace.NS_LAMBDA
-
         const completedBytes = new cw.Metric({
-            namespace: cwNamespace,
+            namespace: `${Aws.STACK_NAME}`,
             metricName: 'CompletedBytes',
             statistic: 'Sum',
             period: Duration.minutes(1),
@@ -38,7 +30,7 @@ export class DashboardStack extends Construct {
         })
 
         const transferredObjects = new cw.Metric({
-            namespace: cwNamespace,
+            namespace: `${Aws.STACK_NAME}`,
             metricName: 'TransferredObjects',
             statistic: 'Sum',
             period: Duration.minutes(1),
@@ -46,7 +38,7 @@ export class DashboardStack extends Construct {
         })
 
         const failedObjects = new cw.Metric({
-            namespace: cwNamespace,
+            namespace: `${Aws.STACK_NAME}`,
             metricName: 'FailedObjects',
             statistic: 'Sum',
             period: Duration.minutes(1),
@@ -54,7 +46,7 @@ export class DashboardStack extends Construct {
         })
 
         const lambdaMemory = new cw.Metric({
-            namespace: cwNamespace,
+            namespace: `${Aws.STACK_NAME}`,
             metricName: 'MaxMemoryUsed',
             statistic: 'Max',
             period: Duration.minutes(1),
