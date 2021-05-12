@@ -49,6 +49,7 @@ if [ -z "$4" ]; then
         export REGION=cn-north-1
     else
         export REGION=us-east-1
+    fi
 else
     export REGION=$4
 fi
