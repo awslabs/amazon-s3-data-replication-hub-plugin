@@ -53,20 +53,6 @@ else
     export VERSION=$3
 fi
 
-
-
-# Do provide a region ($4) when build to avoid failure or change the default region below if needed.
-if [ -z "$4" ]; then
-    if [[ $AWS_DEFAULT_REGION == cn-* ]]; then
-        export REGION=cn-north-1
-    else
-        export REGION=us-east-1
-    fi
-else
-    export REGION=$4
-fi
-
-
 # Get reference for all important folders
 template_dir="$PWD"
 staging_dist_dir="$template_dir/staging"
@@ -119,8 +105,8 @@ cd $source_dir
 
 # Install and build
 echo "npm install && npm run build"
-npm install && npm run build
-# npm run build
+# npm install && npm run build
+npm run build
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
@@ -200,9 +186,13 @@ run sedi $replace $template_dist_dir/*.template
 replace="s/%%VERSION%%/$VERSION/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
 run sedi $replace $template_dist_dir/*.template
-replace="s/%%REGION%%/$REGION/g"
-echo "sed -i '' -e $replace $template_dist_dir/*.template"
-run sedi $replace $template_dist_dir/*.template
+
+if [[ $4 == cn-northwest-1 ]]; then
+    replace="s|https://s3.cn-north-1.amazonaws.com.cn|https://s3.cn-northwest-1.amazonaws.com.cn|g"
+    echo "sed -i '' -e $replace $template_dist_dir/*.template"
+    run sedi $replace $template_dist_dir/*.template
+fi
+
 
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Source code artifacts"

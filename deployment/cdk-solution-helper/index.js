@@ -85,20 +85,20 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     }
   });
 
-  const sg = Object.keys(resources).filter(function (key) {
-    return resources[key].Type === "AWS::EC2::SecurityGroup";
-  });
-  sg.forEach(function (f) {
-    const fn = template.Resources[f];
-    fn.Metadata = {
-      'cfn_nag': {
-        'rules_to_suppress': [
-          { 'id': 'W5' },
-          { 'id': 'W40' }
-        ]
-      }
-    };
-  });
+  // const sg = Object.keys(resources).filter(function (key) {
+  //   return resources[key].Type === "AWS::EC2::SecurityGroup";
+  // });
+  // sg.forEach(function (f) {
+  //   const fn = template.Resources[f];
+  //   fn.Metadata = {
+  //     'cfn_nag': {
+  //       'rules_to_suppress': [
+  //         { 'id': 'W5' },
+  //         { 'id': 'W40' }
+  //       ]
+  //     }
+  //   };
+  // });
 
   // Clean-up nested template stack dependencies
   const nestedStacks = Object.keys(resources).filter(function (key) {
@@ -110,15 +110,13 @@ fs.readdirSync(global_s3_assets).forEach(file => {
       'Fn::Join': [
         '',
         [
-          'https://s3.%%REGION%%.',
-          {
-            'Ref': 'AWS::URLSuffix'
-          },
+          fn.Metadata.domain,
           '/',
           `%%BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/${fn.Metadata.nestedTemplateName}`
         ]
       ]
     };
+
     const params = fn.Properties.Parameters ? fn.Properties.Parameters : {};
     const nestedStackParameters = Object.keys(params).filter(function (key) {
       if (key.search(/[\w]*AssetParameters/g) > -1) {
