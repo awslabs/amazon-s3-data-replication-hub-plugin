@@ -6,12 +6,12 @@ phases:
       nodejs: 14
     commands:
       - echo "nothing to do in install"
-  pre_build:
-    commands:
-      - echo "Installing dependencies and executing unit tests - `pwd`"
-      - cd source
-      - npm install
-      - echo "Installing dependencies and executing unit tests completed `date`"
+  # pre_build:
+  #   commands:
+  #     - echo "Installing dependencies and executing unit tests - `pwd`"
+  #     - cd source
+  #     - npm install
+  #     - echo "Installing dependencies and executing unit tests completed `date`"
 
   build:
     commands:
