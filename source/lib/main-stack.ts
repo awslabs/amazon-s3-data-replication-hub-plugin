@@ -357,6 +357,7 @@ export class DataTransferS3Stack extends Stack {
       SRC_BUCKET: srcBucket.valueAsString,
       SRC_PREFIX: srcPrefix.valueAsString,
       SRC_REGION: srcRegion.valueAsString,
+      SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
 
