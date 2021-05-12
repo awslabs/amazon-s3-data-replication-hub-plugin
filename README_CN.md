@@ -40,8 +40,6 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 
 在此新的V2版本（v2.x.x）中，我们将对本插件进行了一些**重大更改**，其中包括：
 
-- 用Golang重写数据传输的核心逻辑，以提高并发性能。还提供了命令行工具。有关更多详细信息，请参见[drhcli](https://github.com/daixba/drhcli)。从本质上讲，这意味着该插件将使用命令行工具执行相关的任务。
-
 - 使用Amazon EC2和Auto Scaling Group代替Lambda进行数据传输。此解决方案使用`t4g.micro`实例类型以节省成本。在撰写本文时，此实例类型在US West (Oregon)区的价格为`每小时$0.0084`。请查看[EC2定价](https://aws.amazon.com/ec2/pricing/on-demand/)以获取最新价格。
 
 - 默认情况下，Amazon EC2操作系统将启用BBR（Bottleneck Bandwidth and RTT）以提高网络性能。

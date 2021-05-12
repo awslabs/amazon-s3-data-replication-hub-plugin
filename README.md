@@ -42,8 +42,6 @@ The following are the features supported by this plugin.
 
 In this new V2 release (v2.x.x), we are introducing a few **breaking changes** to this solution, including:
 
-- Rewrite the core logic of data transfer in Golang to improve the performance of concurrency. A command line tool is also provided. See [drhcli](https://github.com/daixba/drhcli) for more details. Essentially that means this plugin will use the command line tool to perform the relevent tasks.
-
 - Use Amazon EC2 and Auto Scaling Group to do the data transfer instead of Lambda. `t4g.micro` instance type is used for this solution to save cost. The pricing of this instance type is `$0.0084 per Hour` in US West (Oregon) region at the point of writing. Check out [EC2 Pricing](https://aws.amazon.com/ec2/pricing/on-demand/) to get the latest price. 
 
 - Amazon EC2 operating systems will by default have BBR (Bottleneck Bandwidth and RTT) enabled to improve network performance.
