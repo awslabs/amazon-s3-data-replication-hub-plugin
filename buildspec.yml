@@ -33,6 +33,7 @@ phases:
 
 artifacts:
   files:
+    - .git/**/*
     - deployment/**/*
     - buildspec.yml
     - CHANGELOG.md
