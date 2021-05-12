@@ -103,13 +103,11 @@ echo "--------------------------------------------------------------------------
 # Install the global aws-cdk package
 echo "cd $source_dir"
 cd $source_dir
-# echo "npm install -g aws-cdk@$cdk_version"
-# npm install -g aws-cdk@$cdk_version
 
 # Install and build
 echo "npm install && npm run build"
-# npm install && npm run build
-npm run build
+npm install && npm run build
+# npm run build
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
