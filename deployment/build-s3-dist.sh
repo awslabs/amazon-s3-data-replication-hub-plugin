@@ -27,7 +27,17 @@
 #  - version-code: version of the package
 
 # Important: CDK global version number
-# cdk_version=1.74.0
+set -e
+
+run() {
+    >&2 echo "[run] $*"
+    $*
+}
+
+sedi() {
+    # cross-platform for sed -i
+    sed -i $* 2>/dev/null || sed -i "" $*
+}
 
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] ; then
@@ -42,6 +52,8 @@ if [ -z "$3" ]; then
 else
     export VERSION=$3
 fi
+
+
 
 # Do provide a region ($4) when build to avoid failure or change the default region below if needed.
 if [ -z "$4" ]; then
@@ -69,7 +81,9 @@ echo "--------------------------------------------------------------------------
 echo AWS_DEFAULT_REGION $AWS_DEFAULT_REGION
 echo DIST_OUTPUT_BUCKET $1
 echo SOLUTION_NAME $2
-echo VERSION $VERSION
+echo REGION $REGION
+echo "VERSION=${VERSION}"
+echo "${VERSION}" > $template_dist_dir/version
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
@@ -177,16 +191,16 @@ cd $template_dist_dir
 echo "Updating code source bucket in template with $1"
 replace="s/%%BUCKET_NAME%%/$1/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
-sed -i '' -e $replace $template_dist_dir/*.template
+run sedi $replace $template_dist_dir/*.template
 replace="s/%%SOLUTION_NAME%%/$2/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
-sed -i '' -e $replace $template_dist_dir/*.template
+run sedi $replace $template_dist_dir/*.template
 replace="s/%%VERSION%%/$VERSION/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
-sed -i '' -e $replace $template_dist_dir/*.template
+run sedi $replace $template_dist_dir/*.template
 replace="s/%%REGION%%/$REGION/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
-sed -i '' -e $replace $template_dist_dir/*.template
+run sedi $replace $template_dist_dir/*.template
 
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Source code artifacts"
