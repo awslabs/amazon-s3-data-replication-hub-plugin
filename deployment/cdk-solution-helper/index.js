@@ -131,21 +131,21 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     });
   });
 
-  const policy = Object.keys(resources).filter(function (key) {
-    return resources[key].Type === "AWS::IAM::Policy";
-  });
-  policy.forEach(function (f) {
-    const fn = template.Resources[f];
-    let metadata = Object.assign(fn.Metadata);
-    fn.Metadata = {
-      ...metadata,
-      'cfn_nag': {
-        'rules_to_suppress': [
-          { 'id': 'W12' }
-        ]
-      }
-    };
-  });
+  // const policy = Object.keys(resources).filter(function (key) {
+  //   return resources[key].Type === "AWS::IAM::Policy";
+  // });
+  // policy.forEach(function (f) {
+  //   const fn = template.Resources[f];
+  //   let metadata = Object.assign(fn.Metadata);
+  //   fn.Metadata = {
+  //     ...metadata,
+  //     'cfn_nag': {
+  //       'rules_to_suppress': [
+  //         { 'id': 'W12' }
+  //       ]
+  //     }
+  //   };
+  // });
 
   // Clean-up parameters section
   const parameters = (template.Parameters) ? template.Parameters : {};
