@@ -82,8 +82,6 @@ echo AWS_DEFAULT_REGION $AWS_DEFAULT_REGION
 echo DIST_OUTPUT_BUCKET $1
 echo SOLUTION_NAME $2
 echo REGION $REGION
-echo "VERSION=${VERSION}"
-echo "${VERSION}" > $template_dist_dir/version
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
@@ -188,6 +186,10 @@ fi
 # Find and replace bucket_name, solution_name, and version
 echo "Find and replace bucket_name, solution_name, and version"
 cd $template_dist_dir
+
+echo "VERSION=${VERSION}"
+echo "${VERSION}" > version
+
 echo "Updating code source bucket in template with $1"
 replace="s/%%BUCKET_NAME%%/$1/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
