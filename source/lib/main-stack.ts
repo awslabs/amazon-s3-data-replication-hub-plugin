@@ -58,6 +58,8 @@ export class DataTransferS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
+    const cliRelease = '1.0.1'
+
     const srcType = new CfnParameter(this, 'srcType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
       type: 'String',
@@ -377,7 +379,7 @@ export class DataTransferS3Stack extends Stack {
       vpc: vpc,
       ecsSubnetIds: ecsSubnets.valueAsList,
       ecsClusterName: ecsClusterName.valueAsString,
-      version: VERSION
+      cliRelease: cliRelease,
     }
     const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
 
@@ -427,6 +429,7 @@ export class DataTransferS3Stack extends Stack {
         maxCapacity: maxCapacity?.valueAsNumber,
         minCapacity: minCapacity?.valueAsNumber,
         desiredCapacity: desiredCapacity?.valueAsNumber,
+        cliRelease: cliRelease,
       }
 
       const ec2Stack = new Ec2WorkerStack(this, 'EC2WorkerStack', ec2Props)

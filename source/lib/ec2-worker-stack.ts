@@ -19,6 +19,7 @@ export interface Ec2WorkerProps {
     readonly maxCapacity?: number,
     readonly minCapacity?: number,
     readonly desiredCapacity?: number,
+    readonly cliRelease: string,
 }
 
 
@@ -76,9 +77,6 @@ export class Ec2WorkerStack extends Construct {
             // removalPolicy: RemovalPolicy.DESTROY
         });
 
-        const cliRelease = "1.0.1"
-        const cliArch = "arm64"
-
         const assetTable = new CfnMapping(this, 'AssetTable', {
             mapping: {
                 'aws': {
@@ -91,7 +89,6 @@ export class Ec2WorkerStack extends Construct {
         });
 
         const cliAssetDomain = assetTable.findInMap(Aws.PARTITION, 'assetDomain')
-
 
         this.workerAsg.userData.addCommands(
             'yum update -y',
@@ -112,8 +109,8 @@ export class Ec2WorkerStack extends Construct {
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
             // Get CLI from solution assets
-            `curl -LO "${cliAssetDomain}/drhcli/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"`,
-            `tar zxvf drhcli_${cliRelease}_linux_${cliArch}.tar.gz`,
+            `curl -LO "${cliAssetDomain}/drhcli/v${props.cliRelease}/drhcli_${props.cliRelease}_linux_arm64.tar.gz"`,
+            `tar zxvf drhcli_${props.cliRelease}_linux_arm64.tar.gz`,
 
             // Prepare the environment variables
             `echo "export JOB_TABLE_NAME=${props.env.JOB_TABLE_NAME}" >> env.sh`,

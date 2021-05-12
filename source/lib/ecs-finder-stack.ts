@@ -1,4 +1,4 @@
-import { Construct, Fn, Duration, Aws, CfnMapping, CfnOutput, CustomResource, Stack } from '@aws-cdk/core';
+import { Construct, Duration, Aws, CfnMapping, CfnOutput, CustomResource, Stack } from '@aws-cdk/core';
 import * as events from '@aws-cdk/aws-events';
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as ecs from '@aws-cdk/aws-ecs';
@@ -7,7 +7,7 @@ import * as ecr from '@aws-cdk/aws-ecr';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cr from "@aws-cdk/custom-resources";
-import { RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
+import { RetentionDays } from '@aws-cdk/aws-logs';
 
 import * as path from 'path';
 
@@ -21,9 +21,9 @@ export interface EcsTaskProps {
     // readonly ecsVpcId: string,
     readonly ecsSubnetIds: string[],
     readonly ecsClusterName: string,
-    readonly version?: string,
     readonly cpu?: number,
     readonly memory?: number,
+    readonly cliRelease: string,
 }
 
 export class EcsStack extends Construct {
@@ -60,7 +60,7 @@ export class EcsStack extends Construct {
 
 
         this.taskDefinition.addContainer('DefaultContainer', {
-            image: ecs.ContainerImage.fromEcrRepository(repo, props.version),
+            image: ecs.ContainerImage.fromEcrRepository(repo, props.cliRelease),
             environment: props.env,
             logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender', logRetention: RetentionDays.TWO_WEEKS })
         });
