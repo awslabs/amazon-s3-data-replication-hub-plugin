@@ -105,8 +105,7 @@ cd $source_dir
 
 # Install and build
 echo "npm install && npm run build"
-# npm install && npm run build
-npm run build
+npm install && npm run build
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
