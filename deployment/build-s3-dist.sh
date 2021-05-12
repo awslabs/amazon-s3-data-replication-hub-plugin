@@ -30,11 +30,29 @@
 # cdk_version=1.74.0
 
 # Check to see if the required parameters have been provided:
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+if [ -z "$1" ] || [ -z "$2" ] ; then
     echo "Please provide the base source bucket name, trademark approved solution name and version where the lambda code will eventually reside."
     echo "For example: ./build-s3-dist.sh solutions trademarked-solution-name v1.0.0 us-west-2"
     exit 1
 fi
+
+# Get default version
+if [ -z "$3" ]; then
+    export VERSION=$(git describe --tags || echo v0.0.0)
+else
+    export VERSION=$3
+fi
+
+# Do provide a region ($4) when build to avoid failure or change the default region below if needed.
+if [ -z "$4" ]; then
+    if [[ $AWS_DEFAULT_REGION == cn-* ]]; then
+        export REGION=cn-north-1
+    else
+        export REGION=us-east-1
+else
+    export REGION=$4
+fi
+
 
 # Get reference for all important folders
 template_dir="$PWD"
@@ -50,7 +68,7 @@ echo "--------------------------------------------------------------------------
 echo AWS_DEFAULT_REGION $AWS_DEFAULT_REGION
 echo DIST_OUTPUT_BUCKET $1
 echo SOLUTION_NAME $2
-echo VERSION $3
+echo VERSION $VERSION
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
@@ -132,27 +150,27 @@ if [ "$?" = "1" ]; then
 fi
 
 # Download the cli into global assets folder and replace the cli github.com url in the template with the one in S3
-cd $template_dist_dir
-# The cli release must be same as the one in the current stack.
-if [ -z "$5" ]; then
-    cliRelease=1.0.1
-else
-    cliRelease=$5
-fi
+# cd $template_dist_dir
+# # The cli release must be same as the one in the current stack.
+# if [ -z "$5" ]; then
+#     cliRelease=1.0.1
+# else
+#     cliRelease=$5
+# fi
 
-cliArch=arm64
-echo "Downloading the cli - version ${cliRelease}"
-curl -LO "https://github.com/daixba/drhcli/releases/download/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"
+# cliArch=arm64
+# echo "Downloading the cli - version ${cliRelease}"
+# curl -LO "https://github.com/daixba/drhcli/releases/download/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"
 
-echo "Updating the url of the cli in template"
-if [[ $4 == cn-* ]]; then
-    suffix=amazonaws.com.cn
-else
-    suffix=amazonaws.com
-fi
-replace="s?github.com/[a-z/]*/v[0-9.]*/?s3.%%REGION%%.${suffix}/%%BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/?g"
-echo "sed -i '' -e $replace $template_dist_dir/*.template"
-sed -i '' -e $replace *.template
+# echo "Updating the url of the cli in template"
+# if [[ $4 == cn-* ]]; then
+#     suffix=amazonaws.com.cn
+# else
+#     suffix=amazonaws.com
+# fi
+# replace="s?github.com/[a-z/]*/v[0-9.]*/?s3.%%REGION%%.${suffix}/%%BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/?g"
+# echo "sed -i '' -e $replace $template_dist_dir/*.template"
+# sed -i '' -e $replace *.template
 
 # Find and replace bucket_name, solution_name, and version
 echo "Find and replace bucket_name, solution_name, and version"
@@ -164,10 +182,10 @@ sed -i '' -e $replace $template_dist_dir/*.template
 replace="s/%%SOLUTION_NAME%%/$2/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
 sed -i '' -e $replace $template_dist_dir/*.template
-replace="s/%%VERSION%%/$3/g"
+replace="s/%%VERSION%%/$VERSION/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
 sed -i '' -e $replace $template_dist_dir/*.template
-replace="s/%%REGION%%/$4/g"
+replace="s/%%REGION%%/$REGION/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
 sed -i '' -e $replace $template_dist_dir/*.template
 

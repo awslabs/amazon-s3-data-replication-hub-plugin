@@ -79,6 +79,20 @@ export class Ec2WorkerStack extends Construct {
         const cliRelease = "1.0.1"
         const cliArch = "arm64"
 
+        const assetTable = new CfnMapping(this, 'AssetTable', {
+            mapping: {
+                'aws': {
+                    assetDomain: 'https://aws-gcr-solutions-assets.s3.amazonaws.com',
+                },
+                'aws-cn': {
+                    assetDomain: 'https://aws-gcr-solutions-assets.s3.cn-north-1.amazonaws.com.cn',
+                },
+            }
+        });
+
+        const cliAssetDomain = assetTable.findInMap(Aws.PARTITION, 'assetDomain')
+
+
         this.workerAsg.userData.addCommands(
             'yum update -y',
             'cd /home/ec2-user/',
@@ -97,10 +111,8 @@ export class Ec2WorkerStack extends Construct {
             `sed -i  -e "s/##log group##/${ec2LG.logGroupName}/g" cw_agent_config.json`,
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
-            // Get CLI
-            // 'cliRelease=1.0.1',
-            // 'cliArch=arm64',
-            `curl -LO "https://github.com/daixba/drhcli/releases/download/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"`,
+            // Get CLI from solution assets
+            `curl -LO "${cliAssetDomain}/drhcli/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"`,
             `tar zxvf drhcli_${cliRelease}_linux_${cliArch}.tar.gz`,
 
             // Prepare the environment variables
