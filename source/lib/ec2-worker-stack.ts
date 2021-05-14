@@ -83,7 +83,7 @@ export class Ec2WorkerStack extends Construct {
                     assetDomain: 'https://aws-gcr-solutions-assets.s3.amazonaws.com',
                 },
                 'aws-cn': {
-                    assetDomain: 'https://aws-gcr-solutions-assets.s3.cn-north-1.amazonaws.com.cn',
+                    assetDomain: 'https://aws-gcr-solutions-assets.s3.cn-northwest-1.amazonaws.com.cn',
                 },
             }
         });
