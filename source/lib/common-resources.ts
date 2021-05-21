@@ -24,7 +24,9 @@ export class CommonStack extends Construct {
         this.jobTable = new ddb.Table(this, 'S3TransferTable', {
             partitionKey: { name: 'ObjectKey', type: ddb.AttributeType.STRING },
             billingMode: ddb.BillingMode.PAY_PER_REQUEST,
-            removalPolicy: RemovalPolicy.DESTROY
+            removalPolicy: RemovalPolicy.DESTROY,
+            encryption: ddb.TableEncryption.DEFAULT,
+            pointInTimeRecovery: true,
         })
 
         // this.jobTable.addGlobalSecondaryIndex({
@@ -38,43 +40,32 @@ export class CommonStack extends Construct {
         addCfnNagSuppressRules(cfnJobTable, [
             {
                 id: 'W74',
-                reason: 'No need to use encryption'
+                reason: 'Use deafult encryption. Encryption key owned by Amazon'
             }
         ]);
         cfnJobTable.overrideLogicalId('S3TransferTable')
 
         // Setup SQS
         const sqsQueueDLQ = new sqs.Queue(this, 'S3TransferQueueDLQ', {
-            visibilityTimeout: Duration.minutes(15),
+            visibilityTimeout: Duration.minutes(30),
             retentionPeriod: Duration.days(14),
+            encryption: sqs.QueueEncryption.KMS_MANAGED,
         })
 
         const cfnSqsQueueDLQ = sqsQueueDLQ.node.defaultChild as sqs.CfnQueue;
         cfnSqsQueueDLQ.overrideLogicalId('S3TransferQueueDLQ')
-        addCfnNagSuppressRules(cfnSqsQueueDLQ, [
-            {
-                id: 'W48',
-                reason: 'No need to use encryption'
-            }
-        ]);
 
         this.sqsQueue = new sqs.Queue(this, 'S3TransferQueue', {
-            visibilityTimeout: Duration.minutes(30),
+            visibilityTimeout: Duration.minutes(15),
             retentionPeriod: Duration.days(14),
             deadLetterQueue: {
                 queue: sqsQueueDLQ,
                 maxReceiveCount: 5
-            }
+            },
+            encryption: sqs.QueueEncryption.KMS_MANAGED,
         })
 
         const cfnSqsQueue = this.sqsQueue.node.defaultChild as sqs.CfnQueue;
-        addCfnNagSuppressRules(cfnSqsQueue, [
-            {
-                id: 'W48',
-                reason: 'No need to use encryption'
-            }
-        ]);
-
         cfnSqsQueue.overrideLogicalId('S3TransferQueue')
 
         // Setup Alarm for queue - DLQ
