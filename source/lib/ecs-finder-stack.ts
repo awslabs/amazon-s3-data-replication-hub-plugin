@@ -37,10 +37,10 @@ export class EcsStack extends Construct {
         const repoTable = new CfnMapping(this, 'ECRRepoTable', {
             mapping: {
                 'aws': {
-                    repoArn: 'arn:aws:ecr:us-west-2:627627941158:repository/s3-replication-cli',
+                    repoArn: 'arn:aws:ecr:us-west-2:627627941158:repository/data-transfer-hub-cli',
                 },
                 'aws-cn': {
-                    repoArn: 'arn:aws-cn:ecr:cn-northwest-1:382903357634:repository/s3-replication-cli',
+                    repoArn: 'arn:aws-cn:ecr:cn-northwest-1:382903357634:repository/data-transfer-hub-cli',
                 },
             }
         });
@@ -50,7 +50,7 @@ export class EcsStack extends Construct {
         // const repo = ecr.Repository.fromRepositoryArn(this, 'JobFinderRepo', ecrRepositoryArn)
         const repo = ecr.Repository.fromRepositoryAttributes(this, 'JobFinderRepo', {
             repositoryArn: ecrRepositoryArn,
-            repositoryName: 's3-replication-cli'
+            repositoryName: 'data-transfer-hub-cli'
         })
         this.taskDefinition = new ecs.FargateTaskDefinition(this, 'JobFinderTaskDef', {
             cpu: props.cpu ? props.cpu : 1024 * 4,
@@ -78,9 +78,9 @@ export class EcsStack extends Construct {
             securityGroups: []
         })
 
-        this.securityGroup = new ec2.SecurityGroup(this, 'SecurityGroup', {
+        this.securityGroup = new ec2.SecurityGroup(this, 'S3RepECSSG', {
             vpc: props.vpc,
-            securityGroupName: `${Aws.STACK_NAME}-ECS-TASK-SG`,
+            // securityGroupName: `${Aws.STACK_NAME}-ECS-TASK-SG`,
             description: `Security Group for running ${Aws.STACK_NAME}-DTHFinderTask`,
             allowAllOutbound: true
         });

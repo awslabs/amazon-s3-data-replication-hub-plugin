@@ -58,7 +58,7 @@ export class DataTransferS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
-    const cliRelease = '1.0.1'
+    const cliRelease = '1.0.2'
 
     const srcType = new CfnParameter(this, 'srcType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',

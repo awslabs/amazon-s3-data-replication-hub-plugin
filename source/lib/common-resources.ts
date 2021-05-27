@@ -5,6 +5,7 @@ import * as cw from '@aws-cdk/aws-cloudwatch';
 import * as actions from '@aws-cdk/aws-cloudwatch-actions';
 import * as sns from '@aws-cdk/aws-sns';
 import * as sub from '@aws-cdk/aws-sns-subscriptions';
+import { Alias } from '@aws-cdk/aws-kms'
 
 import { addCfnNagSuppressRules } from "./main-stack";
 
@@ -69,24 +70,23 @@ export class CommonStack extends Construct {
         cfnSqsQueue.overrideLogicalId('S3TransferQueue')
 
         // Setup Alarm for queue - DLQ
-        const alarmDLQ = new cw.Alarm(this, 'SQSDLQAlarm', {
+        const alarmDLQ = new cw.Alarm(this, 'S3TransferDLQAlarm', {
             metric: sqsQueueDLQ.metricApproximateNumberOfMessagesVisible(),
             threshold: 0,
             comparisonOperator: cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
             evaluationPeriods: 1,
             datapointsToAlarm: 1
         });
-        const alarmTopic = new sns.Topic(this, 'SQS queue-DLQ has dead letter');
+
+
+        const snsDefaultKey = Alias.fromAliasName(this, 'SNSDefaultkey', 'alias/aws/sns')
+
+        const alarmTopic = new sns.Topic(this, 'S3TransferAlarmTopic', {
+            masterKey: snsDefaultKey,
+        });
+
         alarmTopic.addSubscription(new sub.EmailSubscription(props.alarmEmail));
         alarmDLQ.addAlarmAction(new actions.SnsAction(alarmTopic));
-
-        const cfnAlarmTopic = alarmTopic.node.defaultChild as sns.CfnTopic;
-        addCfnNagSuppressRules(cfnAlarmTopic, [
-            {
-                id: 'W47',
-                reason: 'No need to use encryption'
-            }
-        ]);
 
         new CfnOutput(this, 'QueueName', {
             value: this.sqsQueue.queueName,
