@@ -1,5 +1,5 @@
 import { CfnParameter, CfnResource, Stack, StackProps, Construct, CfnCondition, Fn, Aws, CfnMapping } from '@aws-cdk/core';
-import * as ssm from '@aws-cdk/aws-ssm';
+import * as sm from '@aws-cdk/aws-secretsmanager';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as ec2 from '@aws-cdk/aws-ec2';
 
@@ -58,7 +58,7 @@ export class DataTransferS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
-    const cliRelease = '1.0.1'
+    const cliRelease = '1.0.2'
 
     const srcType = new CfnParameter(this, 'srcType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
@@ -104,11 +104,11 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Source In Current Account', srcInCurrentAccount.logicalId)
 
     const srcCredentials = new CfnParameter(this, 'srcCredentials', {
-      description: 'The Parameter Store used to keep AK/SK credentials for Source Bucket. Leave blank if source bucket is in current account or source is open data',
+      description: 'The secret name in Secrets Manager used to keep AK/SK credentials for Source Bucket. Leave blank if source bucket is in current account or source is open data',
       default: '',
       type: 'String'
     })
-    this.addToParamLabels('Source Credentials Parameter', srcCredentials.logicalId)
+    this.addToParamLabels('Source Credentials', srcCredentials.logicalId)
 
 
     const destBucket = new CfnParameter(this, 'destBucket', {
@@ -142,11 +142,11 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Destination In Current Account', destInCurrentAccount.logicalId)
 
     const destCredentials = new CfnParameter(this, 'destCredentials', {
-      description: 'The Parameter Store used to keep AK/SK credentials for Destination Bucket. Leave blank if desination bucket is in current account',
+      description: 'The secret name in Secrets Manager used to keep AK/SK credentials for Destination Bucket. Leave blank if desination bucket is in current account',
       default: '',
       type: 'String'
     })
-    this.addToParamLabels('Destination Credentials Parameter', destCredentials.logicalId)
+    this.addToParamLabels('Destination Credentials', destCredentials.logicalId)
 
 
     // 'STANDARD'|'REDUCED_REDUNDANCY'|'STANDARD_IA'|'ONEZONE_IA'|'INTELLIGENT_TIERING'|'GLACIER'|'DEEP_ARCHIVE'|'OUTPOSTS',
@@ -312,20 +312,10 @@ export class DataTransferS3Stack extends Stack {
       }
     }
 
-    // Get SSM parameter of credentials
-    const srcCred = ssm.StringParameter.fromStringParameterAttributes(this, 'SrcCredentialsParam', {
-      parameterName: srcCredentials.valueAsString,
-      simpleName: true,
-      type: ssm.ParameterType.SECURE_STRING,
-      version: 1
-    });
+    // Get Secret for credentials from Secrets Manager
+    const srcCred = sm.Secret.fromSecretNameV2(this, 'SrcCredentialsParam', srcCredentials.valueAsString);
 
-    const destCred = ssm.StringParameter.fromStringParameterAttributes(this, 'DestCredentialsParam', {
-      parameterName: destCredentials.valueAsString,
-      simpleName: true,
-      type: ssm.ParameterType.SECURE_STRING,
-      version: 1
-    });
+    const destCred = sm.Secret.fromSecretNameV2(this, 'DestCredentialsParam', destCredentials.valueAsString);
 
 
     // const isSrc = new CfnCondition(this, 'isSrc', {

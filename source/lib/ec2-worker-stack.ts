@@ -6,7 +6,10 @@ import * as asg from '@aws-cdk/aws-autoscaling';
 import * as sqs from '@aws-cdk/aws-sqs';
 import * as cw from '@aws-cdk/aws-cloudwatch';
 
-import { RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
+import { CfnLogGroup, RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
+
+
+import { addCfnNagSuppressRules } from "./main-stack";
 
 export interface Env {
     [key: string]: any;
@@ -43,7 +46,7 @@ export class Ec2WorkerStack extends Construct {
         });
 
 
-        const ec2SG = new ec2.SecurityGroup(this, 'S3RepSG', {
+        const ec2SG = new ec2.SecurityGroup(this, 'S3RepEC2SG', {
             vpc: props.vpc,
             description: 'Security Group for Data Replication Hub EC2 instances',
             allowAllOutbound: true
@@ -77,6 +80,15 @@ export class Ec2WorkerStack extends Construct {
             // removalPolicy: RemovalPolicy.DESTROY
         });
 
+        const cfnEc2LG = ec2LG.node.defaultChild as CfnLogGroup
+        addCfnNagSuppressRules(cfnEc2LG, [
+            {
+                id: 'W84',
+                reason: 'log group is encrypted with the default master key'
+            }
+        ])
+
+
         const assetTable = new CfnMapping(this, 'AssetTable', {
             mapping: {
                 'aws': {
@@ -109,8 +121,8 @@ export class Ec2WorkerStack extends Construct {
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
             // Get CLI from solution assets
-            `curl -LO "${cliAssetDomain}/drhcli/v${props.cliRelease}/drhcli_${props.cliRelease}_linux_arm64.tar.gz"`,
-            `tar zxvf drhcli_${props.cliRelease}_linux_arm64.tar.gz`,
+            `curl -LO "${cliAssetDomain}/data-transfer-hub-cli/v${props.cliRelease}/dthcli_${props.cliRelease}_linux_arm64.tar.gz"`,
+            `tar zxvf dthcli_${props.cliRelease}_linux_arm64.tar.gz`,
 
             // Prepare the environment variables
             `echo "export JOB_TABLE_NAME=${props.env.JOB_TABLE_NAME}" >> env.sh`,
@@ -142,7 +154,7 @@ export class Ec2WorkerStack extends Construct {
 
             // Create the script
             'echo "source /home/ec2-user/env.sh" >> start-worker.sh',
-            'echo "nohup ./drhcli run -t Worker >> /home/ec2-user/worker.log 2>&1 &" >> start-worker.sh',
+            'echo "nohup ./dthcli run -t Worker >> /home/ec2-user/worker.log 2>&1 &" >> start-worker.sh',
             'chmod +x start-worker.sh',
             // Run the script
             './start-worker.sh',
