@@ -54,6 +54,19 @@ export class Ec2WorkerStack extends Construct {
         // For dev only
         // ec2SG.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow ssh access');
 
+        const cfnSG = ec2SG.node.defaultChild as ec2.CfnSecurityGroup
+        addCfnNagSuppressRules(cfnSG, [
+            {
+                id: 'W5',
+                reason: 'Open egress rule is required to access public network'
+            },
+            {
+                id: 'W40',
+                reason: 'Open egress rule is required to access public network'
+            },
+        ])
+
+
         this.workerAsg = new asg.AutoScalingGroup(this, 'S3RepWorkerASG', {
             autoScalingGroupName: `${Aws.STACK_NAME}-Worker-ASG`,
             vpc: props.vpc,
@@ -160,25 +173,36 @@ export class Ec2WorkerStack extends Construct {
             './start-worker.sh',
         )
 
-        const cwAgentPolicy = new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            resources: [
-                '*'
-            ],
-            actions: [
-                'cloudwatch:PutMetricData',
-                'ec2:DescribeVolumes',
-                'ec2:DescribeTags',
-                'logs:CreateLogGroup',
-                'logs:CreateLogStream',
-                'logs:PutLogEvents',
-                'logs:DescribeLogStreams',
-                'logs:DescribeLogGroups',
-            ],
-        })
+        const cwAgentPolicy = new iam.Policy(this, 'CWAgentPolicy', {
+            statements: [
+                new iam.PolicyStatement({
+                    effect: iam.Effect.ALLOW,
+                    resources: [
+                        '*'
+                    ],
+                    actions: [
+                        'cloudwatch:PutMetricData',
+                        'ec2:DescribeVolumes',
+                        'ec2:DescribeTags',
+                        'logs:CreateLogGroup',
+                        'logs:CreateLogStream',
+                        'logs:PutLogEvents',
+                        'logs:DescribeLogStreams',
+                        'logs:DescribeLogGroups',
+                    ],
+                })
+            ]
+        });
 
+        const cfnCwAgentPolicy = cwAgentPolicy.node.defaultChild as iam.CfnPolicy
+        addCfnNagSuppressRules(cfnCwAgentPolicy, [
+            {
+                id: 'W12',
+                reason: 'Publish log streams requires any resources'
+            },
+        ])
 
-        this.workerAsg.addToRolePolicy(cwAgentPolicy)
+        this.workerAsg.role.attachInlinePolicy(cwAgentPolicy)
 
         ec2LG.addMetricFilter('CompletedBytes', {
             metricName: 'CompletedBytes',

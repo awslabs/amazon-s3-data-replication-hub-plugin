@@ -7,9 +7,11 @@ import * as ecr from '@aws-cdk/aws-ecr';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cr from "@aws-cdk/custom-resources";
-import { RetentionDays } from '@aws-cdk/aws-logs';
+import { CfnLogGroup, RetentionDays, LogGroup } from '@aws-cdk/aws-logs';
 
 import * as path from 'path';
+
+import { addCfnNagSuppressRules } from "./main-stack";
 
 export interface Env {
     [key: string]: any;
@@ -58,11 +60,27 @@ export class EcsStack extends Construct {
             family: `${Aws.STACK_NAME}-DTHFinderTask`,
         });
 
+        const ecsLG = new LogGroup(this, 'FinderLogGroup', {
+            retention: RetentionDays.TWO_WEEKS,
+            // logGroupName: logGroupName,
+            // removalPolicy: RemovalPolicy.DESTROY
+        });
+
+        const cfnEcsLG = ecsLG.node.defaultChild as CfnLogGroup
+        addCfnNagSuppressRules(cfnEcsLG, [
+            {
+                id: 'W84',
+                reason: 'log group is encrypted with the default master key'
+            }
+        ])
 
         this.taskDefinition.addContainer('DefaultContainer', {
             image: ecs.ContainerImage.fromEcrRepository(repo, props.cliRelease),
             environment: props.env,
-            logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender', logRetention: RetentionDays.TWO_WEEKS })
+            logging: ecs.LogDrivers.awsLogs({
+                streamPrefix: 'ecsJobSender',
+                logGroup: ecsLG,
+            })
         });
 
         // Get existing ecs cluster.
@@ -84,6 +102,18 @@ export class EcsStack extends Construct {
             description: `Security Group for running ${Aws.STACK_NAME}-DTHFinderTask`,
             allowAllOutbound: true
         });
+
+        const cfnSG = this.securityGroup.node.defaultChild as ec2.CfnSecurityGroup
+        addCfnNagSuppressRules(cfnSG, [
+            {
+                id: 'W5',
+                reason: 'Open egress rule is required to access public network'
+            },
+            {
+                id: 'W40',
+                reason: 'Open egress rule is required to access public network'
+            },
+        ])
 
         // 8. CloudWatch Rule. 
         // Schedule CRON event to trigger JobSender per hour
@@ -110,6 +140,20 @@ export class EcsStack extends Construct {
             timeout: Duration.minutes(15),
         });
 
+        const cfnFn = onEventHandler.node.defaultChild as lambda.CfnFunction
+        addCfnNagSuppressRules(cfnFn, [
+            {
+                id: 'W58',
+                reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
+            }, {
+                id: 'W92',
+                reason: 'No concurrencies required for this function'
+            }, {
+                id: 'W89',
+                reason: 'This function does not need to be deployed in a VPC'
+            }
+        ])
+
         onEventHandler.node.addDependency(this.taskDefinition)
 
         const taskDefArnNoVersion = Stack.of(this).formatArn({
@@ -118,17 +162,31 @@ export class EcsStack extends Construct {
             resourceName: this.taskDefinition.family
         })
 
-        onEventHandler.addToRolePolicy(new iam.PolicyStatement({
-            actions: ['ecs:RunTask'],
-            effect: iam.Effect.ALLOW,
-            resources: [taskDefArnNoVersion]
-        }))
 
-        onEventHandler.addToRolePolicy(new iam.PolicyStatement({
-            actions: ['ecs:ListTasks'],
-            effect: iam.Effect.ALLOW,
-            resources: ['*']
-        }))
+        const ecsTaskPolicy = new iam.Policy(this, 'ECSTaskPolicy', {
+            statements: [
+                new iam.PolicyStatement({
+                    actions: ['ecs:ListTasks'],
+                    effect: iam.Effect.ALLOW,
+                    resources: ['*']
+                }),
+                new iam.PolicyStatement({
+                    actions: ['ecs:RunTask'],
+                    effect: iam.Effect.ALLOW,
+                    resources: [taskDefArnNoVersion]
+                })
+            ]
+        });
+
+        const cfnEcsTaskPolicy = ecsTaskPolicy.node.defaultChild as iam.CfnPolicy
+        addCfnNagSuppressRules(cfnEcsTaskPolicy, [
+            {
+                id: 'W12',
+                reason: 'List Task Action requires any resources'
+            },
+        ])
+
+        onEventHandler.role?.attachInlinePolicy(ecsTaskPolicy)
 
         this.taskDefinition.taskRole.grantPassRole(onEventHandler.grantPrincipal)
         this.taskDefinition.executionRole?.grantPassRole(onEventHandler.grantPrincipal)
