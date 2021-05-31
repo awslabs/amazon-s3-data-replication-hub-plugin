@@ -395,8 +395,8 @@ export class DataTransferS3Stack extends Stack {
           "secretsmanager:DescribeSecret",
         ],
         resources: [
-          srcCred.secretArn,
-          destCred.secretArn,
+          `${srcCred.secretArn}-??????`,
+          `${destCred.secretArn}-??????`,
         ],
       })
 
