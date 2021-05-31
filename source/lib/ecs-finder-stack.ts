@@ -3,13 +3,14 @@ import * as events from '@aws-cdk/aws-events';
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as ecs from '@aws-cdk/aws-ecs';
 import * as ec2 from '@aws-cdk/aws-ec2';
-import * as ecr from '@aws-cdk/aws-ecr';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cr from "@aws-cdk/custom-resources";
-import { RetentionDays } from '@aws-cdk/aws-logs';
+import { CfnLogGroup, RetentionDays, LogGroup } from '@aws-cdk/aws-logs';
 
 import * as path from 'path';
+
+import { addCfnNagSuppressRules } from "./main-stack";
 
 export interface Env {
     [key: string]: any;
@@ -34,35 +35,34 @@ export class EcsStack extends Construct {
     constructor(scope: Construct, id: string, props: EcsTaskProps) {
         super(scope, id);
 
-        const repoTable = new CfnMapping(this, 'ECRRepoTable', {
-            mapping: {
-                'aws': {
-                    repoArn: 'arn:aws:ecr:us-west-2:627627941158:repository/data-transfer-hub-cli',
-                },
-                'aws-cn': {
-                    repoArn: 'arn:aws-cn:ecr:cn-northwest-1:382903357634:repository/data-transfer-hub-cli',
-                },
-            }
+        const image = `public.ecr.aws/aws-gcr-solutions/data-transfer-hub-cli:${props.cliRelease}`
+
+        const ecsLG = new LogGroup(this, 'FinderLogGroup', {
+            retention: RetentionDays.TWO_WEEKS,
+            // removalPolicy: RemovalPolicy.DESTROY
         });
 
-        const ecrRepositoryArn = repoTable.findInMap(Aws.PARTITION, 'repoArn')
+        const cfnEcsLG = ecsLG.node.defaultChild as CfnLogGroup
+        addCfnNagSuppressRules(cfnEcsLG, [
+            {
+                id: 'W84',
+                reason: 'log group is encrypted with the default master key'
+            }
+        ])
 
-        // const repo = ecr.Repository.fromRepositoryArn(this, 'JobFinderRepo', ecrRepositoryArn)
-        const repo = ecr.Repository.fromRepositoryAttributes(this, 'JobFinderRepo', {
-            repositoryArn: ecrRepositoryArn,
-            repositoryName: 'data-transfer-hub-cli'
-        })
         this.taskDefinition = new ecs.FargateTaskDefinition(this, 'JobFinderTaskDef', {
             cpu: props.cpu ? props.cpu : 1024 * 4,
             memoryLimitMiB: props.memory ? props.memory : 1024 * 8,
             family: `${Aws.STACK_NAME}-DTHFinderTask`,
         });
 
-
         this.taskDefinition.addContainer('DefaultContainer', {
-            image: ecs.ContainerImage.fromEcrRepository(repo, props.cliRelease),
+            image: ecs.ContainerImage.fromRegistry(image),
             environment: props.env,
-            logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'ecsJobSender', logRetention: RetentionDays.TWO_WEEKS })
+            logging: ecs.LogDrivers.awsLogs({
+                streamPrefix: 'ecsJobSender',
+                logGroup: ecsLG,
+            })
         });
 
         // Get existing ecs cluster.
@@ -84,6 +84,18 @@ export class EcsStack extends Construct {
             description: `Security Group for running ${Aws.STACK_NAME}-DTHFinderTask`,
             allowAllOutbound: true
         });
+
+        const cfnSG = this.securityGroup.node.defaultChild as ec2.CfnSecurityGroup
+        addCfnNagSuppressRules(cfnSG, [
+            {
+                id: 'W5',
+                reason: 'Open egress rule is required to access public network'
+            },
+            {
+                id: 'W40',
+                reason: 'Open egress rule is required to access public network'
+            },
+        ])
 
         // 8. CloudWatch Rule. 
         // Schedule CRON event to trigger JobSender per hour
@@ -110,6 +122,20 @@ export class EcsStack extends Construct {
             timeout: Duration.minutes(15),
         });
 
+        const cfnFn = onEventHandler.node.defaultChild as lambda.CfnFunction
+        addCfnNagSuppressRules(cfnFn, [
+            {
+                id: 'W58',
+                reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
+            }, {
+                id: 'W92',
+                reason: 'No concurrencies required for this function'
+            }, {
+                id: 'W89',
+                reason: 'This function does not need to be deployed in a VPC'
+            }
+        ])
+
         onEventHandler.node.addDependency(this.taskDefinition)
 
         const taskDefArnNoVersion = Stack.of(this).formatArn({
@@ -118,17 +144,31 @@ export class EcsStack extends Construct {
             resourceName: this.taskDefinition.family
         })
 
-        onEventHandler.addToRolePolicy(new iam.PolicyStatement({
-            actions: ['ecs:RunTask'],
-            effect: iam.Effect.ALLOW,
-            resources: [taskDefArnNoVersion]
-        }))
 
-        onEventHandler.addToRolePolicy(new iam.PolicyStatement({
-            actions: ['ecs:ListTasks'],
-            effect: iam.Effect.ALLOW,
-            resources: ['*']
-        }))
+        const ecsTaskPolicy = new iam.Policy(this, 'ECSTaskPolicy', {
+            statements: [
+                new iam.PolicyStatement({
+                    actions: ['ecs:ListTasks'],
+                    effect: iam.Effect.ALLOW,
+                    resources: ['*']
+                }),
+                new iam.PolicyStatement({
+                    actions: ['ecs:RunTask'],
+                    effect: iam.Effect.ALLOW,
+                    resources: [taskDefArnNoVersion]
+                })
+            ]
+        });
+
+        const cfnEcsTaskPolicy = ecsTaskPolicy.node.defaultChild as iam.CfnPolicy
+        addCfnNagSuppressRules(cfnEcsTaskPolicy, [
+            {
+                id: 'W12',
+                reason: 'List Task Action requires any resources'
+            },
+        ])
+
+        onEventHandler.role?.attachInlinePolicy(ecsTaskPolicy)
 
         this.taskDefinition.taskRole.grantPassRole(onEventHandler.grantPrincipal)
         this.taskDefinition.executionRole?.grantPassRole(onEventHandler.grantPrincipal)

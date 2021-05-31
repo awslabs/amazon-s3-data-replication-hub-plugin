@@ -5,7 +5,8 @@ import * as cw from '@aws-cdk/aws-cloudwatch';
 import * as actions from '@aws-cdk/aws-cloudwatch-actions';
 import * as sns from '@aws-cdk/aws-sns';
 import * as sub from '@aws-cdk/aws-sns-subscriptions';
-import { Alias } from '@aws-cdk/aws-kms'
+import * as kms from '@aws-cdk/aws-kms'
+import * as iam from '@aws-cdk/aws-iam';
 
 import { addCfnNagSuppressRules } from "./main-stack";
 
@@ -78,15 +79,48 @@ export class CommonStack extends Construct {
             datapointsToAlarm: 1
         });
 
+        const snsKey = new kms.Key(this, 'SNSTopicEncryptionKey', {
+            enableKeyRotation: true,
+            enabled: true,
+            alias: 'alias/dth/sns',
+            // policy: snsKeyPolicy,
+            policy: new iam.PolicyDocument({
+                assignSids: true,
+                statements: [
+                    new iam.PolicyStatement({
+                        actions: [
+                            "kms:GenerateDataKey*",
+                            "kms:Decrypt",
+                            "kms:Encrypt",
+                        ],
+                        resources: ["*"],
+                        effect: iam.Effect.ALLOW,
+                        principals: [
+                            new iam.ServicePrincipal("sns.amazonaws.com"),
+                            new iam.ServicePrincipal("cloudwatch.amazonaws.com"),
+                        ],
+                    }),
+                ],
+            }),
 
-        const snsDefaultKey = Alias.fromAliasName(this, 'SNSDefaultkey', 'alias/aws/sns')
+        })
 
         const alarmTopic = new sns.Topic(this, 'S3TransferAlarmTopic', {
-            masterKey: snsDefaultKey,
-        });
+            masterKey: snsKey,
+            displayName: 'Data Transfer Hub Alarm Topic'
+        })
+
+        const cfnAlarmTopic = alarmTopic.node.defaultChild as sns.CfnTopic;
+        cfnAlarmTopic.overrideLogicalId('S3TransferAlarmTopic')
 
         alarmTopic.addSubscription(new sub.EmailSubscription(props.alarmEmail));
         alarmDLQ.addAlarmAction(new actions.SnsAction(alarmTopic));
+
+
+        new CfnOutput(this, 'TableName', {
+            value: this.jobTable.tableName,
+            description: 'DynamoDB Table Name'
+        })
 
         new CfnOutput(this, 'QueueName', {
             value: this.sqsQueue.queueName,
@@ -96,6 +130,11 @@ export class CommonStack extends Construct {
         new CfnOutput(this, 'DLQQueueName', {
             value: sqsQueueDLQ.queueName,
             description: 'Dead Letter Queue Name'
+        })
+
+        new CfnOutput(this, 'AlarmTopicName', {
+            value: alarmTopic.topicName,
+            description: 'Alarm Topic Name'
         })
     }
 
