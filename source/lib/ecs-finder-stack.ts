@@ -3,7 +3,6 @@ import * as events from '@aws-cdk/aws-events';
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as ecs from '@aws-cdk/aws-ecs';
 import * as ec2 from '@aws-cdk/aws-ec2';
-import * as ecr from '@aws-cdk/aws-ecr';
 import * as lambda from '@aws-cdk/aws-lambda';
 import * as iam from '@aws-cdk/aws-iam';
 import * as cr from "@aws-cdk/custom-resources";
@@ -36,33 +35,10 @@ export class EcsStack extends Construct {
     constructor(scope: Construct, id: string, props: EcsTaskProps) {
         super(scope, id);
 
-        const repoTable = new CfnMapping(this, 'ECRRepoTable', {
-            mapping: {
-                'aws': {
-                    repoArn: 'arn:aws:ecr:us-west-2:627627941158:repository/data-transfer-hub-cli',
-                },
-                'aws-cn': {
-                    repoArn: 'arn:aws-cn:ecr:cn-northwest-1:382903357634:repository/data-transfer-hub-cli',
-                },
-            }
-        });
-
-        const ecrRepositoryArn = repoTable.findInMap(Aws.PARTITION, 'repoArn')
-
-        // const repo = ecr.Repository.fromRepositoryArn(this, 'JobFinderRepo', ecrRepositoryArn)
-        const repo = ecr.Repository.fromRepositoryAttributes(this, 'JobFinderRepo', {
-            repositoryArn: ecrRepositoryArn,
-            repositoryName: 'data-transfer-hub-cli'
-        })
-        this.taskDefinition = new ecs.FargateTaskDefinition(this, 'JobFinderTaskDef', {
-            cpu: props.cpu ? props.cpu : 1024 * 4,
-            memoryLimitMiB: props.memory ? props.memory : 1024 * 8,
-            family: `${Aws.STACK_NAME}-DTHFinderTask`,
-        });
+        const image = `public.ecr.aws/aws-gcr-solutions/data-transfer-hub-cli:${props.cliRelease}`
 
         const ecsLG = new LogGroup(this, 'FinderLogGroup', {
             retention: RetentionDays.TWO_WEEKS,
-            // logGroupName: logGroupName,
             // removalPolicy: RemovalPolicy.DESTROY
         });
 
@@ -74,8 +50,14 @@ export class EcsStack extends Construct {
             }
         ])
 
+        this.taskDefinition = new ecs.FargateTaskDefinition(this, 'JobFinderTaskDef', {
+            cpu: props.cpu ? props.cpu : 1024 * 4,
+            memoryLimitMiB: props.memory ? props.memory : 1024 * 8,
+            family: `${Aws.STACK_NAME}-DTHFinderTask`,
+        });
+
         this.taskDefinition.addContainer('DefaultContainer', {
-            image: ecs.ContainerImage.fromEcrRepository(repo, props.cliRelease),
+            image: ecs.ContainerImage.fromRegistry(image),
             environment: props.env,
             logging: ecs.LogDrivers.awsLogs({
                 streamPrefix: 'ecsJobSender',

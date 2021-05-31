@@ -54,6 +54,12 @@ fs.readdirSync(global_s3_assets).forEach(file => {
             {
               id: 'W58',
               reason: 'False alarm: The Lambda function does have the permission to write CloudWatch Logs.'
+            }, {
+              id: 'W92',
+              reason: 'No concurrencies required for this function'
+            }, {
+              id: 'W89',
+              reason: 'This function does not need to be deployed in a VPC'
             }
           ]
         }
@@ -85,21 +91,6 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     }
   });
 
-  // const sg = Object.keys(resources).filter(function (key) {
-  //   return resources[key].Type === "AWS::EC2::SecurityGroup";
-  // });
-  // sg.forEach(function (f) {
-  //   const fn = template.Resources[f];
-  //   fn.Metadata = {
-  //     'cfn_nag': {
-  //       'rules_to_suppress': [
-  //         { 'id': 'W5' },
-  //         { 'id': 'W40' }
-  //       ]
-  //     }
-  //   };
-  // });
-
   // Clean-up nested template stack dependencies
   const nestedStacks = Object.keys(resources).filter(function (key) {
     return resources[key].Type === 'AWS::CloudFormation::Stack'
@@ -129,21 +120,6 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     });
   });
 
-  // const policy = Object.keys(resources).filter(function (key) {
-  //   return resources[key].Type === "AWS::IAM::Policy";
-  // });
-  // policy.forEach(function (f) {
-  //   const fn = template.Resources[f];
-  //   let metadata = Object.assign(fn.Metadata);
-  //   fn.Metadata = {
-  //     ...metadata,
-  //     'cfn_nag': {
-  //       'rules_to_suppress': [
-  //         { 'id': 'W12' }
-  //       ]
-  //     }
-  //   };
-  // });
 
   // Clean-up parameters section
   const parameters = (template.Parameters) ? template.Parameters : {};

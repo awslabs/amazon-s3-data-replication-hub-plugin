@@ -66,6 +66,41 @@ export class Ec2WorkerStack extends Construct {
             },
         ])
 
+        const workerAsgRole = new iam.Role(this, 'MyRole', {
+            assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
+        })
+
+        const cwAgentPolicy = new iam.Policy(this, 'CWAgentPolicy', {
+            statements: [
+                new iam.PolicyStatement({
+                    effect: iam.Effect.ALLOW,
+                    resources: [
+                        '*'
+                    ],
+                    actions: [
+                        'cloudwatch:PutMetricData',
+                        'ec2:DescribeVolumes',
+                        'ec2:DescribeTags',
+                        'logs:CreateLogGroup',
+                        'logs:CreateLogStream',
+                        'logs:PutLogEvents',
+                        'logs:DescribeLogStreams',
+                        'logs:DescribeLogGroups',
+                    ],
+                })
+            ]
+        });
+
+        const cfnCwAgentPolicy = cwAgentPolicy.node.defaultChild as iam.CfnPolicy
+        addCfnNagSuppressRules(cfnCwAgentPolicy, [
+            {
+                id: 'W12',
+                reason: 'Publish log streams requires any resources'
+            },
+        ])
+
+        workerAsgRole.attachInlinePolicy(cwAgentPolicy)
+
 
         this.workerAsg = new asg.AutoScalingGroup(this, 'S3RepWorkerASG', {
             autoScalingGroupName: `${Aws.STACK_NAME}-Worker-ASG`,
@@ -83,6 +118,7 @@ export class Ec2WorkerStack extends Construct {
             // groupMetrics: [asg.GroupMetrics.all()]
             groupMetrics: [new asg.GroupMetrics(asg.GroupMetric.DESIRED_CAPACITY, asg.GroupMetric.IN_SERVICE_INSTANCES)],
             cooldown: Duration.minutes(2),
+            role: workerAsgRole,
         });
 
         Tags.of(this.workerAsg).add('Name', `${Aws.STACK_NAME}-Replication-Worker`, {})
@@ -173,36 +209,7 @@ export class Ec2WorkerStack extends Construct {
             './start-worker.sh',
         )
 
-        const cwAgentPolicy = new iam.Policy(this, 'CWAgentPolicy', {
-            statements: [
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    resources: [
-                        '*'
-                    ],
-                    actions: [
-                        'cloudwatch:PutMetricData',
-                        'ec2:DescribeVolumes',
-                        'ec2:DescribeTags',
-                        'logs:CreateLogGroup',
-                        'logs:CreateLogStream',
-                        'logs:PutLogEvents',
-                        'logs:DescribeLogStreams',
-                        'logs:DescribeLogGroups',
-                    ],
-                })
-            ]
-        });
 
-        const cfnCwAgentPolicy = cwAgentPolicy.node.defaultChild as iam.CfnPolicy
-        addCfnNagSuppressRules(cfnCwAgentPolicy, [
-            {
-                id: 'W12',
-                reason: 'Publish log streams requires any resources'
-            },
-        ])
-
-        this.workerAsg.role.attachInlinePolicy(cwAgentPolicy)
 
         ec2LG.addMetricFilter('CompletedBytes', {
             metricName: 'CompletedBytes',

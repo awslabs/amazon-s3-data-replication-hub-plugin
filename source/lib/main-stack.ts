@@ -2,6 +2,7 @@ import { CfnParameter, CfnResource, Stack, StackProps, Construct, CfnCondition, 
 import * as sm from '@aws-cdk/aws-secretsmanager';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as ec2 from '@aws-cdk/aws-ec2';
+import * as iam from '@aws-cdk/aws-iam';
 
 import { CommonStack, CommonProps } from "./common-resources";
 import { EcsStack, EcsTaskProps } from "./ecs-finder-stack";
@@ -58,7 +59,7 @@ export class DataTransferS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
-    const cliRelease = '1.0.2'
+    const cliRelease = '1.0.0'
 
     const srcType = new CfnParameter(this, 'srcType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
@@ -340,6 +341,67 @@ export class DataTransferS3Stack extends Stack {
 
     const commonStack = new CommonStack(this, 'Common', commonProps)
 
+    const defaultPolicy = new iam.Policy(this, 'DefaultPolicy');
+
+    defaultPolicy.addStatements(
+      new iam.PolicyStatement({
+        actions: [
+          "s3:GetObject*",
+          "s3:GetBucket*",
+          "s3:List*",
+        ],
+        resources: [srcIBucket.bucketArn],
+      }),
+      new iam.PolicyStatement({
+        actions: [
+          "s3:GetObject*",
+          "s3:GetBucket*",
+          "s3:List*",
+          "s3:DeleteObject*",
+          "s3:PutObject*",
+          "s3:Abort*",
+        ],
+        resources: [destIBucket.bucketArn],
+      }),
+      new iam.PolicyStatement({
+        actions: [
+          "dynamodb:BatchGetItem",
+          "dynamodb:GetRecords",
+          "dynamodb:GetShardIterator",
+          "dynamodb:Query",
+          "dynamodb:GetItem",
+          "dynamodb:Scan",
+          "dynamodb:ConditionCheckItem",
+          "dynamodb:BatchWriteItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+        ],
+        resources: [commonStack.jobTable.tableArn],
+      }),
+      new iam.PolicyStatement({
+        actions: [
+          "sqs:ReceiveMessage",
+          "sqs:ChangeMessageVisibility",
+          "sqs:GetQueueUrl",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ],
+        resources: [commonStack.sqsQueue.queueArn],
+      }),
+      new iam.PolicyStatement({
+        actions: [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+        ],
+        resources: [
+          srcCred.secretArn,
+          destCred.secretArn,
+        ],
+      })
+
+    )
+
     // Start Finder - ECS Stack
     const finderEnv = {
       AWS_DEFAULT_REGION: Aws.REGION,
@@ -373,14 +435,7 @@ export class DataTransferS3Stack extends Stack {
     }
     const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
 
-    srcCred.grantRead(ecsStack.taskDefinition.taskRole)
-    destCred.grantRead(ecsStack.taskDefinition.taskRole)
-    // For finder, read of source and destination
-    srcIBucket.grantRead(ecsStack.taskDefinition.taskRole);
-    destIBucket.grantRead(ecsStack.taskDefinition.taskRole);
-
-    commonStack.jobTable.grantReadData(ecsStack.taskDefinition.taskRole);
-    commonStack.sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
+    ecsStack.taskDefinition.taskRole.attachInlinePolicy(defaultPolicy)
 
     const workerEnv = {
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
@@ -424,14 +479,7 @@ export class DataTransferS3Stack extends Stack {
 
       const ec2Stack = new Ec2WorkerStack(this, 'EC2WorkerStack', ec2Props)
 
-      srcCred.grantRead(ec2Stack.workerAsg.role)
-      destCred.grantRead(ec2Stack.workerAsg.role)
-
-      // For worker, read of source and read+write of destination
-      srcIBucket.grantRead(ec2Stack.workerAsg.role);
-      destIBucket.grantReadWrite(ec2Stack.workerAsg.role);
-      commonStack.jobTable.grantReadWriteData(ec2Stack.workerAsg.role);
-      commonStack.sqsQueue.grantConsumeMessages(ec2Stack.workerAsg.role);
+      ec2Stack.workerAsg.role.attachInlinePolicy(defaultPolicy)
 
       asgName = ec2Stack.workerAsg.autoScalingGroupName
     }
