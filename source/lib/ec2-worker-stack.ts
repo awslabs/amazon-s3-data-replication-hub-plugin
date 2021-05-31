@@ -66,7 +66,7 @@ export class Ec2WorkerStack extends Construct {
             },
         ])
 
-        const workerAsgRole = new iam.Role(this, 'MyRole', {
+        const workerAsgRole = new iam.Role(this, 'WorkerAsgRole', {
             assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com')
         })
 

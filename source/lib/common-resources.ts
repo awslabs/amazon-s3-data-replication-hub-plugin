@@ -1,4 +1,4 @@
-import { Construct, Duration, RemovalPolicy, CfnOutput } from '@aws-cdk/core';
+import { Construct, Duration, RemovalPolicy, CfnOutput, Aws } from '@aws-cdk/core';
 import * as ddb from '@aws-cdk/aws-dynamodb';
 import * as sqs from '@aws-cdk/aws-sqs';
 import * as cw from '@aws-cdk/aws-cloudwatch';
@@ -107,7 +107,7 @@ export class CommonStack extends Construct {
 
         const alarmTopic = new sns.Topic(this, 'S3TransferAlarmTopic', {
             masterKey: snsKey,
-            displayName: 'Data Transfer Hub Alarm Topic'
+            displayName: `Data Transfer Hub (S3 Plugin) Alarm (${Aws.STACK_NAME})`
         })
 
         const cfnAlarmTopic = alarmTopic.node.defaultChild as sns.CfnTopic;
