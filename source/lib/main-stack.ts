@@ -346,17 +346,6 @@ export class DataTransferS3Stack extends Stack {
     defaultPolicy.addStatements(
       new iam.PolicyStatement({
         actions: [
-          "s3:GetObject*",
-          "s3:GetBucket*",
-          "s3:List*",
-        ],
-        resources: [
-          srcIBucket.bucketArn,
-          destIBucket.bucketArn,
-        ],
-      }),
-      new iam.PolicyStatement({
-        actions: [
           "dynamodb:BatchGetItem",
           "dynamodb:GetRecords",
           "dynamodb:GetShardIterator",
@@ -419,6 +408,8 @@ export class DataTransferS3Stack extends Stack {
 
     ecsStack.taskDefinition.taskRole.attachInlinePolicy(defaultPolicy)
     commonStack.sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
+    srcIBucket.grantRead(ecsStack.taskDefinition.taskRole)
+    destIBucket.grantRead(ecsStack.taskDefinition.taskRole)
 
     const workerEnv = {
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
@@ -464,7 +455,8 @@ export class DataTransferS3Stack extends Stack {
 
       ec2Stack.workerAsg.role.attachInlinePolicy(defaultPolicy)
       commonStack.sqsQueue.grantConsumeMessages(ec2Stack.workerAsg.role);
-      destIBucket.grantWrite(ec2Stack.workerAsg.role)
+      srcIBucket.grantRead(ec2Stack.workerAsg.role)
+      destIBucket.grantReadWrite(ec2Stack.workerAsg.role)
 
       asgName = ec2Stack.workerAsg.autoScalingGroupName
     }
