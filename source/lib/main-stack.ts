@@ -350,18 +350,10 @@ export class DataTransferS3Stack extends Stack {
           "s3:GetBucket*",
           "s3:List*",
         ],
-        resources: [srcIBucket.bucketArn],
-      }),
-      new iam.PolicyStatement({
-        actions: [
-          "s3:GetObject*",
-          "s3:GetBucket*",
-          "s3:List*",
-          "s3:DeleteObject*",
-          "s3:PutObject*",
-          "s3:Abort*",
+        resources: [
+          srcIBucket.bucketArn,
+          destIBucket.bucketArn,
         ],
-        resources: [destIBucket.bucketArn],
       }),
       new iam.PolicyStatement({
         actions: [
@@ -378,16 +370,6 @@ export class DataTransferS3Stack extends Stack {
           "dynamodb:DeleteItem",
         ],
         resources: [commonStack.jobTable.tableArn],
-      }),
-      new iam.PolicyStatement({
-        actions: [
-          "sqs:ReceiveMessage",
-          "sqs:ChangeMessageVisibility",
-          "sqs:GetQueueUrl",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-        ],
-        resources: [commonStack.sqsQueue.queueArn],
       }),
       new iam.PolicyStatement({
         actions: [
@@ -436,6 +418,7 @@ export class DataTransferS3Stack extends Stack {
     const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
 
     ecsStack.taskDefinition.taskRole.attachInlinePolicy(defaultPolicy)
+    commonStack.sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
 
     const workerEnv = {
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
@@ -480,6 +463,8 @@ export class DataTransferS3Stack extends Stack {
       const ec2Stack = new Ec2WorkerStack(this, 'EC2WorkerStack', ec2Props)
 
       ec2Stack.workerAsg.role.attachInlinePolicy(defaultPolicy)
+      commonStack.sqsQueue.grantConsumeMessages(ec2Stack.workerAsg.role);
+      destIBucket.grantWrite(ec2Stack.workerAsg.role)
 
       asgName = ec2Stack.workerAsg.autoScalingGroupName
     }
