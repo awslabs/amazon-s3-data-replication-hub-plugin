@@ -82,7 +82,7 @@ export class CommonStack extends Construct {
         const snsKey = new kms.Key(this, 'SNSTopicEncryptionKey', {
             enableKeyRotation: true,
             enabled: true,
-            alias: 'alias/dth/sns',
+            alias: `alias/dth/sns/${Aws.STACK_NAME}`,
             // policy: snsKeyPolicy,
             policy: new iam.PolicyDocument({
                 assignSids: true,
@@ -107,7 +107,7 @@ export class CommonStack extends Construct {
 
         const alarmTopic = new sns.Topic(this, 'S3TransferAlarmTopic', {
             masterKey: snsKey,
-            displayName: `Data Transfer Hub (S3 Plugin) Alarm (${Aws.STACK_NAME})`
+            displayName: `Data Transfer Hub Alarm (${Aws.STACK_NAME})`
         })
 
         const cfnAlarmTopic = alarmTopic.node.defaultChild as sns.CfnTopic;
