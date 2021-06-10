@@ -142,7 +142,7 @@ npm install && npm run build
 Then you can run `cdk deploy` command to deploy the plugin. Please specify the parameter values accordingly, for example:
 
 ```
-cdk deploy \ 
+cdk deploy \
 --parameters srcType=Amazon_S3 \
 --parameters srcBucket=src-bucket \
 --parameters srcRegion=us-west-2 \
@@ -159,7 +159,35 @@ cdk deploy \
 ```
 
 > Note: You can simply run `cdk destroy` if the replication task is no longer required. This command will remove the stack created by this plugin from your AWS account.
-
+### Parameters Table
+|  Parameters   | Description | Example |
+|  ----  | ----  | ----  |
+| srcType | Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS.  `default: 'Amazon_S3', allowedValues:['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS', 'Google_GCS']`| Amazon_S3 |
+| srcBucket | Source Bucket Name | dth-recive-cn-north-1 |
+| srcPrefix | Source Prefix `default: ''`| case1 |
+| srcRegion | Source Region Name `default: ''`| cn-north-1 |
+| srcEndpoint | Source Endpoint URL, leave blank unless you want to provide a custom Endpoint URL `default: ''`|
+| srcInCurrentAccount | Source Bucket in current account? If not, you should provide a credential with read access. `default: 'false, allowedValues: ['true', 'false']`| false |
+| srcCredentials | The parameter's name in Parameter Stroe used to keep AK/SK credentials for Source Bucket. Leave blank if source bucket is in current account or source is open data `default: ''`| drh-cn-secret-key |
+| srcEvent | Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account `default: 'No', allowedValues: ['No', 'Create', 'CreateAndDelete']`| No |
+| includeMetadata | Add replication of object metadata, there will be additional API calls `default: 'true', allowedValues: ['true', 'false']`| false |
+| destBucket | Destination Bucket Name| dth-us-west-2
+| destPrefix |Destination Prefix `default: ''`|  |
+| destRegion |Destination Region Name `default: ''`| us-west-2 |
+| destInCurrentAccount | Destination Bucket in current account? If not, you should provide a credential with read and write access. `default: 'true', allowedValues: ['true', 'false']` | true |
+| destCredentials | The parameter's name in Parameter Stroe used to keep AK/SK credentials for Destination Bucket. Leave blank if desination bucket is in current account. `default: ''`|  |
+| destStorageClass | Destination Storage Class, Default to STANDAD. `default: 'STANDARD', allowedValues: ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING'] `| STANDARD|
+| destAcl | Destination Access Control List. `default: 'bucket-owner-full-control', allowedValues: ['private','public-read','public-read-write','authenticated-read','aws-exec-read','bucket-owner-read','bucket-owner-full-control']` | bucket-owner-full-control
+| ecsClusterName | ECS Cluster Name to run ECS task `default: ''`| DataTransferHub-TaskCluster-RdOzxd4f8j3A |
+| ecsVpcId | VPC ID to run ECS task `default: ''`| vpc-0494480496b8c7782 |
+| ecsSubnets | Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma `default: ''`| subnet-07ed6f4fff4017bd6,subnet-07da258a315d33945 |
+| maxCapacity | Maximum Capacity for Auto Scaling Group `default: '20'`| 20|
+| minCapacity | Minimum Capacity for Auto Scaling Group `default: '1'`| 1 |
+| desiredCapacity | Desired Capacity for Auto Scaling Group `default: '1'`| 5
+| workerNumber | The number of worker threads to run in one worker node/instance `default: '4'`| 4 |
+| finderDepth |The depth of sub folders to compare in parallel. 0 means comparing all objects in sequence `default: '0'`| 0 |
+| finderNumber |The number of finder threads to run in parallel `default: '1'`| 1 |
+| alarmEmail | | xxxx@example.com |
 
 ## FAQ
 
