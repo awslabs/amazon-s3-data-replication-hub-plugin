@@ -166,7 +166,7 @@ export class DashboardStack extends Construct {
 
         // Main Dashboard
         this.dashboard = new cw.Dashboard(this, 'S3Migration', {
-            dashboardName: `${Aws.STACK_NAME}-Dashboard`
+            dashboardName: `${Aws.STACK_NAME}-Dashboard-${Aws.REGION}`
         });
 
         this.dashboard.addWidgets(
