@@ -6,6 +6,8 @@ import * as asg from '@aws-cdk/aws-autoscaling';
 import * as sqs from '@aws-cdk/aws-sqs';
 import * as cw from '@aws-cdk/aws-cloudwatch';
 
+import * as path from 'path';
+
 import { CfnLogGroup, RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
 
 
@@ -115,10 +117,12 @@ export class Ec2WorkerStack extends Construct {
             securityGroup: ec2SG,
             // keyName: 'ad-key',  // dev only
             instanceMonitoring: asg.Monitoring.DETAILED,
+            associatePublicIpAddress: true,
             // groupMetrics: [asg.GroupMetrics.all()]
             groupMetrics: [new asg.GroupMetrics(asg.GroupMetric.DESIRED_CAPACITY, asg.GroupMetric.IN_SERVICE_INSTANCES)],
             cooldown: Duration.minutes(2),
             role: workerAsgRole,
+            signals: asg.Signals.waitForMinCapacity(),
         });
 
         Tags.of(this.workerAsg).add('Name', `${Aws.STACK_NAME}-Replication-Worker`, {})
@@ -151,12 +155,11 @@ export class Ec2WorkerStack extends Construct {
 
         const cliAssetDomain = assetTable.findInMap(Aws.PARTITION, 'assetDomain')
 
+        this.workerAsg.applyCloudFormationInit(ec2.CloudFormationInit.fromElements(ec2.InitFile.fromFileInline('/home/ec2-user/cw_agent_config.json', path.join(__dirname, '../config/cw_agent_config.json'))))
+
         this.workerAsg.userData.addCommands(
             'yum update -y',
             'cd /home/ec2-user/',
-            // `aws s3 cp ${assetUrl} src.zip`,
-            // 'unzip src.zip && rm src.zip',
-            'curl -LO "https://raw.githubusercontent.com/awslabs/amazon-s3-data-replication-hub-plugin/r2/source/config/cw_agent_config.json"',
 
             // Enable BBR
             'echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf',
@@ -203,7 +206,10 @@ export class Ec2WorkerStack extends Construct {
 
             // Create the script
             'echo "source /home/ec2-user/env.sh" >> start-worker.sh',
-            'echo "nohup ./dthcli run -t Worker >> /home/ec2-user/worker.log 2>&1 &" >> start-worker.sh',
+            'echo "nohup ./dthcli run -t Worker |& tee -a /home/ec2-user/worker.log" >> start-worker.sh',
+            'echo "echo \'Error occured, trying to terminate instance...\' >> /home/ec2-user/worker.log" >> start-worker.sh',
+            'shutdown', // shutdown will terminate the instance as asg will automatically replace the stopped one
+
             'chmod +x start-worker.sh',
             // Run the script
             './start-worker.sh',
