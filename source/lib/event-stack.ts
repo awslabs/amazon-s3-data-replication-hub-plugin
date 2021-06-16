@@ -20,7 +20,18 @@ export class EventStack extends NestedStack {
     constructor(scope: Construct, id: string, props: EventProps) {
         super(scope, id);
 
-
+        // Enable S3 Notification
+        props.queue.addToResourcePolicy(new iam.PolicyStatement({
+            actions: ['SQS:SendMessage'],
+            effect: iam.Effect.ALLOW,
+            resources: [props.queue.queueArn],
+            principals: [new iam.ServicePrincipal('s3.amazonaws.com')],
+            conditions: {
+                StringEquals: {
+                    "aws:SourceArn": props.bucket.bucketArn,
+                }
+            }
+        }))
 
         // const eventTable = new CfnMapping(this, 'EventTable', {
         //     mapping: {
