@@ -69,6 +69,12 @@ export class CommonStack extends Construct {
 
         const cfnSqsQueue = this.sqsQueue.node.defaultChild as sqs.CfnQueue;
         cfnSqsQueue.overrideLogicalId('S3TransferQueue')
+        addCfnNagSuppressRules(cfnSqsQueue, [
+            {
+                id: 'W48',
+                reason: 'No need to use encryption'
+            }
+        ]);
 
         // Setup Alarm for queue - DLQ
         const alarmDLQ = new cw.Alarm(this, 'S3TransferDLQAlarm', {
