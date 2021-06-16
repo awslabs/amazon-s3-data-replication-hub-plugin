@@ -7,11 +7,13 @@ import * as sns from '@aws-cdk/aws-sns';
 import * as sub from '@aws-cdk/aws-sns-subscriptions';
 import * as kms from '@aws-cdk/aws-kms'
 import * as iam from '@aws-cdk/aws-iam';
+import * as s3 from '@aws-cdk/aws-s3';
 
 import { addCfnNagSuppressRules } from "./main-stack";
 
 export interface CommonProps {
     readonly alarmEmail: string,
+    readonly bucket: s3.IBucket,
 }
 
 export class CommonStack extends Construct {
@@ -69,6 +71,19 @@ export class CommonStack extends Construct {
 
         const cfnSqsQueue = this.sqsQueue.node.defaultChild as sqs.CfnQueue;
         cfnSqsQueue.overrideLogicalId('S3TransferQueue')
+
+        // Enable S3 Notification
+        this.sqsQueue.addToResourcePolicy(new iam.PolicyStatement({
+            actions: ['SQS:SendMessage'],
+            effect: iam.Effect.ALLOW,
+            resources: [this.sqsQueue.queueArn],
+            principals: [new iam.ServicePrincipal('s3.amazonaws.com')],
+            conditions: {
+                StringEquals: {
+                    "aws:SourceArn": props.bucket.bucketArn,
+                }
+            }
+        }))
 
         // Setup Alarm for queue - DLQ
         const alarmDLQ = new cw.Alarm(this, 'S3TransferDLQAlarm', {

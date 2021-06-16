@@ -76,7 +76,7 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Source Bucket', srcBucket.logicalId)
 
     const srcPrefix = new CfnParameter(this, 'srcPrefix', {
-      description: 'Source Prefix',
+      description: 'Source Prefix (Optional)',
       default: '',
       type: 'String'
     })
@@ -90,7 +90,7 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Source Region', srcRegion.logicalId)
 
     const srcEndpoint = new CfnParameter(this, 'srcEndpoint', {
-      description: 'Source Endpoint URL, leave blank unless you want to provide a custom Endpoint URL',
+      description: 'Source Endpoint URL (Optional), leave blank unless you want to provide a custom Endpoint URL',
       default: '',
       type: 'String'
     })
@@ -120,7 +120,7 @@ export class DataTransferS3Stack extends Stack {
 
 
     const destPrefix = new CfnParameter(this, 'destPrefix', {
-      description: 'Destination Prefix',
+      description: 'Destination Prefix (Optional)',
       default: '',
       type: 'String'
     })
@@ -174,7 +174,7 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Destination Access Control List', destAcl.logicalId)
 
     const ecsClusterName = new CfnParameter(this, 'ecsClusterName', {
-      description: 'ECS Cluster Name to run ECS task',
+      description: 'ECS Cluster Name to run ECS task (Please make sure the cluster exists)',
       default: '',
       type: 'String'
     })
@@ -185,12 +185,14 @@ export class DataTransferS3Stack extends Stack {
       default: '',
       type: 'AWS::EC2::VPC::Id'
     })
+    this.addToParamLabels('VPC ID', ecsVpcId.logicalId)
 
     const ecsSubnets = new CfnParameter(this, 'ecsSubnets', {
       description: 'Subnet IDs to run ECS task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32',
       default: '',
       type: 'List<AWS::EC2::Subnet::Id>'
     })
+    this.addToParamLabels('Subnet IDs', ecsSubnets.logicalId)
 
     const alarmEmail = new CfnParameter(this, 'alarmEmail', {
       allowedPattern: '\\w[-\\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\\.)+[A-Za-z]{2,14}',
@@ -337,6 +339,7 @@ export class DataTransferS3Stack extends Stack {
     // Start Common Stack
     const commonProps: CommonProps = {
       alarmEmail: alarmEmail.valueAsString,
+      bucket: srcIBucket,
     }
 
     const commonStack = new CommonStack(this, 'Common', commonProps)
