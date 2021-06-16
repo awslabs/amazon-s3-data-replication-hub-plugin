@@ -317,9 +317,7 @@ export class DataTransferS3Stack extends Stack {
 
     // Get Secret for credentials from Secrets Manager
     const srcCred = sm.Secret.fromSecretNameV2(this, 'SrcCredentialsParam', srcCredentials.valueAsString);
-
     const destCred = sm.Secret.fromSecretNameV2(this, 'DestCredentialsParam', destCredentials.valueAsString);
-
 
     // const isSrc = new CfnCondition(this, 'isSrc', {
     //   expression: Fn.conditionEquals('YES', srcInCurrentAccount),
@@ -339,7 +337,6 @@ export class DataTransferS3Stack extends Stack {
     // Start Common Stack
     const commonProps: CommonProps = {
       alarmEmail: alarmEmail.valueAsString,
-      bucket: srcIBucket,
     }
 
     const commonStack = new CommonStack(this, 'Common', commonProps)
