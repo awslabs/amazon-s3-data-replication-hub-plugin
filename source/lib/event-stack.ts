@@ -20,7 +20,7 @@ export class EventStack extends NestedStack {
     constructor(scope: Construct, id: string, props: EventProps) {
         super(scope, id);
 
-        props.queue.addToResourcePolicy(new iam.PolicyStatement({
+        const sqsPolicy = new iam.PolicyStatement({
             actions: ['SQS:SendMessage'],
             effect: iam.Effect.ALLOW,
             resources: [props.queue.queueArn],
@@ -30,7 +30,9 @@ export class EventStack extends NestedStack {
                     "aws:SourceArn": props.bucket.bucketArn,
                 }
             }
-        }))
+        })
+
+        props.queue.addToResourcePolicy(sqsPolicy)
 
         // const eventTable = new CfnMapping(this, 'EventTable', {
         //     mapping: {
@@ -89,7 +91,7 @@ export class EventStack extends NestedStack {
                 physicalResourceId: cr.PhysicalResourceId.of(Date.now().toString())
             },
         });
-        s3Notification.node.addDependency(props.queue)
+        s3Notification.node.addDependency(props.queue, sqsPolicy)
     }
 
 
