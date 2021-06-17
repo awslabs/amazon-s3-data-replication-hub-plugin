@@ -208,7 +208,7 @@ export class Ec2WorkerStack extends Construct {
             'echo "source /home/ec2-user/env.sh" >> start-worker.sh',
             'echo "nohup ./dthcli run -t Worker |& tee -a /home/ec2-user/worker.log" >> start-worker.sh',
             'echo "echo \'Error occured, trying to terminate instance...\' >> /home/ec2-user/worker.log" >> start-worker.sh',
-            'shutdown', // shutdown will terminate the instance as asg will automatically replace the stopped one
+            'echo "shutdown" >> start-worker.sh', // shutdown will terminate the instance as asg will automatically replace the stopped one
 
             'chmod +x start-worker.sh',
             // Run the script
