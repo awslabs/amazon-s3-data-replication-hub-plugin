@@ -5,3 +5,5 @@ package-lock.json
 README_CN.md
 CUSTOM_BUILD.md
 ecs-finder-stack.ts
+docs/DEPLOYMENT_CN.md
+docs/DEPLOYMENT_EN.md
