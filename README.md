@@ -11,7 +11,7 @@
 * [FAQ](#faq)
   * [How to monitor](#how-to-monitor)
   * [How to debug](#how-to-debug)
-  * [No log streams in CloudWatch](#no-log-streams-in-cloudwatch)
+  * [No CloudWatch logs](#no-cloudwatch-logs)
   * [How to customize](#how-to-customize)
 * [Known Issues](#known-issues)
 
@@ -90,17 +90,17 @@ Please follow the steps in the [Deployment Guide](./docs/DEPLOYMENT_EN.md) to st
 
 There will be two main log groups created by this plugin.
 
-- &lt;StackName&gt;-ECSStackJobFinderTaskDefDefaultContainerLogGroup-&lt;random suffix&gt;
+- &lt;StackName&gt;-ECSStackFinderLogGroup&lt;random suffix&gt;
 
 This is the log group for scheduled ECS Task. If there is no data transferred, you should check if something is wrong in the ECS task log. This is the first step.
 
-- &lt;StackName&gt;-EC2WorkerStackS3RepWorkerLogGroup-&lt;random suffix&gt;
+- &lt;StackName&gt;-EC2WorkerStackS3RepWorkerLogGroup&lt;random suffix&gt;
 
 This is the log group for all EC2 instances, detailed transfer log can be found here.
 
 If you can't find anything helpful in the log group, please raise an issue in Github.
 
-### No log streams in CloudWatch
+### No CloudWatch logs
 
 **Q**: After I deployed, I can't find any log streams in the two CloudWatch Log Groups
 

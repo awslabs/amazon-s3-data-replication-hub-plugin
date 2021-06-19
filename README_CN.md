@@ -46,7 +46,7 @@ _本项目（Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://g
 
 在AWS Fargate中运行的*Finder* 任务列出了源存储桶和目标存储桶中的所有对象，并确定应复制哪些对象，将在SQS中为每个要复制的对象创建一条消息。 *基于时间的CloudWatch规则*将触发ECS任务每小时运行一次。
 
-此外，本插件也支持S3事件通知，以（实时）触发复制，前提是需要将此插件部署在与源存储桶相同的帐户（和区域）中。 事件消息也将发送到相同的SQS队列。
+此外，本插件也支持S3事件通知，以（实时）触发复制，前提是需要将此插件部署在与源存储桶相同的帐户（和区域）中。 事件消息也将发送到相同的SQS队列。
 
 在EC2中运行的*Worker*任务会消费SQS中的消息，并将对象从源存储桶传输到目标存储桶。你可以根据业务需要, 在Auto Scaling Group里调整使用多少台EC2实例进行数据传输。
 
@@ -87,11 +87,11 @@ _本项目（Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://g
 
 此插件将创建两个主要的CloudWatch日志组。
 
-- &lt;堆栈名&gt;-ECSStackJobFinderTaskDefDefaultContainerLogGroup-&lt;随机后缀&gt;
+- &lt;堆栈名&gt;-ECSStackFinderLogGroup&lt;随机后缀&gt;
 
 这是定时ECS任务的日志组。如果未传输任何数据，则应首先检查ECS任务运行日志中是否出了问题。 这是第一步。
 
-- &lt;堆栈名&gt;-EC2WorkerStackS3RepWorkerLogGroup-&lt;随机后缀&gt;
+- &lt;堆栈名&gt;-EC2WorkerStackS3RepWorkerLogGroup&lt;随机后缀&gt;
 
 这是所有EC2实例的日志组，可以在此处找到详细的传输日志。
 
@@ -109,7 +109,6 @@ _本项目（Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://g
 **问题**：我想要更改此方案，需要做什么?
 
 **回答**：如果要更改解决方案，可以参考[定制](./docs/CUSTOM_BUILD.md) 指南.
-
 
 
 ## 已知问题
