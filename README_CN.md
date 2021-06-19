@@ -1,68 +1,60 @@
 
 [English](./README.md)
 
-# AWS Data Transfer Hub - S3插件
+# Data Transfer Hub - S3插件
 
 ## 目录
 * [介绍](#介绍)
-* [新功能](#新功能)
+* [最新改动](#最新改动)
 * [架构](#架构)
 * [部署](#部署)
-  * [部署前准备](#部署前准备)
-  * [使用AWS Cloudformation方式部署](#使用AWS-Cloudformation方式部署)
-  * [用AWS CDK方式进行部署](#用AWS-CDK方式进行部署)
 * [FAQ](#faq)
   * [如何监控](#如何监控)
   * [如何调试](#如何调试)
-  * [我应该选择哪个版本](#我应该选择哪个版本)
+  * [在CloudWatch里没有日志](#在CloudWatch里没有日志)
+  * [如何客制化](#如何客制化)
 * [已知问题](#已知问题)
 
 ## 介绍
 
-[Data Transfer Hub](https://github.com/awslabs/aws-data-replication-hub)，前称是Data Replication Hub，是一个用于从不同的源复制数据到AWS的解决方案。本项目是该方案的其中一款插件（S3插件）。各插件是可以独立部署和运行的。
+[Data Transfer Hub](https://github.com/awslabs/aws-data-replication-hub)，前称是Data Replication Hub，是一个用于从不同的源传输数据到AWS的解决方案。本项目是该方案的其中一款插件（S3插件）。你可以独立部署和运行此插件而无需使用UI。
 
-_本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://github.com/huangzbaws) 的 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) 基础上开发的。_
+_本项目（Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https://github.com/huangzbaws) 的 [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) 基础上开发的。_
 
 以下是本插件提供的功能列表：
 
-- 用于Amazon S3中国北京和宁夏区和其他区域的相互复制
-- 用于从阿里云OSS复制到Amazon S3
-- 用于从腾讯云COS复制到Amazon S3
-- 用于从七牛云Kodo复制到Amazon S3
-- 用于从Google Cloud Storage复制到Amazon S3(海外)
-- 支持元数据信息的复制
-- 支持单次全量复制
-- 支持增量复制
-- 支持增量复制
-- 支持基于S3 事件触发复制
+- 在 Amazon S3 中国区和海外区之间传输对象
+- 从阿里云OSS /腾讯COS /七牛Kodo 传输对象
+- 大文件支持
+- 支持S3事件触发
+- 支持对象元数据传输
+- 支持增量数据传输
+- 支持从 S3 兼容对象存储传输数据
+- 自动重试和错误处理
 
-## 新功能
+## 最新改动
 
-在此新的V2版本（v2.x.x）中，我们将对本插件进行了一些**重大更改**，其中包括：
+从版本 v2.0.2 开始，我们已更改为使用 Secrets Manager 来维护凭证，而不是使用 System Manager 参数仓库 (Parameter Store)。
 
-- 使用Amazon EC2和Auto Scaling Group代替Lambda进行数据传输。此解决方案使用`t4g.micro`实例类型以节省成本。在撰写本文时，此实例类型在US West (Oregon)区的价格为`每小时$0.0084`。请查看[EC2定价](https://aws.amazon.com/ec2/pricing/on-demand/)以获取最新价格。
+如果您已经部署了 v2.0.2 之前的版本（您可以去 CloudFormation，查看 Stack Info，描述会有版本信息）并且您想要升级，您必须**删除** 现有堆栈，然后按照[部署指南](./docs/DEPLOYMENT_CN.md)中的步骤以重新部署新版本。
 
-- 默认情况下，Amazon EC2操作系统将启用BBR（Bottleneck Bandwidth and RTT）以提高网络性能。
-
-- 支持跨帐户部署。现在，您可以在A账号中部署此方案，从B账号的S3桶里面拷贝数据到C账号的S3桶里面。
-
-请注意，此新版本将提供额外的运行类型（EC2）以执行数据传输。这并不一定意味着新的运行类型（EC2）在所有情况下都比Lambda更好。例如，您可能对可以启动EC2实例的数量有所限制，并且可以使用lambda并发（默认为1000），可以更快地完成作业。但是建议默认使用新的EC2运行类型，尤其是在使用Lambda的网络性能非常差的情况下。如果要部署以前的版本，请查看[Release v1.x.x](https://github.com/awslabs/amazon-s3-data-replication-hub-plugin/tree/r1)。
-
+> 请注意，一旦您删除旧版本，之前此插件创建的任何资源（例如 DynamoDB 表和 SQS 队列以及 CloudWatch 仪表板）将会被删除，但已经存在于目标桶里的文件不会重新传输。
 
 ## 架构
 
 ![S3 Plugin Architect](s3-plugin-architect.png)
 
-在AWS Fargate中运行的*JobFinder* ECS任务列出了源存储桶和目标存储桶中的所有对象，并确定应复制哪些对象，将在SQS中为每个要复制的对象创建一条消息。 *基于时间的CloudWatch规则*将触发ECS任务每小时运行一次。
+在AWS Fargate中运行的*Finder* 任务列出了源存储桶和目标存储桶中的所有对象，并确定应复制哪些对象，将在SQS中为每个要复制的对象创建一条消息。 *基于时间的CloudWatch规则*将触发ECS任务每小时运行一次。
 
-此外，本插件也支持S3事件通知，以（实时）触发复制，前提是需要将此插件部署在与源存储桶相同的帐户（和区域）中。 事件消息也将发送到相同的SQS队列。
+此外，本插件也支持S3事件通知，以（实时）触发复制，前提是需要将此插件部署在与源存储桶相同的帐户（和区域）中。 事件消息也将发送到相同的SQS队列。
 
-在Lambda或EC2中运行的*JobWorker*会使用SQS中的消息，并将对象从源存储桶传输到目标存储桶。
+在EC2中运行的*Worker*任务会消费SQS中的消息，并将对象从源存储桶传输到目标存储桶。你可以根据业务需要, 在Auto Scaling Group里调整使用多少台EC2实例进行数据传输。
 
 如果某个对象或对象的一部分传输失败，则*JobWorker*将在队列中释放该消息，并且该消息在队列中可见后将再次传输该对象（默认可见性超时设置为15分钟，大文件会自动延长)。经过几次尝试，如果传输依然失败，该消息就会被移到Dead Letter Queue并且触发Alarm提醒。
 
 该插件支持传输大文件。它将大文件分成多个小的部分并利用Amazon S3的[multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) 功能进行分段传输，支持断点续传。
 
+> 注意: 此解决方案使用`t4g.micro`实例类型以节省成本。在撰写本文时，此实例类型在US West (Oregon)区的价格为`每小时$0.0084`。请查看[EC2定价](https://aws.amazon.com/ec2/pricing/on-demand/)以获取最新价格。 并且Amazon EC2操作系统将默认启用BBR（Bottleneck Bandwidth and RTT）以提高网络性能。
 
 ## 部署
 
@@ -72,92 +64,10 @@ _本项目（AWS Date Replication Hub - S3 Plugin）是基于[huangzbaws@](https
 - 部署预计用时3-5分钟
 - 一旦部署完成，复制任务就会马上开始
 
-###  部署前准备
+请参考[部署指南](./docs/DEPLOYMENT_CN.md)里的步骤进行部署。
 
-- 配置 **凭据**
+> 注意：如果不再需要数据传输任务，则可以从CloudFormation控制台中删除堆栈。
 
-您需要提供“AccessKeyID”和“SecretAccessKey”（即“AK/SK”）凭据，才能从其他分区S3或其他云存储服务中读取或写入存储桶。 凭据会以安全方式存储于参数存储区。
-
-请在**AWS Systems Manager** 的**参数存储区**创建一个参数，选择 **SecureString** 作为其类型，然后按照以下格式提供相应的**值**。
-
-```
-{
-  "access_key_id": "<Your Access Key ID>",
-  "secret_access_key": "<Your Access Key Secret>"
-}
-```
-
-> 注意：如果该AK/SK是针对源桶, 则需要具有桶的**读**权限, 如果是针对目标桶, 则需要具有桶的**读与写**权限。
-
-
-- 配置 **ECS集群** and **VPC**
-
-此插件的部署将在您的AWS账户中启动和运行ECS Fargate任务，因此，如果您还没有配置ECS集群和VPC，则需要在部署插件之前对其进行设置。
-
-> 注意：对于ECS群集，您可以选择**仅限网络**类型。 对于VPC，请确保VPC至少具有两个子网分布在两个可用区域上。
-
-
-### 使用AWS Cloudformation方式部署
-
-请按照以下步骤通过AWS Cloudformation部署此插件。
-
-1.登录到AWS管理控制台，切换到将CloudFormation Stack部署到的区域。
-
-1.单击以下按钮在该区域中启动CloudFormation堆栈。
-
-  - 部署到AWS中国北京和宁夏区之外的其他区
-
-  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
-
-  - 部署到AWS中国北京和宁夏区
-
-  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
-    
-1.单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
-
-1.单击**下一步**。 配置其他堆栈选项，例如标签（可选）。
-
-1.单击**下一步**。 查看并勾选确认，然后单击“创建堆栈”开始部署。
-
-如果要更改解决方案，可以参考[定制](CUSTOM_BUILD.md) 指南.
-
-> 注意：如果不再需要复制任务，则可以从CloudFormation控制台中删除堆栈。
-
-### 用AWS CDK方式进行部署
-
-如果要使用AWS CDK部署此插件，请确保满足以下先决条件：
-
-* [AWS Command Line Interface](https://aws.amazon.com/cli/)
-* Node.js 12.x 或以上版本
-
-在项目**source**文件夹下，运行以下命令将TypeScript编译为JavaScript。
-
-```
-cd source
-npm install -g aws-cdk
-npm install && npm run build
-```
-
-然后使用“cdk deploy”命令来部署。请相应地指定参数值，例如：
-
-```
-cdk deploy \ 
---parameters srcType=Amazon_S3 \
---parameters srcBucket=src-bucket \
---parameters srcRegion=us-west-2 \
---parameters srcInCurrentAccount=true \
---parameters srcEvent=CreateAndDelete \
---parameters destBucket=dest-bucket \
---parameters destRegion=cn-northwest-1 \
---parameters destCredentials=cn \
---parameters destInCurrentAccount=false \
---parameters ecsClusterName=testcluster \
---parameters ecsVpcId=vpc-92c418eb \
---parameters ecsSubnets=subnet-07f0e94f,subnet-a996ddf3 \
---parameters alarmEmail=xxx@example.com
-```
-
-> 注意：如果不再需要复制任务，则可以简单地运行“cdk destroy”。 此命令将从您的AWS账户中删除本插件所创建的堆栈。
 
 ## FAQ
 
@@ -177,27 +87,34 @@ cdk deploy \
 
 此插件将创建两个主要的CloudWatch日志组。
 
-- &lt;堆栈名&gt;-ECSStackJobFinderTaskDefDefaultContainerLogGroup-&lt;随机后缀&gt;
+- &lt;堆栈名&gt;-ECSStackFinderLogGroup&lt;随机后缀&gt;
 
 这是定时ECS任务的日志组。如果未传输任何数据，则应首先检查ECS任务运行日志中是否出了问题。 这是第一步。
 
-- &lt;堆栈名&gt;-EC2WorkerStackS3RepWorkerLogGroup-&lt;随机后缀&gt;
+- &lt;堆栈名&gt;-EC2WorkerStackS3RepWorkerLogGroup&lt;随机后缀&gt;
 
 这是所有EC2实例的日志组，可以在此处找到详细的传输日志。
 
 如果您在日志组中找不到任何有帮组的内容，请在Github中提出问题。
 
-### 我应该选择哪个版本
+### 在CloudWatch里没有日志
 
-**问题**：由于有两种运行类型，EC2和Lambda，如何选择？
+**问题**：我部署完该插件, 但我在在CloudWatch日志组里没有找到任何日志
 
-**回答**：一般来说，建议在大多数情况下使用EC2。但是，在可能的情况下使用任何一种方法之前，都应根据您的场景测试这两种方法。成本同样非常重要，您可以根据两种运行类型的测试结果来进行成本估算。 如果Lambda的网络性能非常差，则EC2运行类型将为您节省大量成本。
+**回答**：这一定是因为您在部署此解决方案时选择的子网没有公共网络访问权限，因此 Fargate任务无法拉取映像，而EC2实例则无法下载 CloudWatch Agent以将日志发送到 CloudWatch。 请检查您的 VPC 设置（请参阅[部署指南](./docs/DEPLOYMENT_CN.md) 步骤 1）。 修复问题后，您需要手动终止正在运行的此方案的EC2 实例（如果有的话）。之后，Auto Scaling Group将自动启动新实例。
+
+
+### 如何客制化
+
+**问题**：我想要更改此方案，需要做什么?
+
+**回答**：如果要更改解决方案，可以参考[定制](./docs/CUSTOM_BUILD.md) 指南.
 
 
 ## 已知问题
 
 在此新的V2版本（v2.x.x）中，目前尚有如下已知问题：
 
-- 尚不支持Google GCS的复制
+- 尚不支持Google GCS的复制（您可以联系我们）
 
 如果您发现有其他问题， 欢迎在Github Issue里提，我们会根据情况尽快进行Fix。
