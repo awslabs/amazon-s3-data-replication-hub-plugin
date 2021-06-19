@@ -5,65 +5,58 @@
 
 ## Table of contents
 * [Introduction](#introduction)
-* [New Features](#new-features)
+* [Breaking Change](#breaking-change)
 * [Architect](#architect)
 * [Deployment](#deployment)
-  * [Before Deployment](#before-deployment)
-  * [Deploy via AWS Cloudformation](#deploy-via-aws-cloudformation)
-  * [Deploy via AWS CDK](#deploy-via-aws-cdk)
 * [FAQ](#faq)
   * [How to monitor](#how-to-monitor)
   * [How to debug](#how-to-debug)
-  * [How to choose run type](#how-to-choose-run-type)
+  * [No log streams in CloudWatch](#no-log-streams-in-cloudwatch)
+  * [How to customize](#how-to-customize)
 * [Known Issues](#known-issues)
 
 
 ## Introduction
 
-
-[Data Transfer Hub](https://github.com/awslabs/aws-data-replication-hub), a.k.a Data Replication Hub, is a solution for replicating data from different sources into AWS. This project is for S3 replication plugin. Each of the replication plugin can run independently. 
+[Data Transfer Hub](https://github.com/awslabs/aws-data-replication-hub), a.k.a Data Replication Hub, is a solution for transferring data from different sources into AWS. This project is for S3 Transfer plugin. You can deploy and run this plugin independently without the UI. 
 
 _This Date Transfer Hub - S3 Plugin is based on [amazon-s3-resumable-upload](https://github.com/aws-samples/amazon-s3-resumable-upload) contributed by [huangzbaws@](https://github.com/huangzbaws)._
 
 The following are the features supported by this plugin.
 
-- Amazon S3 object replication between AWS Beijing and Ningxia China regions and any other regions
-- Replication from Aliyun OSS to Amazon S3
-- Replication from Tencent COS to Amazon S3
-- Replication from Qiniu Kodo to Amazon S3
-- Replication from Google Cloud Storage to Amazon S3 (All Regions other than China Regions)
-- Support replication with Metadata
-- Support One-time replication
-- Support Incremental replication
-- Support S3 Events to trigger replication
+- Transfer Amazon S3 objects between AWS China regions and Global regions
+- Transfer objects from Aliyun OSS / Tencent COS / Qiniu Kodo
+- Large file support
+- Support S3 Event trigger
+- Support Transfer with object metadata
+- Support incremental data transfer
+- Support transfer from S3 compatible storage
+- Auto retry and error handling
 
 
-## New Features
+## Breaking Change
 
-In this new V2 release (v2.x.x), we are introducing a few **breaking changes** to this solution, including:
+Start from release v2.0.2, we have changed to use Secrets Manager to maintain the Credentials rather than using System Manager Parameter Store.  
 
-- Use Amazon EC2 and Auto Scaling Group to do the data transfer instead of Lambda. `t4g.micro` instance type is used for this solution to save cost. The pricing of this instance type is `$0.0084 per Hour` in US West (Oregon) region at the point of writing. Check out [EC2 Pricing](https://aws.amazon.com/ec2/pricing/on-demand/) to get the latest price. 
+If you have deployed a version before v2.0.2 (You can go to CloudFormation, check the Stack Info, the description will have the version info) and you want to upgrade, you must **DELETE** the existing stack and then follow the steps in the [Deployment Guide](./docs/DEPLOYMENT_EN.md) to redeploy the new version.
 
-- Amazon EC2 operating systems will by default have BBR (Bottleneck Bandwidth and RTT) enabled to improve network performance.
-
-- Support cross account deployment. Now you can deploy this solution in account A, and then replicate data from bucket in account B to another bucket in Account C.
-
-Note that, this new release is to provide an extra run type (EC2) to perform the data transfer. This doesn't necessarily mean the new run type (EC2) is better than the Lambda one in all circumstances. For example, you might have limitation of the number of EC2 instances can be started, and with the benefit of lambda concurrency (Default to 1000), you can complete the job more faster. But new EC2 run type will be suggested to use by default, especially when the network performance is very bad when using Lambda. If you want to deploy previous release, check out [Release v1.x.x](https://github.com/awslabs/amazon-s3-data-replication-hub-plugin/tree/r1).
-
+> Please note that once you delete the old version, any existing resource provisioned by the solution such as DynamoDB table and SQS queue and CloudWatch Dashboard will be removed as well, but existing objects in destination bucket won't be transferred again.
 
 ## Architect
 
 ![S3 Plugin Architect](s3-plugin-architect.png)
 
-A *JobFinder* ECS Task running in AWS Fargate lists all the objects in source and destination buckets and determines what objects should be replicated, a message for each object to be replicated will be created in SQS. A *time-based CloudWatch rule* will trigger the ECS task to run every hour. 
+A *Finder* job running in AWS Fargate lists all the objects in source and destination buckets and determines what objects should be transferred, a message for each object to be transferred will be created in SQS. A *time-based CloudWatch rule* will trigger the ECS task to run every hour. 
 
-This plugin also supports S3 Event notification to trigger the replication (near real-time), only if the source bucket is in the same account (and region) as the one you deploy this plugin to. The event message will also be sent the same SQS queue.
+This plugin also supports S3 Event notification to trigger the data transfer (near real-time), only if the source bucket is in the same account (and region) as the one you deploy this plugin to. The event message will also be sent the same SQS queue.
 
-The *JobWorker* either running in Lambda or EC2 consumes the message in SQS and transfer the object from source bucket to destination bucket.
+The *Worker* job running in EC2 consumes the message in SQS and transfer the object from source bucket to destination bucket. You can use Auto Scaling Group to controll the number of EC2 instances to transfer the data based on your business need.
 
-If an object or a part of an object failed to transfer, the *JobWorker* will release the message in the Queue, and the object will be transferred again after the message is visible in the queue (Default visibility timeout is set to 15 minutes, extended for large objects). After a few retries, if the transfer still failed, the message will be sent to the Dead Letter Queue and an alarm will be triggered.
+If an object or a part of an object failed to transfer, the EC2 instance will release the message in the Queue, and the object will be transferred again after the message is visible in the queue (Default visibility timeout is set to 15 minutes, extended for large objects). After a few retries, if the transfer still failed, the message will be sent to the Dead Letter Queue and an alarm will be triggered.
 
 This plugin supports transfer large size file. It will divide it into small parts and leverage the [multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
+
+> Note: This solution uses `t4g.micro` EC2 instance type to save cost. The pricing of this instance type is `$0.0084 per Hour` in US West (Oregon) region at the point of writing. Check out [EC2 Pricing](https://aws.amazon.com/ec2/pricing/on-demand/) to get the latest price. And the EC2 operating systems will by default have BBR (Bottleneck Bandwidth and RTT) enabled to improve network performance.
 
 
 ## Deployment
@@ -72,93 +65,11 @@ Things to know about the deployment of this plugin:
 
 - The deployment will automatically provision resources like lambda, dynamoDB table, ECS Task Definition, etc. in your AWS account.
 - The deployment will take approximately 3-5 minutes.
-- Once the deployment is completed, the data replication task will start right away.
+- Once the deployment is completed, the data transfer task will start right away.
 
-###  Before Deployment
+Please follow the steps in the [Deployment Guide](./docs/DEPLOYMENT_EN.md) to start the deployment.
 
-- Configure **credentials**
-
-You will need to provide `AccessKeyID` and `SecretAccessKey` (namely `AK/SK`) to read or write bucket in S3 from or to another AWS account or other cloud storage service. And a Parameter Store is used to store the credentials in a secure manner.
-
-Please create a parameter in **Parameter Store** from **AWS Systems Manager**, select **SecureString** as its type, and put a **Value** following below format.
-
-```
-{
-  "access_key_id": "<Your Access Key ID>",
-  "secret_access_key": "<Your Access Key Secret>"
-}
-```
-
-> Note that if the AK/SK is for source bucket, **READ** access to bucket is required, if it's for destination bucket, **READ** and **WRITE** access to bucket is required.
-
-- Set up **ECS Cluster** and **VPC**
-
-The deployment of this plugin will launch an ECS Task running in Fargate in your AWS Account, hence you will need to set up an ECS Cluster and the VPC before the deployment if you haven't got any. 
-
-> Note: For ECS Cluster, you can choose **Networking only** type. For VPC, please make sure the VPC should have at least two subnets across two available zones.
-
-
-### Deploy via AWS Cloudformation
-
-Please follow below steps to deploy this plugin via AWS Cloudformation.
-
-1. Sign in to AWS Management Console, switch to the region to deploy the CloudFormation Stack to.
-
-1. Click the following button to launch the CloudFormation Stack in that region.
-
-    - For all Regions other than China Regions
-
-    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
-
-    - For Beijing and Ningxia China Regions
-
-    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
-    
-1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
-
-1. Click **Next**. Configure additional stack options such as tags (Optional). 
-
-1. Click **Next**. Review and confirm acknowledgement,  then click **Create Stack** to start the deployment.
-
-If you want to make custom changes to this plugin, you can follow [custom build](CUSTOM_BUILD.md) guide.
-
-> Note: You can simply delete the stack from CloudFormation console if the replication task is no longer required.
-
-### Deploy via AWS CDK
-
-If you want to use AWS CDK to deploy this plugin, please make sure you have met below prerequisites:
-
-* [AWS Command Line Interface](https://aws.amazon.com/cli/)
-* Node.js 12.x or later
-
-Under the project **source** folder, run below to compile TypeScript into JavaScript. 
-
-```
-cd source
-npm install -g aws-cdk
-npm install && npm run build
-```
-
-Then you can run `cdk deploy` command to deploy the plugin. Please specify the parameter values accordingly, for example:
-
-```
-cdk deploy \ 
---parameters srcType=Amazon_S3 \
---parameters srcBucket=src-bucket \
---parameters srcRegion=us-west-2 \
---parameters srcInCurrentAccount=true \
---parameters srcEvent=CreateAndDelete \
---parameters destBucket=dest-bucket \
---parameters destRegion=cn-northwest-1 \
---parameters destCredentials=cn \
---parameters destInCurrentAccount=false \
---parameters ecsClusterName=testcluster \
---parameters ecsVpcId=vpc-92c418eb \
---parameters ecsSubnets=subnet-07f0e94f,subnet-a996ddf3 \
---parameters alarmEmail=xxx@example.com
-```
-
-> Note: You can simply run `cdk destroy` if the replication task is no longer required. This command will remove the stack created by this plugin from your AWS account.
+> Note: You can simply delete the stack from CloudFormation console if the data transfer job is no longer required.
 
 
 ## FAQ
@@ -189,17 +100,24 @@ This is the log group for all EC2 instances, detailed transfer log can be found 
 
 If you can't find anything helpful in the log group, please raise an issue in Github.
 
-### How to choose run type
+### No log streams in CloudWatch
 
-**Q**: Since there are two run types, EC2 and Lambda, How to choose?
+**Q**: After I deployed, I can't find any log streams in the two CloudWatch Log Groups
 
-**A**: Generally speaking, EC2 is suggested to use for most cases. However, you should test both approach based on your scenerio before using any of them whenever possible. Cost should be very important too, you can do cost estimation base on your test result for both run type. If the network performance is very bad in Lambda, EC2 run type will save your cost a lot.
+**A**: This must because the subnets you choose when you deployed this solution doesn't have public network access, therefore, the Fargate task failed to pull the images, and the EC2 can't download the CloudWatch Agent to send logs to CloudWatch.  So please check you VPC set up (See [Deployment Guide](./docs/DEPLOYMENT_EN.md) Step 1). Once you fix the issue, you need to manually terminate the running EC2 instances by this solution if any. After that, the auto scaling group will automatically start new ones.
+
+
+### How to customize
+
+**Q**: I want to make some custom changes, how do I do?
+
+If you want to make custom changes to this plugin, you can follow [custom build](./docs/CUSTOM_BUILD.md) guide.
 
 
 ## Known Issues
 
 In this new V2 release (v2.x.x), we are expecting below known issues:
 
-- Google GCS is not yet supported (If you have such requirement, you will need to use release v1.x.x)
+- Google GCS is no longer supported (you may contact us)
 
 If you found any other issues, please raise one in Github Issue, we will work on the fix accordingly.

@@ -26,8 +26,10 @@ export VERSION=my-version # version number for the customized code
 ```
 
 ## 4. Create an Amazon S3 Bucket
-The CloudFormation template is configured to pull the Lambda deployment packages from Amazon S3 bucket in the region the template is being launched in. Create a bucket in the desired region with the region name appended to the name of the bucket.
+The CloudFormation template is configured to pull the Lambda deployment packages from Amazon S3 bucket in the region the template is being launched in. Use below command to create the buckets.
+
 ```bash
+aws s3 mb s3://$DIST_OUTPUT_BUCKET --region $REGION
 aws s3 mb s3://$DIST_OUTPUT_BUCKET-$REGION --region $REGION
 ```
 
@@ -42,6 +44,6 @@ chmod +x ./build-s3-dist.sh
 
 Deploy the distributable to the Amazon S3 bucket in your account:
 ```bash
+aws s3 cp ./global-s3-assets/ s3://$DIST_OUTPUT_BUCKET/$SOLUTION_NAME/$VERSION/ --recursive --acl bucket-owner-full-control
 aws s3 cp ./regional-s3-assets/ s3://$DIST_OUTPUT_BUCKET-$REGION/$SOLUTION_NAME/$VERSION/ --recursive --acl bucket-owner-full-control
-aws s3 cp ./global-s3-assets/ s3://$DIST_OUTPUT_BUCKET-$REGION/$SOLUTION_NAME/$VERSION/ --recursive --acl bucket-owner-full-control
 ```
