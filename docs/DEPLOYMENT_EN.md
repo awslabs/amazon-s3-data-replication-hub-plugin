@@ -20,7 +20,7 @@ Go to AWS Management Console > Elastic Container Service (ECS). From ECS Cluster
 
 Step 1: Select Cluster Template, make sure you choose **Network Only** type. 
 
-Step 2: Configure cluster, just specify a cluster name and click Create. If you want to also create a new VCP (public subnets only), please also check the **Create a new VPC for this cluster** option.
+Step 2: Configure cluster, just specify a cluster name and click Create. If you want to also create a new VPC (public subnets only), please also check the **Create a new VPC for this cluster** option.
 
 ![Create Cluster](cluster_en.png)
 
@@ -44,12 +44,12 @@ Go to AWS Management Console > Secrets Manager. From Secrets Manager home page, 
 Click Next to specify a secret name, and click Create in teh last step.
 
 
-> Note that if the AK/SK is for source bucket, **READ** access to bucket is required, if it's for destination bucket, **READ** and **WRITE** access to bucket is required. For Amazon S3, you can refer to [Example IAM Policy](./IAM_POLICY.md)
+> Note that if the AK/SK is for source bucket, **READ** access to bucket is required, if it's for destination bucket, **READ** and **WRITE** access to bucket is required. For Amazon S3, you can refer to [Set up Credential](./IAM_POLICY.md)
 
 
 ## 4. Launch AWS Cloudformation Stack
 
-Please follow below steps to deploy this plugin via AWS Cloudformation.
+Please follow below steps to deploy this solution via AWS Cloudformation.
 
 1. Sign in to AWS Management Console, switch to the region to deploy the CloudFormation Stack to.
 
@@ -57,11 +57,11 @@ Please follow below steps to deploy this plugin via AWS Cloudformation.
 
     - For AWS China Regions
 
-    [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
+      [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
 
     - For AWS Global regions
 
-    [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
+      [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
     
 1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 
