@@ -20,7 +20,7 @@
 
 步骤1：选择集群模版，确保选择 **仅限联网** 类型。
 
-步骤2：配置集群，指定集群名称，点击创建即可。 如果您还想创建一个新的 VCP（仅限公有子网），还请选中**为此集群创建新的 VPC** 选项。
+步骤2：配置集群，指定集群名称，点击创建即可。 如果您还想创建一个新的 VPC（仅限公有子网），还请选中**为此集群创建新的 VPC** 选项。
 
 ![创建集群](cluster_cn.png)
 
@@ -44,30 +44,30 @@
 然后下一步指定密钥名称，最后一步点击创建。
 
 
-> 注意：如果该AK/SK是针对源桶, 则需要具有桶的**读**权限, 如果是针对目标桶, 则需要具有桶的**读与写**权限。 如果是Amazon S3, 可以参考[IAM Policy示例](./IAM_POLICY.md)
+> 注意：如果该AK/SK是针对源桶, 则需要具有桶的**读**权限, 如果是针对目标桶, 则需要具有桶的**读与写**权限。 如果是Amazon S3, 可以参考[配置凭据](./IAM_POLICY.md)
 
 
 ## 4. 启动AWS Cloudformation部署
 
-请按照以下步骤通过AWS Cloudformation部署此插件。
+请按照以下步骤通过AWS Cloudformation部署此解决方案。
 
-1.登录到AWS管理控制台，切换到将CloudFormation Stack部署到的区域。
+1. 登录到AWS管理控制台，切换到将CloudFormation Stack部署到的区域。
 
-1.单击以下按钮在该区域中启动CloudFormation堆栈。
+1. 单击以下按钮在该区域中启动CloudFormation堆栈。
 
-  - 部署到AWS中国北京和宁夏区
+    - 部署到AWS中国北京和宁夏区
 
-  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
+      [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
 
-  - 部署到AWS海外区
+    - 部署到AWS海外区
 
-  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
+      [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
 
     
-1.单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
+1. 单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
 
-1.单击**下一步**。 配置其他堆栈选项，例如标签（可选）。
+1. 单击**下一步**。 配置其他堆栈选项，例如标签（可选）。
 
-1.单击**下一步**。 查看并勾选确认，然后单击“创建堆栈”开始部署。
+1. 单击**下一步**。 查看并勾选确认，然后单击“创建堆栈”开始部署。
 
 部署预计用时3-5分钟
