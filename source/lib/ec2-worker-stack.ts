@@ -123,6 +123,14 @@ export class Ec2WorkerStack extends Construct {
             cooldown: Duration.minutes(2),
             role: workerAsgRole,
             signals: asg.Signals.waitForMinCapacity(),
+            blockDevices: [
+                {
+                    deviceName: '/dev/xvda',
+                    volume: asg.BlockDeviceVolume.ebs(8, {
+                        encrypted: true,
+                    }),
+                },
+            ]
         });
 
         Tags.of(this.workerAsg).add('Name', `${Aws.STACK_NAME}-Replication-Worker`, {})
