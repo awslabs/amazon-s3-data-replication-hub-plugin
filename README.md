@@ -3,6 +3,8 @@
 
 # Data Transfer Hub - S3 Plugin
 
+## [Dual-Way Mode Deployment Guide](./docs/DUAL_WAY_DEPLOYMENT_EN.md)
+
 ## Table of contents
 * [Introduction](#introduction)
 * [Breaking Change](#breaking-change)

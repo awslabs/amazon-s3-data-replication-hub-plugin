@@ -101,6 +101,7 @@ export class EcsStack extends Construct {
         // Schedule CRON event to trigger JobSender per hour
         const trigger = new events.Rule(this, 'DTHFinderSchedule', {
             schedule: events.Schedule.rate(Duration.hours(1)),
+            enabled: false,
         })
 
         // Add target to cloudwatch rule.

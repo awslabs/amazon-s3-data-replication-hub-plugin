@@ -20,8 +20,9 @@ def on_create(event):
     props = event["ResourceProperties"]
     print("create new resource with props %s" % props)
 
-    print('Run fargate task')
-    run_fargate(props)
+    # print('Run fargate task')
+    # run_fargate(props)
+    print('Get Dual-way work, stop automated finder')
 
     physical_id = props['stack_name']
     return {'PhysicalResourceId': physical_id}
@@ -31,9 +32,10 @@ def on_update(event):
     physical_id = event["PhysicalResourceId"]
     props = event["ResourceProperties"]
     print("update resource %s with props %s" % (physical_id, props))
-
-    print('Run fargate task')
-    run_fargate(props)
+    
+    print('Get Dual-way work, stop automated finder')
+    # print('Run fargate task')
+    # run_fargate(props)
 
 
 def on_delete(event):

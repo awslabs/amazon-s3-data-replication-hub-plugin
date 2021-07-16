@@ -97,8 +97,8 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Source Endpoint URL', srcEndpoint.logicalId)
 
     const srcInCurrentAccount = new CfnParameter(this, 'srcInCurrentAccount', {
-      description: 'Source Bucket in current account? If not, you should provide a credential with read access',
-      default: 'false',
+      description: 'Source Bucket in current account? In dual-way mode, it need to be true.',
+      default: 'true',
       type: 'String',
       allowedValues: ['true', 'false']
     })
@@ -135,8 +135,8 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamLabels('Destination Region', destRegion.logicalId)
 
     const destInCurrentAccount = new CfnParameter(this, 'destInCurrentAccount', {
-      description: 'Destination Bucket in current account? If not, you should provide a credential with read and write access',
-      default: 'true',
+      description: 'Destination Bucket in current account? In dual-way mode, it need to be false.',
+      default: 'false',
       type: 'String',
       allowedValues: ['true', 'false']
     })
@@ -207,39 +207,30 @@ export class DataTransferS3Stack extends Stack {
       type: 'String',
       allowedValues: ['true', 'false']
     })
-
     this.addToParamLabels('Include Metadata', includeMetadata.logicalId)
+
+    const enableSynchronization = new CfnParameter(this, 'enableSynchronization', {
+      description: 'Enable the two way Synchronization between source and destination',
+      default: 'true',
+      type: 'String',
+      allowedValues: ['true', 'false']
+    })
+    this.addToParamLabels('Enable Synchronization', enableSynchronization.logicalId)
+
+    const userID = new CfnParameter(this, 'userID', {
+      description: 'The userId of the user whose credential is stored in Secrets Manager, used to prevent recursive triggering. Using `aws iam list-users` in terminal to get the userID',
+      default: '',
+      type: 'String',
+    })
+    this.addToParamLabels('userID for Two Way Synchronization', userID.logicalId)
 
     const srcEvent = new CfnParameter(this, 'srcEvent', {
       description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
-      default: 'No',
+      default: 'CreateAndDelete',
       type: 'String',
       allowedValues: ['No', 'Create', 'CreateAndDelete']
-      // allowedValues: ['No', 's3:ObjectCreated:*', 's3:ObjectRemoved:*', 's3:ObjectCreated:*,s3:ObjectRemoved:*']
     })
     this.addToParamLabels('Enable S3 Event', srcEvent.logicalId)
-    // const srcEvent = new CfnParameter(this, 'srcEvent', {
-    //   description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
-    //   default: '',
-    //   type: 'CommaDelimitedList',
-    //   allowedValues: ['', 'Create', 'Delete', 'Create,Delete', 'Delete,Create']
-    // })
-    // this.addToParamLabels('Source Bucket Notification', srcEvent.logicalId)
-
-
-    // const multipartThreshold = new CfnParameter(this, 'multipartThreshold', {
-    //   description: 'Threshold Size for multipart upload in MB, default to 10 (MB)',
-    //   default: '10',
-    //   type: 'String',
-    //   allowedValues: ['10', '15', '20', '50', '100'],
-    // })
-
-    // const chunkSize = new CfnParameter(this, 'chunkSize', {
-    //   description: 'Chunk Size for multipart upload in MB, default to 5 (MB)',
-    //   default: '5',
-    //   type: 'String',
-    //   allowedValues: ['5', '10', '20']
-    // })
 
     const finderDepth = new CfnParameter(this, 'finderDepth', {
       description: 'The depth of sub folders to compare in parallel. 0 means comparing all objects in sequence',
@@ -258,7 +249,7 @@ export class DataTransferS3Stack extends Stack {
     })
 
 
-    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId)
+    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId, userID.logicalId)
     this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId, destAcl.logicalId)
     this.addToParamGroups('Notification Information', alarmEmail.logicalId)
     this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId)
@@ -302,7 +293,7 @@ export class DataTransferS3Stack extends Stack {
       this.addToParamLabels('Desired Capacity', desiredCapacity.logicalId)
 
       this.addToParamGroups('Advanced Options', finderDepth.logicalId, finderNumber.logicalId, workerNumber.logicalId, includeMetadata.logicalId,
-        maxCapacity.logicalId, minCapacity.logicalId, desiredCapacity.logicalId)
+        maxCapacity.logicalId, minCapacity.logicalId, desiredCapacity.logicalId, enableSynchronization.logicalId)
 
     }
 
@@ -435,6 +426,8 @@ export class DataTransferS3Stack extends Stack {
       FINDER_NUMBER: finderNumber.valueAsString,
       WORKER_NUMBER: workerNumber.valueAsString,
       INCLUDE_METADATA: includeMetadata.valueAsString,
+      ENABLE_SYNCHRONIZATION: enableSynchronization.valueAsString,
+      USER_ID: userID.valueAsString,
 
     }
 
