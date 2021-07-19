@@ -3,6 +3,7 @@
 
 # Data Transfer Hub - S3插件
 
+## [双向同步部署手册](./docs/DUAL_WAY_DEPLOYMENT_CN.md)
 ## 目录
 * [介绍](#介绍)
 * [最新改动](#最新改动)

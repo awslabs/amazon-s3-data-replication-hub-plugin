@@ -115,7 +115,7 @@ export class Ec2WorkerStack extends Construct {
             // spotPrice: "0.01",
             // healthCheck: autoscaling.HealthCheck.ec2(),
             securityGroup: ec2SG,
-            // keyName: 'ad-key',  // dev only
+            // keyName: 'ubuntu-key',  // dev only
             instanceMonitoring: asg.Monitoring.DETAILED,
             associatePublicIpAddress: true,
             // groupMetrics: [asg.GroupMetrics.all()]
@@ -181,8 +181,13 @@ export class Ec2WorkerStack extends Construct {
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
             // Get CLI from solution assets
-            `curl -LO "${cliAssetDomain}/data-transfer-hub-cli/v${props.cliRelease}/dthcli_${props.cliRelease}_linux_arm64.tar.gz"`,
-            `tar zxvf dthcli_${props.cliRelease}_linux_arm64.tar.gz`,
+            // `curl -LO "${cliAssetDomain}/data-transfer-hub-cli/v${props.cliRelease}/dthcli_${props.cliRelease}_linux_arm64.tar.gz"`,
+            // `tar zxvf dthcli_${props.cliRelease}_linux_arm64.tar.gz`,
+            `curl -LO "https://github.com/YikaiHu/data-transfer-hub-cli/releases/download/v1.1.1/dthcli_1.1.1_linux_arm64.tar.gz"`,
+            `tar zxvf dthcli_1.1.1_linux_arm64.tar.gz`,
+
+            // `curl -LO https://kervin-solutions-us-west-2.s3.us-west-2.amazonaws.com/dthcli/dthcli`,
+            // `chmod +x dthcli`,
 
             // Prepare the environment variables
             `echo "export JOB_TABLE_NAME=${props.env.JOB_TABLE_NAME}" >> env.sh`,
@@ -210,6 +215,8 @@ export class Ec2WorkerStack extends Construct {
             `echo "export FINDER_NUMBER=${props.env.FINDER_NUMBER}" >> env.sh`,
             `echo "export WORKER_NUMBER=${props.env.WORKER_NUMBER}" >> env.sh`,
             `echo "export INCLUDE_METADATA=${props.env.INCLUDE_METADATA}" >> env.sh`,
+            `echo "export ENABLE_SYNCHRONIZATION=${props.env.ENABLE_SYNCHRONIZATION}" >> env.sh`,
+            `echo "export USER_ID=${props.env.USER_ID}" >> env.sh`,
             `echo "export AWS_DEFAULT_REGION=${Aws.REGION}" >> env.sh`,
 
             // Create the script
