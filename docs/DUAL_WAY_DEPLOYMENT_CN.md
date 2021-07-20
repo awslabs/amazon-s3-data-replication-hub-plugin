@@ -43,8 +43,6 @@
 
 点击 **Create Policy**，随后点击**JSON**，输入下述的Json，**请把 dth-dual-dev-cn-north-1 换成您 Account A 中的 S3 桶名称**：
 
-![cn-iam-policy](./cn-iam-policy.png)
-
 ```json
 {
     "Version": "2012-10-17",
@@ -54,6 +52,7 @@
                 "s3:ListBucket",
                 "s3:GetObject",
                 "s3:PutObject",
+                "s3:DeleteObject",
                 "s3:AbortMultipartUpload",
                 "s3:ListBucketMultipartUploads",
                 "s3:PutObjectAcl",
@@ -121,6 +120,7 @@ aws iam list-users
                 "s3:ListBucket",
                 "s3:GetObject",
                 "s3:PutObject",
+                "s3:DeleteObject",
                 "s3:AbortMultipartUpload",
                 "s3:ListBucketMultipartUploads",
                 "s3:PutObjectAcl",

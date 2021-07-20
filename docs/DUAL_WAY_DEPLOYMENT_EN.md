@@ -46,8 +46,6 @@ Log in to the IAM console of Account A, here we log in [cn-north-1 console](http
 
 Click **Create Policy**, choose **JSON**, enter the following Json, **Please replace dth-dual-dev-cn-north-1 with your S3 bucket name in Account A**：
 
-![cn-iam-policy](./cn-iam-policy.png)
-
 ```json
 {
     "Version": "2012-10-17",
@@ -57,6 +55,7 @@ Click **Create Policy**, choose **JSON**, enter the following Json, **Please rep
                 "s3:ListBucket",
                 "s3:GetObject",
                 "s3:PutObject",
+                "s3:DeleteObject",
                 "s3:AbortMultipartUpload",
                 "s3:ListBucketMultipartUploads",
                 "s3:PutObjectAcl",
@@ -123,6 +122,7 @@ Click **Create Policy**, then click **JSON**, enter the following Json, **please
                 "s3:ListBucket",
                 "s3:GetObject",
                 "s3:PutObject",
+                "s3:DeleteObject",
                 "s3:AbortMultipartUpload",
                 "s3:ListBucketMultipartUploads",
                 "s3:PutObjectAcl",
