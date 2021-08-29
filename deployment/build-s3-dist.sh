@@ -104,8 +104,8 @@ echo "cd $source_dir"
 cd $source_dir
 
 # Install and build
-echo "npm install && npm run build"
-npm install && npm run build
+echo "npm run build"
+npm run build
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
@@ -145,28 +145,6 @@ if [ "$?" = "1" ]; then
 	exit 1
 fi
 
-# Download the cli into global assets folder and replace the cli github.com url in the template with the one in S3
-# cd $template_dist_dir
-# # The cli release must be same as the one in the current stack.
-# if [ -z "$5" ]; then
-#     cliRelease=1.0.1
-# else
-#     cliRelease=$5
-# fi
-
-# cliArch=arm64
-# echo "Downloading the cli - version ${cliRelease}"
-# curl -LO "https://github.com/daixba/drhcli/releases/download/v${cliRelease}/drhcli_${cliRelease}_linux_${cliArch}.tar.gz"
-
-# echo "Updating the url of the cli in template"
-# if [[ $4 == cn-* ]]; then
-#     suffix=amazonaws.com.cn
-# else
-#     suffix=amazonaws.com
-# fi
-# replace="s?github.com/[a-z/]*/v[0-9.]*/?s3.%%REGION%%.${suffix}/%%BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/?g"
-# echo "sed -i '' -e $replace $template_dist_dir/*.template"
-# sed -i '' -e $replace *.template
 
 # Find and replace bucket_name, solution_name, and version
 echo "Find and replace bucket_name, solution_name, and version"

@@ -42,7 +42,6 @@ If it's for S3 buckets in China regions, please make sure you also change to use
             "Effect": "Allow",
             "Action": [
                 "s3:PutObject",
-                "s3:GetObject",
                 "s3:ListBucket",
                 "s3:PutObjectAcl",
                 "s3:AbortMultipartUpload",

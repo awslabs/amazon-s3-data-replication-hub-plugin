@@ -1,3 +1,20 @@
+/*
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+
 import { CfnParameter, CfnResource, Stack, StackProps, Construct, CfnCondition, Fn, Aws, CfnMapping } from '@aws-cdk/core';
 import * as sm from '@aws-cdk/aws-secretsmanager';
 import * as s3 from '@aws-cdk/aws-s3';
@@ -65,7 +82,7 @@ export class DataTransferS3Stack extends Stack {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
       type: 'String',
       default: 'Amazon_S3',
-      allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS', 'Google_GCS']
+      allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS']
     })
     this.addToParamLabels('Source Type', srcType.logicalId)
 
@@ -215,31 +232,8 @@ export class DataTransferS3Stack extends Stack {
       default: 'No',
       type: 'String',
       allowedValues: ['No', 'Create', 'CreateAndDelete']
-      // allowedValues: ['No', 's3:ObjectCreated:*', 's3:ObjectRemoved:*', 's3:ObjectCreated:*,s3:ObjectRemoved:*']
     })
     this.addToParamLabels('Enable S3 Event', srcEvent.logicalId)
-    // const srcEvent = new CfnParameter(this, 'srcEvent', {
-    //   description: 'Whether to enable S3 Event to trigger the replication. Note that S3Event is only applicable if source is in Current account',
-    //   default: '',
-    //   type: 'CommaDelimitedList',
-    //   allowedValues: ['', 'Create', 'Delete', 'Create,Delete', 'Delete,Create']
-    // })
-    // this.addToParamLabels('Source Bucket Notification', srcEvent.logicalId)
-
-
-    // const multipartThreshold = new CfnParameter(this, 'multipartThreshold', {
-    //   description: 'Threshold Size for multipart upload in MB, default to 10 (MB)',
-    //   default: '10',
-    //   type: 'String',
-    //   allowedValues: ['10', '15', '20', '50', '100'],
-    // })
-
-    // const chunkSize = new CfnParameter(this, 'chunkSize', {
-    //   description: 'Chunk Size for multipart upload in MB, default to 5 (MB)',
-    //   default: '5',
-    //   type: 'String',
-    //   allowedValues: ['5', '10', '20']
-    // })
 
     const finderDepth = new CfnParameter(this, 'finderDepth', {
       description: 'The depth of sub folders to compare in parallel. 0 means comparing all objects in sequence',
@@ -268,18 +262,7 @@ export class DataTransferS3Stack extends Stack {
     let minCapacity: CfnParameter | undefined
     let desiredCapacity: CfnParameter | undefined
 
-    if (runType === RunType.LAMBDA) {
-      // lambdaMemory = new CfnParameter(this, 'lambdaMemory', {
-      //   description: 'Lambda Memory, default to 256 MB',
-      //   default: '256',
-      //   type: 'Number',
-      //   allowedValues: ['128', '256', '512', '1024']
-      // })
-      // this.addToParamLabels('Lambda Memory', lambdaMemory.logicalId)
-      // this.addToParamGroups('Advanced Options', lambdaMemory.logicalId)
-
-    } else {
-
+    if (runType === RunType.EC2) {
       maxCapacity = new CfnParameter(this, 'maxCapacity', {
         description: 'Maximum Capacity for Auto Scaling Group',
         default: '20',
@@ -318,10 +301,6 @@ export class DataTransferS3Stack extends Stack {
     // Get Secret for credentials from Secrets Manager
     const srcCred = sm.Secret.fromSecretNameV2(this, 'SrcCredentialsParam', srcCredentials.valueAsString);
     const destCred = sm.Secret.fromSecretNameV2(this, 'DestCredentialsParam', destCredentials.valueAsString);
-
-    // const isSrc = new CfnCondition(this, 'isSrc', {
-    //   expression: Fn.conditionEquals('YES', srcInCurrentAccount),
-    // });
 
     // const bucketName = Fn.conditionIf(isSrc.logicalId, destBucket.valueAsString, srcBucket.valueAsString).toString();
     const srcIBucket = s3.Bucket.fromBucketName(this, `SrcBucket`, srcBucket.valueAsString);
@@ -459,10 +438,6 @@ export class DataTransferS3Stack extends Stack {
       destIBucket.grantReadWrite(ec2Stack.workerAsg.role)
 
       asgName = ec2Stack.workerAsg.autoScalingGroupName
-    }
-    else {
-      // start Lambda stack
-      // TODO: Create lambda stack
     }
 
     // Setup Cloudwatch Dashboard

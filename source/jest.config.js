@@ -1,7 +1,13 @@
 module.exports = {
-  roots: ['<rootDir>/test'],
+  "roots": [
+    "<rootDir>/test"
+  ],
   testMatch: ['**/*.test.ts'],
-  transform: {
-    '^.+\\.tsx?$': 'ts-jest'
-  }
-};
+  "transform": {
+    "^.+\\.tsx?$": "ts-jest"
+  },
+  coverageReporters: [
+    "text",
+    ["lcov", { "projectRoot": "../" }]
+  ]
+}
