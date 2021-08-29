@@ -17,12 +17,30 @@ limitations under the License.
 
 import * as cdk from '@aws-cdk/core';
 import { SynthUtils } from '@aws-cdk/assert';
-import * as main from '../lib/main-stack';
+import * as worker from '../lib/ec2-worker-stack';
+import * as sqs from '@aws-cdk/aws-sqs';
+import * as ec2 from '@aws-cdk/aws-ec2';
 
-test('Test main stack', () => {
-    const app = new cdk.App();
+test('Test EC2 worker stack', () => {
+
+    const stack = new cdk.Stack();
     // WHEN
-    const stack = new main.DataTransferS3Stack(app, 'MyTestStack');
+    new worker.Ec2WorkerStack(stack, 'MyTestWorkerStack', {
+        env: {
+            'SRC_BUCKET': 'test-src',
+        },
+        vpc: new ec2.Vpc(stack, 'TestVpc', {
+            cidr: '10.0.0.0/21',
+            subnetConfiguration: [
+                {
+                    subnetType: ec2.SubnetType.PUBLIC,
+                    name: 'Public'
+                },
+            ]
+        }),
+        queue: new sqs.Queue(stack, 'TestQueue'),
+        cliRelease: 'v1.0.0',
+    });
     // THEN
     expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
 });

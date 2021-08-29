@@ -17,12 +17,15 @@ limitations under the License.
 
 import * as cdk from '@aws-cdk/core';
 import { SynthUtils } from '@aws-cdk/assert';
-import * as main from '../lib/main-stack';
+import * as cm from '../lib/common-resources';
 
-test('Test main stack', () => {
-    const app = new cdk.App();
+test('Test Common stack', () => {
+
+    const stack = new cdk.Stack();
     // WHEN
-    const stack = new main.DataTransferS3Stack(app, 'MyTestStack');
+    new cm.CommonStack(stack, 'MyTestCommonStack', {
+        alarmEmail: 'admin@example.com',
+    });
     // THEN
     expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
 });

@@ -17,12 +17,22 @@ limitations under the License.
 
 import * as cdk from '@aws-cdk/core';
 import { SynthUtils } from '@aws-cdk/assert';
-import * as main from '../lib/main-stack';
+import * as finder from '../lib/ecs-finder-stack';
+import * as ec2 from '@aws-cdk/aws-ec2';
 
-test('Test main stack', () => {
-    const app = new cdk.App();
+test('Test ECS finder stack', () => {
+
+    const stack = new cdk.Stack();
     // WHEN
-    const stack = new main.DataTransferS3Stack(app, 'MyTestStack');
+    new finder.EcsStack(stack, 'MyTestFinderStack', {
+        env: {
+            'SRC_BUCKET': 'test-src',
+        },
+        vpc: new ec2.Vpc(stack, 'TestVpc'),
+        ecsSubnetIds: ['subnet-1', 'subnet-2'],
+        ecsClusterName: 'TestCluster',
+        cliRelease: 'v1.0.0',
+    });
     // THEN
     expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
 });
