@@ -445,7 +445,6 @@ export class DataTransferS3Stack extends Stack {
       runType: runType,
       queue: commonStack.sqsQueue,
       asgName: asgName,
-      handler: handler,
     }
     new DashboardStack(this, 'DashboardStack', dbProps);
 

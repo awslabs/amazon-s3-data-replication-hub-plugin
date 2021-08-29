@@ -17,12 +17,20 @@ limitations under the License.
 
 import * as cdk from '@aws-cdk/core';
 import { SynthUtils } from '@aws-cdk/assert';
-import * as main from '../lib/main-stack';
+import * as event from '../lib/event-stack';
+import * as s3 from '@aws-cdk/aws-s3';
+import * as sqs from '@aws-cdk/aws-sqs';
 
-test('Test main stack', () => {
-    const app = new cdk.App();
+
+test('Test event stack', () => {
+    const stack = new cdk.Stack();
     // WHEN
-    const stack = new main.DataTransferS3Stack(app, 'MyTestStack');
+    new event.EventStack(stack, 'MyTestStack', {
+        events: 'Create',
+        bucket: new s3.Bucket(stack, 'TestBucket'),
+        prefix: 'test',
+        queue: new sqs.Queue(stack, 'TestQueue'),
+    });
     // THEN
     expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
 });

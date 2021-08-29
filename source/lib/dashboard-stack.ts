@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { Construct, Duration, Aws } from '@aws-cdk/core';
-import * as lambda from '@aws-cdk/aws-lambda';
 import * as cw from '@aws-cdk/aws-cloudwatch';
 import * as sqs from '@aws-cdk/aws-sqs';
 
@@ -24,9 +23,7 @@ import { RunType } from './main-stack';
 export interface DBProps {
     readonly runType: RunType,
     readonly queue: sqs.Queue
-    // readonly queueDLQ: sqs.Queue
     readonly asgName?: string
-    readonly handler?: lambda.Function
 }
 
 export class DashboardStack extends Construct {
@@ -60,13 +57,6 @@ export class DashboardStack extends Construct {
             label: 'Failed(Objects)'
         })
 
-        const lambdaMemory = new cw.Metric({
-            namespace: `${Aws.STACK_NAME}`,
-            metricName: 'MaxMemoryUsed',
-            statistic: 'Max',
-            period: Duration.minutes(1),
-            label: 'Max Memory Used'
-        })
 
         const asgDesired = new cw.Metric({
             namespace: 'AWS/AutoScaling',
@@ -191,71 +181,31 @@ export class DashboardStack extends Construct {
             })
         )
 
-        if (props.handler) {
 
-            this.dashboard.addWidgets(
-                new cw.GraphWidget({
-                    title: 'Max Memory Used(MB)',
-                    left: [lambdaMemory]
-                }),
+        this.dashboard.addWidgets(
+            new cw.GraphWidget({
+                title: 'Network In/Out',
+                left: [asgNetworkIn, asgNetworkOut]
+            }),
 
-                new cw.GraphWidget({
-                    title: 'Concurrency',
-                    left: [props.handler.metric('ConcurrentExecutions', {
-                        period: Duration.minutes(1),
-                        statistic: 'Max'
-                    }),]
-                }),
-                new cw.GraphWidget({
-                    title: 'Invocations / Errors',
-                    left: [
-                        props.handler.metricInvocations({
-                            period: Duration.minutes(1),
-                            statistic: 'Sum'
-                        }),
-                        props.handler.metricErrors({
-                            period: Duration.minutes(1),
-                            statistic: 'Sum'
-                        }),
-                        // props.handler.metricThrottles({ period: Duration.minutes(1) })
-                    ]
-                }),
-                new cw.GraphWidget({
-                    title: 'Duration (Average)',
-                    left: [props.handler.metricDuration({ period: Duration.minutes(1) })]
-                })
+            new cw.GraphWidget({
+                title: 'CPU Utilization (Average)',
+                left: [asgCPU]
+            }),
 
-            )
-        }
-        else {
-
-            this.dashboard.addWidgets(
-                new cw.GraphWidget({
-                    title: 'Network In/Out',
-                    left: [asgNetworkIn, asgNetworkOut]
-                }),
-
-                new cw.GraphWidget({
-                    title: 'CPU Utilization (Average)',
-                    left: [asgCPU]
-                }),
-
-                new cw.GraphWidget({
-                    title: 'Memory / Disk (Average)',
-                    left: [asgMemory, asgDisk]
-                }),
+            new cw.GraphWidget({
+                title: 'Memory / Disk (Average)',
+                left: [asgMemory, asgDisk]
+            }),
 
 
-                new cw.GraphWidget({
-                    title: 'Desired / InService Instances',
-                    left: [asgDesired, asgInSvc]
-                }),
+            new cw.GraphWidget({
+                title: 'Desired / InService Instances',
+                left: [asgDesired, asgInSvc]
+            }),
 
 
-            )
-
-        }
-
+        )
 
     }
 
