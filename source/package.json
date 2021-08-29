@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest",
+    "test": "jest --coverage",
     "cdk": "cdk"
   },
   "devDependencies": {
@@ -18,7 +18,8 @@
     "jest": "^26.4.2",
     "ts-jest": "^26.2.0",
     "ts-node": "^9.0.0",
-    "typescript": "~3.9.7"
+    "typescript": "~3.9.7",
+    "path-parse": ">=1.0.7"
   },
   "dependencies": {
     "@aws-cdk/aws-apigateway": "1.85.0",

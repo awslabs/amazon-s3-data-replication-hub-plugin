@@ -42,9 +42,9 @@ If you have deployed a version before v2.0.2 (You can go to CloudFormation, chec
 
 > Please note that once you delete the old version, any existing resource provisioned by the solution such as DynamoDB table and SQS queue and CloudWatch Dashboard will be removed as well, but existing objects in destination bucket won't be transferred again.
 
-## Architect
+## Architecture
 
-![S3 Plugin Architect](s3-plugin-architect.png)
+![S3 Plugin Architecture](s3-plugin-architect.png)
 
 A *Finder* job running in AWS Fargate lists all the objects in source and destination buckets and determines what objects should be transferred, a message for each object to be transferred will be created in SQS. A *time-based CloudWatch rule* will trigger the ECS task to run every hour. 
 
