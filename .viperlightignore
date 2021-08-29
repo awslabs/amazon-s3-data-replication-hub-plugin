@@ -3,7 +3,7 @@ CONTRIBUTING.md:50
 package-lock.json
 docs/DEPLOYMENT_CN.md:30
 docs/DEPLOYMENT_EN.md:30
-source/test/common-stack.test.ts:25
+source/test/common-stack.test.ts:27
 
 node_modules/
 cdk.out
