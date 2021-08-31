@@ -31,6 +31,8 @@ The following are the features supported by this plugin.
 - Support Transfer with object metadata
 - Support incremental data transfer
 - Support transfer from S3 compatible storage
+- Support prefix list filter
+- Support Cron Expressions job config
 - Auto retry and error handling
 
 
