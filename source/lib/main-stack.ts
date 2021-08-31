@@ -76,7 +76,7 @@ export class DataTransferS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
-    const cliRelease = '1.0.0'
+    const cliRelease = '1.1.0'
 
     const srcType = new CfnParameter(this, 'srcType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
@@ -98,6 +98,21 @@ export class DataTransferS3Stack extends Stack {
       type: 'String'
     })
     this.addToParamLabels('Source Prefix', srcPrefix.logicalId)
+
+    const srcPrefixsListFile = new CfnParameter(this, 'srcPrefixsListFile', {
+      description: 'Source Prefixs List File S3 path (Optional), support txt type, the maximum number of lines is 10 millions. e.g. my_prefix_list.txt',
+      default: '',
+      type: 'String'
+    })
+    this.addToParamLabels('Source Prefixs List File', srcPrefixsListFile.logicalId)
+
+    const srcSkipCompare = new CfnParameter(this, 'srcSkipCompare', {
+      description: 'Skip the data comparison in task finding process? If yes, all data in the source will be sent to the destination',
+      default: 'false',
+      type: 'String',
+      allowedValues: ['true', 'false']
+    })
+    this.addToParamLabels('Skip Data Comparison', srcSkipCompare.logicalId)
 
     const srcRegion = new CfnParameter(this, 'srcRegion', {
       description: 'Source Region Name',
@@ -211,6 +226,21 @@ export class DataTransferS3Stack extends Stack {
     })
     this.addToParamLabels('Subnet IDs', ecsSubnets.logicalId)
 
+    const ecsFargateMemory = new CfnParameter(this, 'ecsFargateMemory', {
+      description: 'The amount of memory (in MiB) used by the Finder task.',
+      default: '8192',
+      type: 'Number',
+      allowedValues: ['8192', '12288', '16384', '20480', '24576', '30720']
+    })
+    this.addToParamLabels('ECS Fargate Memory', ecsFargateMemory.logicalId)
+
+    const ecsCronExpression = new CfnParameter(this, 'ecsCronExpression', {
+      description: 'Cron Expression For ECS Finder Task. Leave blank to execute only once.',
+      default: '0/60 * * * ? *',
+      type: 'String',
+    })
+    this.addToParamLabels('ECS Cron Expression', ecsCronExpression.logicalId)
+
     const alarmEmail = new CfnParameter(this, 'alarmEmail', {
       allowedPattern: '\\w[-\\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\\.)+[A-Za-z]{2,14}',
       type: 'String',
@@ -252,10 +282,10 @@ export class DataTransferS3Stack extends Stack {
     })
 
 
-    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId)
+    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcPrefixsListFile.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId, srcSkipCompare.logicalId)
     this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId, destAcl.logicalId)
     this.addToParamGroups('Notification Information', alarmEmail.logicalId)
-    this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId)
+    this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId, ecsFargateMemory.logicalId, ecsCronExpression.logicalId)
 
     // let lambdaMemory: CfnParameter | undefined
     let maxCapacity: CfnParameter | undefined
@@ -360,10 +390,12 @@ export class DataTransferS3Stack extends Stack {
       SOURCE_TYPE: srcType.valueAsString,
       SRC_BUCKET: srcBucket.valueAsString,
       SRC_PREFIX: srcPrefix.valueAsString,
+      SRC_PREFIX_LIST: srcPrefixsListFile.valueAsString,
       SRC_REGION: srcRegion.valueAsString,
       SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
+      SKIP_COMPARE: srcSkipCompare.valueAsString,
 
       DEST_BUCKET: destBucket.valueAsString,
       DEST_PREFIX: destPrefix.valueAsString,
@@ -381,7 +413,9 @@ export class DataTransferS3Stack extends Stack {
       vpc: vpc,
       ecsSubnetIds: ecsSubnets.valueAsList,
       ecsClusterName: ecsClusterName.valueAsString,
+      memory: ecsFargateMemory.valueAsNumber,
       cliRelease: cliRelease,
+      ecsCronExpression: ecsCronExpression.valueAsString,
     }
     const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
 
@@ -397,6 +431,7 @@ export class DataTransferS3Stack extends Stack {
 
       SRC_BUCKET: srcBucket.valueAsString,
       SRC_PREFIX: srcPrefix.valueAsString,
+      SRC_PREFIX_LIST: srcPrefixsListFile.valueAsString,
       SRC_REGION: srcRegion.valueAsString,
       SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
