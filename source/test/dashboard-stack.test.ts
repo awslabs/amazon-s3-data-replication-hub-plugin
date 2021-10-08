@@ -28,6 +28,7 @@ test('Test dashboard stack', () => {
     new db.DashboardStack(stack, 'MyTestDashboardStack', {
         runType: RunType.EC2,
         queue: new sqs.Queue(stack, 'TestQueue'),
+        asgName: 'TestASG',
     });
     // THEN
     expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
