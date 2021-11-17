@@ -251,11 +251,31 @@ export class DataTransferS3Stack extends Stack {
       type: 'String',
     })
 
+    const ossFinanceLBIp = new CfnParameter(this, 'ossFinanceLBIp', {
+      description: 'The IP of the LB of OSS Finance',
+      default: '',
+      type: 'String',
+    })
+
+    const ossFinanceEndpoint = new CfnParameter(this, 'ossFinanceEndpoint', {
+      description: 'The Endpoint of OSS Finance',
+      default: '',
+      type: 'String',
+    })
+
+    const dthWorkerCliS3BucketName = new CfnParameter(this, 'dthWorkerCliS3BucketName', {
+      description: 'The S3 bucket name where stored the DTH worker\'s CLI',
+      default: '',
+      type: 'String',
+    })
+
+
 
     this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId)
     this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId, destAcl.logicalId)
     this.addToParamGroups('Notification Information', alarmEmail.logicalId)
     this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId, ecsVpcId.logicalId, ecsSubnets.logicalId)
+    this.addToParamGroups('Additional Information For OSS Finance', ossFinanceLBIp.logicalId, ossFinanceEndpoint.logicalId, dthWorkerCliS3BucketName.logicalId)
 
     // let lambdaMemory: CfnParameter | undefined
     let maxCapacity: CfnParameter | undefined
@@ -305,6 +325,7 @@ export class DataTransferS3Stack extends Stack {
     // const bucketName = Fn.conditionIf(isSrc.logicalId, destBucket.valueAsString, srcBucket.valueAsString).toString();
     const srcIBucket = s3.Bucket.fromBucketName(this, `SrcBucket`, srcBucket.valueAsString);
     const destIBucket = s3.Bucket.fromBucketName(this, `DestBucket`, destBucket.valueAsString);
+    const workerCliBucket = s3.Bucket.fromBucketName(this, `WorkerCliBucket`, dthWorkerCliS3BucketName.valueAsString)
 
     // Get VPC
     const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
@@ -428,6 +449,10 @@ export class DataTransferS3Stack extends Stack {
         minCapacity: minCapacity?.valueAsNumber,
         desiredCapacity: desiredCapacity?.valueAsNumber,
         cliRelease: cliRelease,
+        ossFinanceLBIp: ossFinanceLBIp.valueAsString,
+        ossFinanceEndpoint: ossFinanceEndpoint.valueAsString,
+        dthWorkerCliS3BucketName: dthWorkerCliS3BucketName.valueAsString,
+        srcBucketName: srcBucket.valueAsString
       }
 
       const ec2Stack = new Ec2WorkerStack(this, 'EC2WorkerStack', ec2Props)
@@ -436,6 +461,7 @@ export class DataTransferS3Stack extends Stack {
       commonStack.sqsQueue.grantConsumeMessages(ec2Stack.workerAsg.role);
       srcIBucket.grantRead(ec2Stack.workerAsg.role)
       destIBucket.grantReadWrite(ec2Stack.workerAsg.role)
+      workerCliBucket.grantRead(ec2Stack.workerAsg.role)
 
       asgName = ec2Stack.workerAsg.autoScalingGroupName
     }

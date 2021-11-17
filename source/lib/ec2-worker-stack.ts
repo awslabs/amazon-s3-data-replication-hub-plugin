@@ -37,6 +37,10 @@ export interface Ec2WorkerProps {
     readonly minCapacity?: number,
     readonly desiredCapacity?: number,
     readonly cliRelease: string,
+    readonly ossFinanceLBIp: string,
+    readonly ossFinanceEndpoint: string,
+    readonly dthWorkerCliS3BucketName: string,
+    readonly srcBucketName: string,
 }
 
 
@@ -184,13 +188,17 @@ export class Ec2WorkerStack extends Construct {
             'sysctl -p',
             'echo `sysctl net.ipv4.tcp_congestion_control` > worker.log',
 
+            // Config the hosts for aliyun finance
+            `sudo echo "${props.ossFinanceLBIp} ${props.ossFinanceEndpoint}" >> /etc/hosts`,
+            `sudo echo "${props.ossFinanceLBIp} ${props.dthWorkerCliS3BucketName}.${props.ossFinanceEndpoint}" >> /etc/hosts`,
+
             // Enable Cloudwatch Agent
             'yum install -y amazon-cloudwatch-agent',
             `sed -i  -e "s/##log group##/${ec2LG.logGroupName}/g" cw_agent_config.json`,
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
             // Get CLI from solution assets
-            `curl -LO "${cliAssetDomain}/data-transfer-hub-cli/v${props.cliRelease}/dthcli_${props.cliRelease}_linux_arm64.tar.gz"`,
+            `aws s3 cp s3://${props.dthWorkerCliS3BucketName}/dthcli_${props.cliRelease}_linux_arm64.tar.gz`,
             `tar zxvf dthcli_${props.cliRelease}_linux_arm64.tar.gz`,
 
             // Prepare the environment variables
