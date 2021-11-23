@@ -37,10 +37,10 @@ export interface Ec2WorkerProps {
     readonly minCapacity?: number,
     readonly desiredCapacity?: number,
     readonly cliRelease: string,
-    readonly ossFinanceLBIp: string,
-    readonly ossFinanceEndpoint: string,
-    readonly dthWorkerCliS3BucketName: string,
-    readonly srcBucketName: string,
+    readonly ossFinanceLBIp?: string,
+    readonly ossFinanceEndpoint?: string,
+    readonly dthWorkerCliS3BucketName?: string,
+    readonly srcBucketName?: string,
 }
 
 
