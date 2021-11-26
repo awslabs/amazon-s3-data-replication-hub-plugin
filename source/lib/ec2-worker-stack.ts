@@ -131,7 +131,7 @@ export class Ec2WorkerStack extends Construct {
             // spotPrice: "0.01",
             // healthCheck: autoscaling.HealthCheck.ec2(),
             securityGroup: ec2SG,
-            // keyName: 'ad-key',  // dev only
+            // keyName: 'cn-nw1-key',  // dev only
             instanceMonitoring: asg.Monitoring.DETAILED,
             associatePublicIpAddress: true,
             groupMetrics: [new asg.GroupMetrics(asg.GroupMetric.DESIRED_CAPACITY, asg.GroupMetric.IN_SERVICE_INSTANCES)],
@@ -179,7 +179,7 @@ export class Ec2WorkerStack extends Construct {
         this.workerAsg.applyCloudFormationInit(ec2.CloudFormationInit.fromElements(ec2.InitFile.fromFileInline('/home/ec2-user/cw_agent_config.json', path.join(__dirname, '../config/cw_agent_config.json'))))
 
         this.workerAsg.userData.addCommands(
-            'yum update -y',
+            // 'yum update -y',
             'cd /home/ec2-user/',
 
             // Enable BBR
@@ -190,15 +190,18 @@ export class Ec2WorkerStack extends Construct {
 
             // Config the hosts for aliyun finance
             `sudo echo "${props.ossFinanceLBIp} ${props.ossFinanceEndpoint}" >> /etc/hosts`,
-            `sudo echo "${props.ossFinanceLBIp} ${props.dthWorkerCliS3BucketName}.${props.ossFinanceEndpoint}" >> /etc/hosts`,
+            `sudo echo "${props.ossFinanceLBIp} ${props.env.SRC_BUCKET}.${props.ossFinanceEndpoint}" >> /etc/hosts`,
 
             // Enable Cloudwatch Agent
-            'yum install -y amazon-cloudwatch-agent',
+            // 'yum install -y amazon-cloudwatch-agent',
+            `export AWS_DEFAULT_REGION="cn-northwest-1"`,
+            `aws s3 cp s3://${props.dthWorkerCliS3BucketName}/amazon-cloudwatch-agent.rpm .`,
+            `sudo rpm -U ./amazon-cloudwatch-agent.rpm`,
             `sed -i  -e "s/##log group##/${ec2LG.logGroupName}/g" cw_agent_config.json`,
             '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/home/ec2-user/cw_agent_config.json -s',
 
             // Get CLI from solution assets
-            `aws s3 cp s3://${props.dthWorkerCliS3BucketName}/dthcli_${props.cliRelease}_linux_arm64.tar.gz`,
+            `aws s3 cp s3://${props.dthWorkerCliS3BucketName}/dthcli_${props.cliRelease}_linux_arm64.tar.gz .`,
             `tar zxvf dthcli_${props.cliRelease}_linux_arm64.tar.gz`,
 
             // Prepare the environment variables
