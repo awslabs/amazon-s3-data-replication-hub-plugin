@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 
-import { CfnParameter, CfnResource, Stack, StackProps, Construct, CfnCondition, Fn, Aws, CfnMapping } from '@aws-cdk/core';
+import { CfnParameter, CfnResource, Stack, StackProps, Construct, CfnCondition, Fn, Aws } from '@aws-cdk/core';
 import * as sm from '@aws-cdk/aws-secretsmanager';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as ec2 from '@aws-cdk/aws-ec2';
@@ -461,12 +461,8 @@ export class DataTransferS3Stack extends Stack {
     eventStack.nestedStackResource?.addMetadata('nestedTemplateName', eventStack.templateFile.slice(0, -5));
     eventStack.nestedStackResource?.overrideLogicalId('EventStack')
 
-    const isCN = new CfnCondition(this, 'IsChinaRegion', {
-      expression: Fn.conditionEquals(Aws.PARTITION, 'aws-cn')
-    });
-
-    const s3Domain = Fn.conditionIf(isCN.logicalId, 'https://s3.cn-north-1.amazonaws.com.cn', 'https://s3.amazonaws.com').toString();
-    eventStack.nestedStackResource?.addMetadata('domain', s3Domain);
+    const templateBucket = process.env.TEMPLATE_OUTPUT_BUCKET || 'aws-gcr-solutions'
+    eventStack.nestedStackResource?.addMetadata('domain', `https://${templateBucket}.s3.amazonaws.com`);
 
     const useS3Event = new CfnCondition(this, 'UseS3Event', {
       expression: Fn.conditionAnd(
