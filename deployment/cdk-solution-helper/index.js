@@ -103,7 +103,7 @@ fs.readdirSync(global_s3_assets).forEach(file => {
         [
           fn.Metadata.domain,
           '/',
-          `%%BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/${fn.Metadata.nestedTemplateName}`
+          `%%TEMPLATE_BUCKET_NAME%%/%%SOLUTION_NAME%%/%%VERSION%%/${fn.Metadata.nestedTemplateName}`
         ]
       ]
     };

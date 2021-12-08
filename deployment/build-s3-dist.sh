@@ -161,7 +161,10 @@ if [[ -z $TEMPLATE_OUTPUT_BUCKET ]]; then
 fi
 
 echo "Updating code source bucket in template with $1"
-replace="s/%%BUCKET_NAME%%/$TEMPLATE_OUTPUT_BUCKET/g"
+replace="s/%%TEMPLATE_BUCKET_NAME%%/$TEMPLATE_OUTPUT_BUCKET/g"
+echo "sed -i '' -e $replace $template_dist_dir/*.template"
+run sedi $replace $template_dist_dir/*.template
+replace="s/%%BUCKET_NAME%%/$1/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
 run sedi $replace $template_dist_dir/*.template
 replace="s/%%SOLUTION_NAME%%/$2/g"
