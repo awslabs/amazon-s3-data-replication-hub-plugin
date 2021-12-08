@@ -153,8 +153,15 @@ cd $template_dist_dir
 echo "VERSION=${VERSION}"
 echo "${VERSION}" > version
 
+# Need to specify TEMPLATE_OUTPUT_BUCKET for customization.
+# If not, the nested stack will be point to the default bucket aws-gcr-solutions
+# But the version might not exist.
+if [[ -z $TEMPLATE_OUTPUT_BUCKET ]]; then
+    export TEMPLATE_OUTPUT_BUCKET="aws-gcr-solutions"
+fi
+
 echo "Updating code source bucket in template with $1"
-replace="s/%%BUCKET_NAME%%/$1/g"
+replace="s/%%BUCKET_NAME%%/$TEMPLATE_OUTPUT_BUCKET/g"
 echo "sed -i '' -e $replace $template_dist_dir/*.template"
 run sedi $replace $template_dist_dir/*.template
 replace="s/%%SOLUTION_NAME%%/$2/g"
