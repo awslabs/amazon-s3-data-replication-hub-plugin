@@ -63,8 +63,6 @@ Please follow below steps to deploy this solution via AWS Cloudformation.
 
       [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
     
-1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required. If you want to use the prefix list to complete the transmission of data in multiple specified prefixes, please refer to [Using Prefix List Guide](./USING_PREFIX_LIST_EN.md).
-
 1. Click **Next**. Specify values to parameters accordingly. Change the stack name if required.
 
 1. Click **Next**. Configure additional stack options such as tags (Optional). 

@@ -64,7 +64,6 @@
       [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/latest/DataTransferS3Stack-ec2.template)
 
     
-1. 单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。如果您想使用前缀列表来完成多个指定前缀中数据的传输，请参考[使用前缀列表教程](./USING_PREFIX_LIST_CN.md)。
 
 1. 单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
 
