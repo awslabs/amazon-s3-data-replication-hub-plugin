@@ -31,7 +31,8 @@ test('Test ECS finder stack', () => {
         vpc: new ec2.Vpc(stack, 'TestVpc'),
         ecsSubnetIds: ['subnet-1', 'subnet-2'],
         ecsClusterName: 'TestCluster',
-        cliRelease: 'v1.0.0',
+        cliRelease: 'v1.1.0',
+        ecsCronExpression: '0/60 * * * ? *',
     });
     // THEN
     expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();

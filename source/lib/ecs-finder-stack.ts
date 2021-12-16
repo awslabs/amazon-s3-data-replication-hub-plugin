@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 
-import { Construct, Duration, Aws, CfnMapping, CfnOutput, CustomResource, Stack } from '@aws-cdk/core';
+import { Construct, Duration, Aws, CfnMapping, CfnCondition, Fn, CfnOutput, CustomResource, Stack } from '@aws-cdk/core';
 import * as events from '@aws-cdk/aws-events';
 import * as targets from '@aws-cdk/aws-events-targets';
 import * as ecs from '@aws-cdk/aws-ecs';
@@ -42,6 +42,7 @@ export interface EcsTaskProps {
     readonly cpu?: number,
     readonly memory?: number,
     readonly cliRelease: string,
+    readonly ecsCronExpression: string,
 }
 
 export class EcsStack extends Construct {
@@ -107,10 +108,16 @@ export class EcsStack extends Construct {
         ])
 
         // 8. CloudWatch Rule. 
-        // Schedule CRON event to trigger JobSender per hour
+        // Default Schedule CRON event to trigger JobSender per hour
+        const enableECSTrigger = new CfnCondition(this, 'enableECSTrigger', {
+            expression: Fn.conditionEquals(props.ecsCronExpression, ""),
+        });
+
+        // If props.ecsCronExpression is null, set CronExpression to 0/60 * * * ? 2000 to stop the schedule trigger
+        const CronExpression = Fn.conditionIf(enableECSTrigger.logicalId, '0/60 * * * ? 2000', props.ecsCronExpression)
         const trigger = new events.Rule(this, 'DTHFinderSchedule', {
-            schedule: events.Schedule.rate(Duration.hours(1)),
-        })
+            schedule: events.Schedule.expression('cron(' + CronExpression + ')'),
+        });
 
         // Add target to cloudwatch rule.
         trigger.addTarget(new targets.EcsTask({
