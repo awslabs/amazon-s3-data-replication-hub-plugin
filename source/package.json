@@ -5,6 +5,7 @@
     "data-replication-component-s3": "bin/main-stack.js"
   },
   "scripts": {
+    "preinstall": "npx npm-force-resolutions",
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest --coverage",
@@ -43,5 +44,9 @@
     "@aws-cdk/custom-resources": "1.125.0",
     "hosted-git-info": ">=2.8.9",
     "source-map-support": "^0.5.16"
+  },
+  "resolutions": {
+    "ansi-regex": "5.0.1",
+    "vm2": "3.9.6"
   }
 }
