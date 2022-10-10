@@ -214,7 +214,7 @@ aws iam list-users
 
   - 部署到AWS中国北京或宁夏区
 
-  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://drh-solution.s3.cn-northwest-1.amazonaws.com.cn/dth-s3-sync-plugin/v1.1.2/DataTransferS3Stack-ec2.template)
+  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/v2.0.0-dual-way/DataTransferS3Stack-ec2.template)
 
 **注意**: 在Template的参数的 `userID for Two Way Synchronization` ，填写 **Step2** 中您获取的UserID，本案例中为AIDA22DTNGKCEFNXNVSDR。 本测试案例中 China Region的参数如下：
 
@@ -225,7 +225,7 @@ aws iam list-users
 
   - 部署到AWS海外区
 
-  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://drh-solution.s3.us-west-2.amazonaws.com/dth-s3-sync-plugin/v1.1.2/DataTransferS3Stack-ec2.template)
+  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/v2.0.0-dual-way/DataTransferS3Stack-ec2.template)
 
 **注意**: 在Template的参数的 `userID for Two Way Synchronization` ，填写 **Step4** 中您获取的UserID，本案例中为AIDAYCQ5VG226XD5UCUOR。 本测试案例中 Global Region的参数如下：
 
