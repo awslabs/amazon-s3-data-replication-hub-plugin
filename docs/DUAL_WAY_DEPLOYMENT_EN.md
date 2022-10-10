@@ -222,7 +222,7 @@ Click the button below to launch the CloudFormation stack in this area.
 
   - Deploy to AWS China Beijing or Ningxia Region
 
-  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://drh-solution.s3.cn-northwest-1.amazonaws.com.cn/dth-s3-sync-plugin/v1.1.2/DataTransferS3Stack-ec2.template)
+  [![Launch Stack](launch-stack.svg)](https://console.amazonaws.cn/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://aws-gcr-solutions.s3.cn-north-1.amazonaws.com.cn/data-transfer-hub-s3/v2.0.0-dual-way/DataTransferS3Stack-ec2.template)
 
 **Note**: In the `userID for Two Way Synchronization` of the template parameter, fill in the UserID you obtained in **Step2**, in this case AIDA22DTNGKCEFNXNVSDR. The parameters of China Region in this test case are as follows:
 
@@ -234,7 +234,7 @@ Click the button below to launch the CloudFormation stack in this area.
 
   - Deploy to AWS Global regions
 
-  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://drh-solution.s3.us-west-2.amazonaws.com/dth-s3-sync-plugin/v1.1.2/DataTransferS3Stack-ec2.template)
+  [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3DualStack&templateURL=https://aws-gcr-solutions.s3.amazonaws.com/data-transfer-hub-s3/v2.0.0-dual-way/DataTransferS3Stack-ec2.template)
 
 **Note**: In the `userID for Two Way Synchronization` of the template parameter, fill in the UserID you obtained in **Step4**, in this case AIDAYCQ5VG226XD5UCUOR. The parameters of the Global Region in this test case are as follows:
 
