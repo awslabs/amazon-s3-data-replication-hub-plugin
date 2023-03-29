@@ -14,9 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Construct, Duration, Aws } from '@aws-cdk/core';
-import * as cw from '@aws-cdk/aws-cloudwatch';
-import * as sqs from '@aws-cdk/aws-sqs';
+import {
+    Construct,
+} from 'constructs';
+import {
+    Aws,
+    Duration,
+    aws_cloudwatch as cw,
+    aws_sqs as sqs,
+} from 'aws-cdk-lib';
 
 import { RunType } from './main-stack';
 
@@ -61,8 +67,8 @@ export class DashboardStack extends Construct {
         const asgDesired = new cw.Metric({
             namespace: 'AWS/AutoScaling',
             metricName: 'GroupDesiredCapacity',
-            dimensions: {
-                'AutoScalingGroupName': props.asgName
+            dimensionsMap: {
+                'AutoScalingGroupName': props.asgName!
             },
             statistic: 'Max',
             period: Duration.minutes(1),
@@ -72,8 +78,8 @@ export class DashboardStack extends Construct {
         const asgInSvc = new cw.Metric({
             namespace: 'AWS/AutoScaling',
             metricName: 'GroupInServiceInstances',
-            dimensions: {
-                'AutoScalingGroupName': props.asgName
+            dimensionsMap: {
+                'AutoScalingGroupName': props.asgName!
             },
             statistic: 'Max',
             period: Duration.minutes(1),
@@ -83,8 +89,8 @@ export class DashboardStack extends Construct {
         const asgNetworkIn = new cw.Metric({
             namespace: 'AWS/EC2',
             metricName: 'NetworkIn',
-            dimensions: {
-                'AutoScalingGroupName': props.asgName
+            dimensionsMap: {
+                'AutoScalingGroupName': props.asgName!
             },
             statistic: 'Sum',
             period: Duration.minutes(1)
@@ -92,8 +98,8 @@ export class DashboardStack extends Construct {
         const asgNetworkOut = new cw.Metric({
             namespace: 'AWS/EC2',
             metricName: 'NetworkOut',
-            dimensions: {
-                'AutoScalingGroupName': props.asgName
+            dimensionsMap: {
+                'AutoScalingGroupName': props.asgName!
             },
             statistic: 'Sum',
             period: Duration.minutes(1)
@@ -102,8 +108,8 @@ export class DashboardStack extends Construct {
         const asgCPU = new cw.Metric({
             namespace: 'AWS/EC2',
             metricName: 'CPUUtilization',
-            dimensions: {
-                'AutoScalingGroupName': props.asgName
+            dimensionsMap: {
+                'AutoScalingGroupName': props.asgName!
             },
             statistic: 'Average',
             period: Duration.minutes(1),
@@ -113,8 +119,8 @@ export class DashboardStack extends Construct {
         const asgMemory = new cw.Metric({
             namespace: 'CWAgent',
             metricName: 'mem_used_percent',
-            dimensions: {
-                'AutoScalingGroupName': props.asgName
+            dimensionsMap: {
+                'AutoScalingGroupName': props.asgName!
             },
             statistic: 'Average',
             period: Duration.minutes(1),
@@ -124,8 +130,8 @@ export class DashboardStack extends Construct {
         const asgDisk = new cw.Metric({
             namespace: 'CWAgent',
             metricName: 'disk_used_percent',
-            dimensions: {
-                'AutoScalingGroupName': props.asgName
+            dimensionsMap: {
+                'AutoScalingGroupName': props.asgName!
             },
             statistic: 'Average',
             period: Duration.minutes(1),

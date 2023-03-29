@@ -33,12 +33,13 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     const fn = template.Resources[f];
     if (fn.Properties.Code.hasOwnProperty('S3Bucket')) {
       // Set the S3 key reference
-      let artifactHash = Object.assign(fn.Properties.Code.S3Bucket.Ref);
-      // artifactHash = artifactHash.replace('AssetParameters', '');
-      let start = artifactHash.indexOf('AssetParameters') + 15
-      artifactHash = artifactHash.substring(start, artifactHash.indexOf('S3Bucket'));
-      const assetPath = `asset${artifactHash}`;
-      fn.Properties.Code.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${assetPath}.zip`;
+      let s3Key = Object.assign(fn.Properties.Code.S3Key);
+      // https://github.com/aws/aws-cdk/issues/10608
+      if (!s3Key.endsWith('.zip')) {
+        fn.Properties.Code.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${s3Key}.zip`;
+      } else {
+        fn.Properties.Code.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${s3Key}`;
+      }
       // Set the S3 bucket reference
       fn.Properties.Code.S3Bucket = {
         'Fn::Sub': '%%BUCKET_NAME%%-${AWS::Region}'
@@ -67,58 +68,20 @@ fs.readdirSync(global_s3_assets).forEach(file => {
     }
   });
 
-  // Clean-up Lambda layer code dependencies
+  // Clean-up Lambda Layer code dependencies
   const lambdaLayers = Object.keys(resources).filter(function (key) {
     return resources[key].Type === "AWS::Lambda::LayerVersion";
-  });
-  lambdaLayers.forEach(function (f) {
-    const fn = template.Resources[f];
-    if (fn.Properties.Content.hasOwnProperty('S3Bucket')) {
-      // Set the S3 key reference
-      let artifactHash = Object.assign(fn.Properties.Content.S3Bucket.Ref);
-      // artifactHash = artifactHash.replace('AssetParameters', '');
-      let start = artifactHash.indexOf('AssetParameters') + 15
-      artifactHash = artifactHash.substring(start, artifactHash.indexOf('S3Bucket'));
-      const assetPath = `asset${artifactHash}`;
-      fn.Properties.Content.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${assetPath}.zip`;
-      // Set the S3 bucket reference
-      fn.Properties.Content.S3Bucket = {
+  })
+  lambdaLayers.forEach(function (l) {
+    const layer = template.Resources[l];
+    if (layer.Properties.Content.hasOwnProperty('S3Bucket')) {
+      let s3Key = Object.assign(layer.Properties.Content.S3Key);
+      layer.Properties.Content.S3Key = `%%SOLUTION_NAME%%/%%VERSION%%/${s3Key}`;
+      layer.Properties.Content.S3Bucket = {
         'Fn::Sub': '%%BUCKET_NAME%%-${AWS::Region}'
-      };
-      // // Set the handler
-      // const handler = fn.Properties.Handler;
-      // fn.Properties.Handler = `${assetPath}/${handler}`;
-    }
-  });
-
-  // Clean-up nested template stack dependencies
-  const nestedStacks = Object.keys(resources).filter(function (key) {
-    return resources[key].Type === 'AWS::CloudFormation::Stack'
-  });
-  nestedStacks.forEach(function (f) {
-    const fn = template.Resources[f];
-    fn.Properties.TemplateURL = {
-      'Fn::Join': [
-        '',
-        [
-          fn.Metadata.domain,
-          '/',
-          `%%SOLUTION_NAME%%/%%VERSION%%/${fn.Metadata.nestedTemplateName}`
-        ]
-      ]
-    };
-
-    const params = fn.Properties.Parameters ? fn.Properties.Parameters : {};
-    const nestedStackParameters = Object.keys(params).filter(function (key) {
-      if (key.search(/[\w]*AssetParameters/g) > -1) {
-        return true;
       }
-      return false;
-    });
-    nestedStackParameters.forEach(function (stkParam) {
-      fn.Properties.Parameters[stkParam] = undefined;
-    });
-  });
+    }
+  })
 
 
   // Clean-up parameters section
@@ -129,6 +92,17 @@ fs.readdirSync(global_s3_assets).forEach(file => {
   assetParameters.forEach(function (a) {
     template.Parameters[a] = undefined;
   });
+
+  // Clean-up BootstrapVersion parameter
+  if (parameters.hasOwnProperty('BootstrapVersion')) {
+    parameters.BootstrapVersion = undefined
+  }
+
+  // Clean-up CheckBootstrapVersion Rule
+  const rules = (template.Rules) ? template.Rules : {};
+  if (rules.hasOwnProperty('CheckBootstrapVersion')) {
+    rules.CheckBootstrapVersion = undefined
+  }
 
   // Output modified template file
   const output_template = JSON.stringify(template, null, 2);

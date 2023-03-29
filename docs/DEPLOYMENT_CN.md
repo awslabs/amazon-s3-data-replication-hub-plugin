@@ -64,6 +64,7 @@
       [![Launch Stack](launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/template?stackName=DTHS3Stack&templateURL=https://solutions-reference.s3.amazonaws.com/data-transfer-hub-s3-plugin/latest/DataTransferS3Stack-ec2.template)
 
     
+
 1. 单击**下一步**。 相应地为参数指定值。 如果需要，请更改堆栈名称。
 
 1. 单击**下一步**。 配置其他堆栈选项，例如标签（可选）。

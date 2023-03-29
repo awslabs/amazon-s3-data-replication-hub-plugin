@@ -15,17 +15,31 @@ limitations under the License.
 */
 
 
-import { CfnParameter, CfnResource, Stack, StackProps, Construct, CfnCondition, Fn, Aws } from '@aws-cdk/core';
-import * as sm from '@aws-cdk/aws-secretsmanager';
-import * as s3 from '@aws-cdk/aws-s3';
-import * as ec2 from '@aws-cdk/aws-ec2';
-import * as iam from '@aws-cdk/aws-iam';
+import {
+  Construct,
+  IConstruct
+} from 'constructs';
+import {
+  Aws,
+  Fn,
+  CfnParameter,
+  CfnResource,
+  CfnCondition,
+  Aspects,
+  IAspect,
+  Stack,
+  StackProps,
+  aws_secretsmanager as sm,
+  aws_s3 as s3,
+  aws_s3_notifications as s3n,
+  aws_ec2 as ec2,
+  aws_iam as iam
+} from 'aws-cdk-lib';
 
 import { CommonStack, CommonProps } from "./common-resources";
-import { EcsStack, EcsTaskProps } from "./ecs-finder-stack";
+import { Ec2FinderStack, Ec2FinderProps } from "./ec2-finder-stack";
 import { Ec2WorkerStack, Ec2WorkerProps } from "./ec2-worker-stack";
 import { DashboardStack, DBProps } from "./dashboard-stack";
-import { EventStack, EventProps } from "./event-stack";
 
 const { VERSION } = process.env;
 
@@ -76,10 +90,10 @@ export class DataTransferS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
-    const cliRelease = '1.0.0'
+    const cliRelease = '1.2.1'
 
     const srcType = new CfnParameter(this, 'srcType', {
-      description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS',
+      description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
       type: 'String',
       default: 'Amazon_S3',
       allowedValues: ['Amazon_S3', 'Aliyun_OSS', 'Qiniu_Kodo', 'Tencent_COS']
@@ -98,6 +112,21 @@ export class DataTransferS3Stack extends Stack {
       type: 'String'
     })
     this.addToParamLabels('Source Prefix', srcPrefix.logicalId)
+
+    const srcPrefixsListFile = new CfnParameter(this, 'srcPrefixsListFile', {
+      description: 'Source Prefixs List File S3 path (Optional), support txt type, the maximum number of lines is 10 millions. e.g. my_prefix_list.txt',
+      default: '',
+      type: 'String'
+    })
+    this.addToParamLabels('Source Prefixs List File', srcPrefixsListFile.logicalId)
+
+    const srcSkipCompare = new CfnParameter(this, 'srcSkipCompare', {
+      description: 'Skip the data comparison in task finding process? If yes, all data in the source will be sent to the destination',
+      default: 'false',
+      type: 'String',
+      allowedValues: ['true', 'false']
+    })
+    this.addToParamLabels('Skip Data Comparison', srcSkipCompare.logicalId)
 
     const srcRegion = new CfnParameter(this, 'srcRegion', {
       description: 'Source Region Name',
@@ -169,8 +198,8 @@ export class DataTransferS3Stack extends Stack {
 
     // 'STANDARD'|'REDUCED_REDUNDANCY'|'STANDARD_IA'|'ONEZONE_IA'|'INTELLIGENT_TIERING'|'GLACIER'|'DEEP_ARCHIVE'|'OUTPOSTS',
     const destStorageClass = new CfnParameter(this, 'destStorageClass', {
-      description: 'Destination Storage Class, Default to STANDAD',
-      default: 'STANDARD',
+      description: 'Destination Storage Class, Default to INTELLIGENT_TIERING',
+      default: 'INTELLIGENT_TIERING',
       type: 'String',
       allowedValues: ['STANDARD', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING']
     })
@@ -190,31 +219,39 @@ export class DataTransferS3Stack extends Stack {
     })
     this.addToParamLabels('Destination Access Control List', destAcl.logicalId)
 
-    const ecsClusterName = new CfnParameter(this, 'ecsClusterName', {
-      description: 'ECS Cluster Name to run ECS task (Please make sure the cluster exists)',
-      default: '',
-      type: 'String'
-    })
-    this.addToParamLabels('ECS Cluster Name', ecsClusterName.logicalId)
-
-    const ecsVpcId = new CfnParameter(this, 'ecsVpcId', {
-      description: 'VPC ID to run ECS task and EC2 instances, e.g. vpc-bef13dc7',
+    const ec2VpcId = new CfnParameter(this, 'ec2VpcId', {
+      description: 'VPC ID to run EC2 task, e.g. vpc-bef13dc7',
       default: '',
       type: 'AWS::EC2::VPC::Id'
     })
-    this.addToParamLabels('VPC ID', ecsVpcId.logicalId)
+    this.addToParamLabels('VPC ID', ec2VpcId.logicalId)
 
-    const ecsSubnets = new CfnParameter(this, 'ecsSubnets', {
-      description: 'Subnet IDs to run ECS task and EC2 instances. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32',
+    const ec2Subnets = new CfnParameter(this, 'ec2Subnets', {
+      description: 'Subnet IDs to run EC2 task. Please provide two subnets at least delimited by comma, e.g. subnet-97bfc4cd,subnet-7ad7de32',
       default: '',
       type: 'List<AWS::EC2::Subnet::Id>'
     })
-    this.addToParamLabels('Subnet IDs', ecsSubnets.logicalId)
+    this.addToParamLabels('Subnet IDs', ec2Subnets.logicalId)
+
+    const finderEc2Memory = new CfnParameter(this, 'finderEc2Memory', {
+      description: 'The amount of memory (in GB) used by the Finder task.',
+      default: '8',
+      type: 'String',
+      allowedValues: ['8', '16', '32', '64', '128', '256']
+    })
+    this.addToParamLabels('EC2 Finder Memory', finderEc2Memory.logicalId)
+
+    const ec2CronExpression = new CfnParameter(this, 'ec2CronExpression', {
+      description: 'Cron Expression For EC2 Finder Task. Leave blank to execute only once.',
+      default: '0/60 * * * ? *',
+      type: 'String',
+    })
+    this.addToParamLabels('EC2 Cron Expression', ec2CronExpression.logicalId)
 
     const alarmEmail = new CfnParameter(this, 'alarmEmail', {
       allowedPattern: '\\w[-\\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\\.)+[A-Za-z]{2,14}',
       type: 'String',
-      description: 'Error notification will be sent to this email address'
+      description: 'Errors will be sent to this email.'
     })
     this.addToParamLabels('Alarm Email', alarmEmail.logicalId)
 
@@ -252,11 +289,10 @@ export class DataTransferS3Stack extends Stack {
     })
 
 
-    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId)
+    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcPrefixsListFile.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId, srcSkipCompare.logicalId)
     this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId, destAcl.logicalId)
-    this.addToParamGroups('ECS Cluster Information', ecsClusterName.logicalId)
-    this.addToParamGroups('Network Information', ecsVpcId.logicalId, ecsSubnets.logicalId)
     this.addToParamGroups('Notification Information', alarmEmail.logicalId)
+    this.addToParamGroups('EC2 Cluster Information', ec2VpcId.logicalId, ec2Subnets.logicalId, finderEc2Memory.logicalId, ec2CronExpression.logicalId)
 
     // let lambdaMemory: CfnParameter | undefined
     let maxCapacity: CfnParameter | undefined
@@ -308,10 +344,10 @@ export class DataTransferS3Stack extends Stack {
     const destIBucket = s3.Bucket.fromBucketName(this, `DestBucket`, destBucket.valueAsString);
 
     // Get VPC
-    const vpc = ec2.Vpc.fromVpcAttributes(this, 'ECSVpc', {
-      vpcId: ecsVpcId.valueAsString,
+    const vpc = ec2.Vpc.fromVpcAttributes(this, 'EC2Vpc', {
+      vpcId: ec2VpcId.valueAsString,
       availabilityZones: Fn.getAzs(),
-      publicSubnetIds: ecsSubnets.valueAsList
+      publicSubnetIds: ec2Subnets.valueAsList
     })
 
     // Start Common Stack
@@ -353,7 +389,7 @@ export class DataTransferS3Stack extends Stack {
 
     )
 
-    // Start Finder - ECS Stack
+    // Start Finder - EC2 Stack
     const finderEnv = {
       AWS_DEFAULT_REGION: Aws.REGION,
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
@@ -361,10 +397,12 @@ export class DataTransferS3Stack extends Stack {
       SOURCE_TYPE: srcType.valueAsString,
       SRC_BUCKET: srcBucket.valueAsString,
       SRC_PREFIX: srcPrefix.valueAsString,
+      SRC_PREFIX_LIST: srcPrefixsListFile.valueAsString,
       SRC_REGION: srcRegion.valueAsString,
       SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
+      SKIP_COMPARE: srcSkipCompare.valueAsString,
 
       DEST_BUCKET: destBucket.valueAsString,
       DEST_PREFIX: destPrefix.valueAsString,
@@ -377,19 +415,19 @@ export class DataTransferS3Stack extends Stack {
 
     }
 
-    const ecsProps: EcsTaskProps = {
+    const finderProps: Ec2FinderProps = {
       env: finderEnv,
       vpc: vpc,
-      ecsSubnetIds: ecsSubnets.valueAsList,
-      ecsClusterName: ecsClusterName.valueAsString,
+      ec2SubnetIds: ec2Subnets.valueAsList,
       cliRelease: cliRelease,
+      ec2CronExpression: ec2CronExpression.valueAsString,
+      ec2Memory: finderEc2Memory.valueAsString,
     }
-    const ecsStack = new EcsStack(this, 'ECSStack', ecsProps);
-
-    ecsStack.taskDefinition.taskRole.attachInlinePolicy(defaultPolicy)
-    commonStack.sqsQueue.grantSendMessages(ecsStack.taskDefinition.taskRole);
-    srcIBucket.grantRead(ecsStack.taskDefinition.taskRole)
-    destIBucket.grantRead(ecsStack.taskDefinition.taskRole)
+    const finderStack = new Ec2FinderStack(this, 'FinderStack', finderProps)
+    finderStack.finderRole.attachInlinePolicy(defaultPolicy)
+    commonStack.sqsQueue.grantSendMessages(finderStack.finderRole);
+    srcIBucket.grantRead(finderStack.finderRole)
+    destIBucket.grantRead(finderStack.finderRole)
 
     const workerEnv = {
       JOB_TABLE_NAME: commonStack.jobTable.tableName,
@@ -398,6 +436,7 @@ export class DataTransferS3Stack extends Stack {
 
       SRC_BUCKET: srcBucket.valueAsString,
       SRC_PREFIX: srcPrefix.valueAsString,
+      SRC_PREFIX_LIST: srcPrefixsListFile.valueAsString,
       SRC_REGION: srcRegion.valueAsString,
       SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
@@ -449,21 +488,56 @@ export class DataTransferS3Stack extends Stack {
     }
     new DashboardStack(this, 'DashboardStack', dbProps);
 
+    commonStack.sqsQueue.addToResourcePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        conditions: {
+          StringEquals: {
+            "aws:SourceArn": srcIBucket.bucketArn,
+          },
+        },
+        principals: [new iam.ServicePrincipal("s3.amazonaws.com")],
+        resources: [commonStack.sqsQueue.queueArn],
+        actions: [
+          "sqs:SendMessage"
+        ],
+      })
+    );
+    
+    // Here we create the notification resource by default
+    // Using cdk condition to enable or disable this notification
+    // Using cdk Aspects to modify the event type.
+    srcIBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.SqsDestination(commonStack.sqsQueue),
+      {
+        prefix: srcPrefix.valueAsString,
+      }
+    );
 
-
-    // Set up event stack
-    const eventProps: EventProps = {
-      events: srcEvent.valueAsString,
-      bucket: srcIBucket,
-      prefix: srcPrefix.valueAsString,
-      queue: commonStack.sqsQueue,
-    }
-    const eventStack = new EventStack(this, 'EventStack', eventProps)
-    eventStack.nestedStackResource?.addMetadata('nestedTemplateName', eventStack.templateFile.slice(0, -5));
-    eventStack.nestedStackResource?.overrideLogicalId('EventStack')
-
-    const templateBucket = process.env.TEMPLATE_OUTPUT_BUCKET || 'aws-gcr-solutions'
-    eventStack.nestedStackResource?.addMetadata('domain', `https://${templateBucket}.s3.amazonaws.com`);
+    const hasDelete = new CfnCondition(this, 'hasDelete', {
+      expression: Fn.conditionEquals('CreateAndDelete', srcEvent.valueAsString),
+    });
+    const events = Fn.conditionIf(hasDelete.logicalId, 's3:ObjectCreated:*,s3:ObjectRemoved:*', 's3:ObjectCreated:*').toString();
+    const s3EventConfiguration = [
+      {
+        "Events": Fn.split(",", events),
+        "Filter": {
+          "Key": {
+            "FilterRules": [
+              {
+                "Name": "prefix",
+                "Value": srcPrefix.valueAsString
+              }
+            ]
+          }
+        },
+        "QueueArn": commonStack.sqsQueue.queueArn
+      }
+    ]
+    Aspects.of(this).add(
+      new InjectS3CreateAndDeleteEventConfig(s3EventConfiguration)
+    );
 
     const useS3Event = new CfnCondition(this, 'UseS3Event', {
       expression: Fn.conditionAnd(
@@ -476,9 +550,34 @@ export class DataTransferS3Stack extends Stack {
       ),
     });
 
-    if (eventStack.nestedStackResource) {
-      eventStack.nestedStackResource.cfnOptions.condition = useS3Event
-    }
+    Aspects.of(this).add(
+      new InjectS3NotificationCondition(useS3Event)
+    );
+  }
+}
 
+class InjectS3NotificationCondition implements IAspect {
+  public constructor(private condition: CfnCondition) { }
+
+  public visit(node: IConstruct): void {
+    if (
+      node instanceof CfnResource &&
+      node.cfnResourceType === "Custom::S3BucketNotifications"
+    ) {
+      node.cfnOptions.condition = this.condition;
+    }
+  }
+}
+
+class InjectS3CreateAndDeleteEventConfig implements IAspect {
+  public constructor(private queueConfigurations: any) { }
+
+  public visit(node: IConstruct): void {
+    if (
+      node instanceof CfnResource &&
+      node.cfnResourceType === "Custom::S3BucketNotifications"
+    ) {
+      node.addPropertyOverride("NotificationConfiguration.QueueConfigurations", this.queueConfigurations);
+    }
   }
 }

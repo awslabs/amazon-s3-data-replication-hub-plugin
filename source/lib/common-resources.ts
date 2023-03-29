@@ -15,15 +15,24 @@ limitations under the License.
 */
 
 
-import { Construct, Duration, RemovalPolicy, CfnOutput, Aws } from '@aws-cdk/core';
-import * as ddb from '@aws-cdk/aws-dynamodb';
-import * as sqs from '@aws-cdk/aws-sqs';
-import * as cw from '@aws-cdk/aws-cloudwatch';
-import * as actions from '@aws-cdk/aws-cloudwatch-actions';
-import * as sns from '@aws-cdk/aws-sns';
-import * as sub from '@aws-cdk/aws-sns-subscriptions';
-import * as kms from '@aws-cdk/aws-kms'
-import * as iam from '@aws-cdk/aws-iam';
+import {
+    Construct,
+} from 'constructs';
+import {
+    Aws,
+    Duration,
+    CfnOutput,
+    RemovalPolicy,
+    aws_iam as iam,
+    aws_dynamodb as ddb,
+    aws_sqs as sqs,
+    aws_cloudwatch as cw,
+    aws_cloudwatch_actions as actions,
+    aws_sns as sns,
+    aws_sns_subscriptions as sub,
+    aws_kms as kms
+} from 'aws-cdk-lib';
+import { NagSuppressions } from "cdk-nag";
 
 import { addCfnNagSuppressRules } from "./main-stack";
 
@@ -63,6 +72,11 @@ export class CommonStack extends Construct {
             retentionPeriod: Duration.days(14),
             encryption: sqs.QueueEncryption.KMS_MANAGED,
         })
+        NagSuppressions.addResourceSuppressions(sqsQueueDLQ, [
+            { id: "AwsSolutions-SQS3", reason: "it is a DLQ" },
+            { id: "AwsSolutions-SQS2", reason: "it is a DLQ" },
+            { id: "AwsSolutions-SQS4", reason: "it is a DLQ" },
+        ]);
 
         const cfnSqsQueueDLQ = sqsQueueDLQ.node.defaultChild as sqs.CfnQueue;
         cfnSqsQueueDLQ.overrideLogicalId('S3TransferQueueDLQ')
@@ -75,6 +89,10 @@ export class CommonStack extends Construct {
                 maxReceiveCount: 5
             },
         })
+        NagSuppressions.addResourceSuppressions(this.sqsQueue, [
+            { id: "AwsSolutions-SQS2", reason: "this queue only used by DTH solution" },
+            { id: "AwsSolutions-SQS4", reason: "this queue only used by DTH solution" },
+        ]);
 
         const cfnSqsQueue = this.sqsQueue.node.defaultChild as sqs.CfnQueue;
         cfnSqsQueue.overrideLogicalId('S3TransferQueue')
@@ -115,6 +133,31 @@ export class CommonStack extends Construct {
                             new iam.ServicePrincipal("cloudwatch.amazonaws.com"),
                         ],
                     }),
+                    // This policy is in CDK v1, we just move it to here
+                    new iam.PolicyStatement({
+                        actions: [
+                            "kms:Create*",
+                            "kms:Describe*",
+                            "kms:Enable*",
+                            "kms:List*",
+                            "kms:Put*",
+                            "kms:Update*",
+                            "kms:Revoke*",
+                            "kms:Disable*",
+                            "kms:Get*",
+                            "kms:Delete*",
+                            "kms:ScheduleKeyDeletion",
+                            "kms:CancelKeyDeletion",
+                            "kms:GenerateDataKey",
+                            "kms:TagResource",
+                            "kms:UntagResource"
+                        ],
+                        resources: ["*"],
+                        effect: iam.Effect.ALLOW,
+                        principals: [
+                            new iam.AccountRootPrincipal()                        
+                        ],
+                    }),
                 ],
             }),
 
@@ -150,6 +193,11 @@ export class CommonStack extends Construct {
         new CfnOutput(this, 'AlarmTopicName', {
             value: alarmTopic.topicName,
             description: 'Alarm Topic Name'
+        })
+
+        new CfnOutput(this, 'StackName', {
+            value: Aws.STACK_NAME,
+            description: 'Stack Name'
         })
     }
 

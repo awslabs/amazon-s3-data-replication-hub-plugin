@@ -14,13 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Construct, Duration, Tags, Aws, CfnMapping } from '@aws-cdk/core';
-import * as iam from '@aws-cdk/aws-iam';
-import * as ec2 from '@aws-cdk/aws-ec2';
-import * as asg from '@aws-cdk/aws-autoscaling';
-import * as sqs from '@aws-cdk/aws-sqs';
-import * as cw from '@aws-cdk/aws-cloudwatch';
-import { CfnLogGroup, RetentionDays, LogGroup, FilterPattern } from '@aws-cdk/aws-logs';
+import {
+    Construct,
+} from 'constructs';
+import {
+    Aws,
+    Duration,
+    CfnOutput,
+    CfnMapping,
+    Tags,
+    aws_iam as iam,
+    aws_ec2 as ec2,
+    aws_logs as logs,
+    aws_cloudwatch as cw,
+    aws_sqs as sqs,
+    aws_autoscaling as asg
+} from 'aws-cdk-lib';
+import { NagSuppressions } from 'cdk-nag';
 
 import * as path from 'path';
 import { addCfnNagSuppressRules } from "./main-stack";
@@ -114,7 +124,7 @@ export class Ec2WorkerStack extends Construct {
         ])
 
         workerAsgRole.attachInlinePolicy(cwAgentPolicy)
-
+        workerAsgRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
 
         this.workerAsg = new asg.AutoScalingGroup(this, 'S3RepWorkerASG', {
             autoScalingGroupName: `${Aws.STACK_NAME}-Worker-ASG`,
@@ -143,14 +153,20 @@ export class Ec2WorkerStack extends Construct {
                 },
             ]
         });
+        NagSuppressions.addResourceSuppressions(this.workerAsg, [
+            {
+                id: 'AwsSolutions-AS3',
+                reason: 'we do not need notification, this asg will change automated',
+            },
+        ]);
 
         Tags.of(this.workerAsg).add('Name', `${Aws.STACK_NAME}-Replication-Worker`, {})
 
-        const ec2LG = new LogGroup(this, 'S3RepWorkerLogGroup', {
-            retention: RetentionDays.TWO_WEEKS,
+        const ec2LG = new logs.LogGroup(this, 'S3RepWorkerLogGroup', {
+            retention: logs.RetentionDays.TWO_WEEKS,
         });
 
-        const cfnEc2LG = ec2LG.node.defaultChild as CfnLogGroup
+        const cfnEc2LG = ec2LG.node.defaultChild as logs.CfnLogGroup
         addCfnNagSuppressRules(cfnEc2LG, [
             {
                 id: 'W84',
@@ -238,21 +254,21 @@ export class Ec2WorkerStack extends Construct {
             metricName: 'CompletedBytes',
             metricNamespace: `${Aws.STACK_NAME}`,
             metricValue: '$Bytes',
-            filterPattern: FilterPattern.literal('[data, time, p="----->Completed", Bytes, ...]')
+            filterPattern: logs.FilterPattern.literal('[data, time, p="----->Completed", Bytes, ...]')
         })
 
         ec2LG.addMetricFilter('Transferred-Objects', {
             metricName: 'TransferredObjects',
             metricNamespace: `${Aws.STACK_NAME}`,
             metricValue: '1',
-            filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="DONE"]')
+            filterPattern: logs.FilterPattern.literal('[data, time, p="----->Transferred", ..., s="DONE"]')
         })
 
         ec2LG.addMetricFilter('Failed-Objects', {
             metricName: 'FailedObjects',
             metricNamespace: `${Aws.STACK_NAME}`,
             metricValue: '1',
-            filterPattern: FilterPattern.literal('[data, time, p="----->Transferred", ..., s="ERROR"]')
+            filterPattern: logs.FilterPattern.literal('[data, time, p="----->Transferred", ..., s="ERROR"]')
         })
 
         const allMsg = new cw.MathExpression({
@@ -277,7 +293,15 @@ export class Ec2WorkerStack extends Construct {
             adjustmentType: asg.AdjustmentType.CHANGE_IN_CAPACITY,
         })
 
+        new CfnOutput(this, 'WorkerLogGroupName', {
+            value: ec2LG.logGroupName,
+            description: 'Worker Log Group Name'
+        })
 
+        new CfnOutput(this, 'WorkerASGName', {
+            value: this.workerAsg.autoScalingGroupName,
+            description: 'Worker ASG Name'
+        })
 
     }
 

@@ -15,14 +15,26 @@ limitations under the License.
 */
 
 
-import * as cdk from '@aws-cdk/core';
-import { SynthUtils } from '@aws-cdk/assert';
+import { App, Stack } from "aws-cdk-lib";
+import { Match, Template } from "aws-cdk-lib/assertions";
 import * as main from '../lib/main-stack';
 
-test('Test main stack', () => {
-    const app = new cdk.App();
-    // WHEN
-    const stack = new main.DataTransferS3Stack(app, 'MyTestStack');
-    // THEN
-    expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
+beforeEach(() => {
+    jest.resetModules();
+    process.env = {};
+});
+
+describe("MainStack", () => {
+    test("Test main stack with default setting", () => {
+        const app = new App();
+
+        // WHEN
+        const stack = new main.DataTransferS3Stack(app, "MyTestStack");
+        const template = Template.fromStack(stack);
+
+        template.hasResourceProperties("AWS::DynamoDB::Table", {});
+
+        template.resourceCountIs("AWS::SQS::Queue", 2);
+    });
+
 });

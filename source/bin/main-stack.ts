@@ -18,8 +18,31 @@ limitations under the License.
 
 
 import 'source-map-support/register';
-import * as cdk from '@aws-cdk/core';
+import { App, Aspects, Stack } from "aws-cdk-lib";
 import { DataTransferS3Stack } from '../lib/main-stack';
 
-const app = new cdk.App();
-new DataTransferS3Stack(app, 'DataTransferS3Stack');
+import {
+    AwsSolutionsChecks,
+    NagPackSuppression,
+    NagSuppressions,
+} from "cdk-nag";
+
+const app = new App();
+
+function stackSuppressions(
+    stacks: Stack[],
+    suppressions: NagPackSuppression[]
+) {
+    stacks.forEach((s) =>
+        NagSuppressions.addStackSuppressions(s, suppressions, true)
+    );
+}
+
+stackSuppressions([
+    new DataTransferS3Stack(app, 'DataTransferS3Stack'),
+], [
+    { id: 'AwsSolutions-IAM5', reason: 'some policies need to get dynamic resources' },
+    { id: 'AwsSolutions-IAM4', reason: 'these policies is used by CDK Customer Resource lambda' },
+]);
+
+Aspects.of(app).add(new AwsSolutionsChecks());

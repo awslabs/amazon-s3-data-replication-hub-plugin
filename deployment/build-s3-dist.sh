@@ -47,10 +47,10 @@ if [ -z "$1" ] || [ -z "$2" ] ; then
 fi
 
 # Get default version
-if [ -z "$3" ]; then
-    export VERSION=$(git describe --tags || echo v0.0.0)
+if [ ! -z $3 ]; then
+    export VERSION="$3"
 else
-    export VERSION=$3
+    export VERSION=$(git describe --tags --exact-match || { [ -n "$BRANCH_NAME" ] && echo "$BRANCH_NAME"; } || echo v0.0.0)
 fi
 
 # Get reference for all important folders
@@ -67,7 +67,7 @@ echo "--------------------------------------------------------------------------
 echo AWS_DEFAULT_REGION $AWS_DEFAULT_REGION
 echo DIST_OUTPUT_BUCKET $1
 echo SOLUTION_NAME $2
-echo REGION $REGION
+# echo REGION $REGION
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
@@ -102,10 +102,6 @@ echo "--------------------------------------------------------------------------
 # Install the global aws-cdk package
 echo "cd $source_dir"
 cd $source_dir
-
-# Install and build
-echo "npm run build"
-npm run build
 
 # Run 'cdk synth' to generate raw solution outputs
 echo "cdk synth --output=$staging_dist_dir"
@@ -181,22 +177,39 @@ for d in `find . -mindepth 1 -maxdepth 1 -type d`; do
     # cd $d
     # Rename the artifact, removing the period for handler compatibility
     pfname="$(basename -- $d)"
-    fname="$(echo $pfname | sed -e 's/\.//g')"
-    echo "zipping the artifact"
-    mv $d $fname
-    pushd $fname
-    echo "zip -qr9 $staging_dist_dir/$fname.zip ."
-    zip -qr9 $staging_dist_dir/$fname.zip .
-    popd
-
-    # Copy the zipped artifact from /staging to /regional-s3-assets
-    echo "mv $fname.zip $build_dist_dir"
-    mv $fname.zip $build_dist_dir
+    # zip folder
+    echo "zip -rq $pfname.zip $pfname"
+    cd $pfname
+    zip -rq $pfname.zip *
+    mv $pfname.zip ../
+    cd ..
 
     # Remove the old, unzipped artifact from /staging
-    echo "rm -rf $fname"
-    rm -rf $fname
+    echo "rm -rf $pfname"
+    rm -rf $pfname
 
+    # ... repeat until all source code artifacts are zipped and placed in the /staging
+done
+
+
+# ... For each asset.*.zip code artifact in the temporary /staging folder...
+cd $staging_dist_dir
+for f in `find . -iname \*.zip`; do
+    # Rename the artifact, removing the period for handler compatibility
+    # pfname = asset.<key-name>.zip
+    pfname="$(basename -- $f)"
+    echo $pfname
+    # fname = <key-name>.zip
+    fname="$(echo $pfname | sed -e 's/asset\.//g')"
+    mv $pfname $fname
+
+    # Copy the zipped artifact from /staging to /regional-s3-assets
+    echo "cp $fname $build_dist_dir"
+    cp $fname $build_dist_dir
+
+    # Remove the old, zipped artifact from /staging
+    echo "rm $fname"
+    rm $fname
 done
 
 echo "------------------------------------------------------------------------------"
