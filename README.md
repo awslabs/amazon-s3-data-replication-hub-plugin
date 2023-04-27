@@ -46,13 +46,17 @@ If you have deployed a version before v2.0.2 (You can go to CloudFormation, chec
 
 ![S3 Plugin Architecture](s3-plugin-architect.png)
 
-A *Finder* job running in AWS Fargate lists all the objects in source and destination buckets and determines what objects should be transferred, a message for each object to be transferred will be created in SQS. A *time-based CloudWatch rule* will trigger the ECS task to run every hour. 
+The Amazon S3 plugin runs the following workflows:
 
-This plugin also supports S3 Event notification to trigger the data transfer (near real-time), only if the source bucket is in the same account (and region) as the one you deploy this plugin to. The event message will also be sent the same SQS queue.
-
-The *Worker* job running in EC2 consumes the message in SQS and transfer the object from source bucket to destination bucket. You can use Auto Scaling Group to controll the number of EC2 instances to transfer the data based on your business need.
-
-If an object or a part of an object failed to transfer, the EC2 instance will release the message in the Queue, and the object will be transferred again after the message is visible in the queue (Default visibility timeout is set to 15 minutes, extended for large objects). After a few retries, if the transfer still failed, the message will be sent to the Dead Letter Queue and an alarm will be triggered.
+1.	A time-based Event Bridge rule triggers a AWS Lambda function on an hourly basis. 
+2.  AWS Lambda uses the launch template to launch a data comparison job (JobFinder) in an [Amazon Elastic Compute Cloud (Amazon EC2)](https://aws.amazon.com/ec2/).
+3. The job lists all the objects in the source and destination
+buckets, makes comparisons among objects and determines which objects should be transferred.
+4.	Amazon EC2 sends a message for each object that will be transferred to [Amazon Simple Queue Service (Amazon SQS)](https://aws.amazon.com/sqs/). Amazon S3 event messages can also be supported for more real-time data transfer; whenever there is object uploaded to source bucket, the event message is sent to the same Amazon SQS queue.
+5.	A JobWorker running in Amazon EC2 consumes the messages in SQS and transfers the object from the source bucket to the destination bucket. You can use an Auto Scaling Group to control the number of EC2 instances to transfer the data based on business need.
+6.	A record with transfer status for each object is stored in Amazon DynamoDB. 
+7.	The Amazon EC2 instance will get (download) the object from the source bucket based on the Amazon SQS message. 
+8.	The Amazon EC2 instance will put (upload) the object to the destination bucket based on the Amazon SQS message. 
 
 This plugin supports transfer large size file. It will divide it into small parts and leverage the [multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html) feature of Amazon S3.
 

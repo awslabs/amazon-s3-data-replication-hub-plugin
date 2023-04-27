@@ -1,6 +1,11 @@
 {
-  "name": "data-replication-component-s3",
-  "version": "0.1.0",
+  "name": "data-transfer-hub-s3-plugin",
+  "version": "2.4.0",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Amazon Web Services",
+    "url": "https://aws.amazon.com/solutions"
+  },
   "bin": {
     "data-replication-component-s3": "bin/main-stack.js"
   },
@@ -14,9 +19,8 @@
   "devDependencies": {
     "@types/jest": "^27.0.2",
     "@types/node": "16.10.3",
-    "aws-cdk": "2.69.0",
-    "aws-cdk-lib": "2.69.0",
-    "aws-sdk": "2.814.0",
+    "aws-cdk": "2.74.0",
+    "aws-cdk-lib": "2.74.0",
     "jest": "^27.2.4",
     "path-parse": ">=1.0.7",
     "ts-jest": "^27.0.5",
@@ -25,8 +29,8 @@
   },
   "dependencies": {
     "hosted-git-info": ">=2.8.9",
-    "aws-cdk": "2.69.0",
-    "aws-cdk-lib": "2.69.0",
+    "aws-cdk": "2.74.0",
+    "aws-cdk-lib": "2.74.0",
     "cdk-nag": "2.23.5",
     "constructs": "10.1.85",
     "source-map-support": "0.5.20"
@@ -36,6 +40,7 @@
     "vm2": "3.9.11",
     "async": "3.2.2",
     "minimatch": "3.0.5",
-    "json5": "2.2.3"
+    "json5": "2.2.3",
+    "yaml": "2.2.2"
   }
 }

@@ -29,17 +29,24 @@ import {
   IAspect,
   Stack,
   StackProps,
+  Duration,
+  CustomResource,
   aws_secretsmanager as sm,
   aws_s3 as s3,
   aws_s3_notifications as s3n,
   aws_ec2 as ec2,
-  aws_iam as iam
+  aws_iam as iam,
+  custom_resources as cr,
+  aws_lambda as lambda,
 } from 'aws-cdk-lib';
+import { NagSuppressions } from "cdk-nag";
 
 import { CommonStack, CommonProps } from "./common-resources";
 import { Ec2FinderStack, Ec2FinderProps } from "./ec2-finder-stack";
 import { Ec2WorkerStack, Ec2WorkerProps } from "./ec2-worker-stack";
 import { DashboardStack, DBProps } from "./dashboard-stack";
+
+import * as path from "path";
 
 const { VERSION } = process.env;
 
@@ -90,7 +97,7 @@ export class DataTransferS3Stack extends Stack {
 
     const runType: RunType = this.node.tryGetContext('runType') || RunType.EC2
 
-    const cliRelease = '1.2.1'
+    const cliRelease = '1.2.2'
 
     const srcType = new CfnParameter(this, 'srcType', {
       description: 'Choose type of source storage, including Amazon S3, Aliyun OSS, Qiniu Kodo, Tencent COS or Google GCS',
@@ -156,6 +163,14 @@ export class DataTransferS3Stack extends Stack {
       type: 'String'
     })
     this.addToParamLabels('Source Credentials', srcCredentials.logicalId)
+
+    const isPayerRequest = new CfnParameter(this, 'isPayerRequest', {
+      description: 'Enable Payer Request?',
+      default: 'false',
+      type: 'String',
+      allowedValues: ['true', 'false']
+    })
+    this.addToParamLabels('Enable Payer Request', isPayerRequest.logicalId)
 
 
     const destBucket = new CfnParameter(this, 'destBucket', {
@@ -289,7 +304,7 @@ export class DataTransferS3Stack extends Stack {
     })
 
 
-    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcPrefixsListFile.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId, srcSkipCompare.logicalId)
+    this.addToParamGroups('Source Information', srcType.logicalId, srcBucket.logicalId, srcPrefix.logicalId, srcPrefixsListFile.logicalId, srcRegion.logicalId, srcEndpoint.logicalId, srcInCurrentAccount.logicalId, srcCredentials.logicalId, srcEvent.logicalId, srcSkipCompare.logicalId, isPayerRequest.logicalId)
     this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId, destAcl.logicalId)
     this.addToParamGroups('Notification Information', alarmEmail.logicalId)
     this.addToParamGroups('EC2 Cluster Information', ec2VpcId.logicalId, ec2Subnets.logicalId, finderEc2Memory.logicalId, ec2CronExpression.logicalId)
@@ -353,6 +368,7 @@ export class DataTransferS3Stack extends Stack {
     // Start Common Stack
     const commonProps: CommonProps = {
       alarmEmail: alarmEmail.valueAsString,
+      srcIBucket: srcIBucket,
     }
 
     const commonStack = new CommonStack(this, 'Common', commonProps)
@@ -402,6 +418,7 @@ export class DataTransferS3Stack extends Stack {
       SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
+      PAYER_REQUEST: isPayerRequest.valueAsString,
       SKIP_COMPARE: srcSkipCompare.valueAsString,
 
       DEST_BUCKET: destBucket.valueAsString,
@@ -441,6 +458,7 @@ export class DataTransferS3Stack extends Stack {
       SRC_ENDPOINT: srcEndpoint.valueAsString,
       SRC_CREDENTIALS: srcCredentials.valueAsString,
       SRC_IN_CURRENT_ACCOUNT: srcInCurrentAccount.valueAsString,
+      PAYER_REQUEST: isPayerRequest.valueAsString,
 
       DEST_BUCKET: destBucket.valueAsString,
       DEST_PREFIX: destPrefix.valueAsString,
@@ -503,81 +521,78 @@ export class DataTransferS3Stack extends Stack {
         ],
       })
     );
-    
+
     // Here we create the notification resource by default
     // Using cdk condition to enable or disable this notification
     // Using cdk Aspects to modify the event type.
-    srcIBucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED,
-      new s3n.SqsDestination(commonStack.sqsQueue),
+    // Lambda to enable bucket notification of log source account.
+    const s3NotificationHelperFn = new lambda.Function(
+      this,
+      "s3NotificationHelperFn",
       {
-        prefix: srcPrefix.valueAsString,
-      }
-    );
-
-    const hasDelete = new CfnCondition(this, 'hasDelete', {
-      expression: Fn.conditionEquals('CreateAndDelete', srcEvent.valueAsString),
-    });
-    const events = Fn.conditionIf(hasDelete.logicalId, 's3:ObjectCreated:*,s3:ObjectRemoved:*', 's3:ObjectCreated:*').toString();
-    const s3EventConfiguration = [
-      {
-        "Events": Fn.split(",", events),
-        "Filter": {
-          "Key": {
-            "FilterRules": [
-              {
-                "Name": "prefix",
-                "Value": srcPrefix.valueAsString
-              }
-            ]
-          }
+        description: `${Aws.STACK_NAME} - Create S3 Notification Processor`,
+        runtime: lambda.Runtime.PYTHON_3_9,
+        handler: "lambda_function.lambda_handler",
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, "../lambda/custom-resource")
+        ),
+        memorySize: 256,
+        timeout: Duration.seconds(60),
+        environment: {
+          STACK_NAME: Aws.STACK_NAME,
+          SOLUTION_VERSION: process.env.VERSION || "v1.0.0",
+          BUCKET_NAME: srcIBucket.bucketName,
+          OBJECT_PREFIX: srcPrefix.valueAsString,
+          EVENT_QUEUE_NAME: commonStack.sqsQueue.queueName,
+          EVENT_QUEUE_ARN: commonStack.sqsQueue.queueArn,
+          EVENT_ACTION: srcEvent.valueAsString,
         },
-        "QueueArn": commonStack.sqsQueue.queueArn
       }
-    ]
-    Aspects.of(this).add(
-      new InjectS3CreateAndDeleteEventConfig(s3EventConfiguration)
+    );
+    // Create the policy and role for the Lambda to create and delete CloudWatch Log Group Subscription Filter with cross-account scenario
+    s3NotificationHelperFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "s3:GetBucketNotification",
+          "s3:PutBucketNotification"
+        ],
+        effect: iam.Effect.ALLOW,
+        resources: [
+          `arn:${Aws.PARTITION}:s3:::${srcIBucket.bucketName}`,
+          `arn:${Aws.PARTITION}:s3:::${srcIBucket.bucketName}/*`,
+        ],
+      })
     );
 
-    const useS3Event = new CfnCondition(this, 'UseS3Event', {
-      expression: Fn.conditionAnd(
-        // source in current account
-        Fn.conditionEquals('true', srcInCurrentAccount.valueAsString),
-        // Source Type is Amazon S3 - Optional
-        Fn.conditionEquals('Amazon_S3', srcType.valueAsString),
-        // Enable S3 Event is Yes
-        Fn.conditionNot(Fn.conditionEquals('No', srcEvent.valueAsString)),
-      ),
-    });
-
-    Aspects.of(this).add(
-      new InjectS3NotificationCondition(useS3Event)
+    const s3NotificationHelperProvider = new cr.Provider(
+      this,
+      "s3NotificationHelperProvider",
+      {
+        onEventHandler: s3NotificationHelperFn,
+      }
     );
-  }
-}
 
-class InjectS3NotificationCondition implements IAspect {
-  public constructor(private condition: CfnCondition) { }
+    s3NotificationHelperProvider.node.addDependency(
+      s3NotificationHelperFn
+    );
+    NagSuppressions.addResourceSuppressions(s3NotificationHelperProvider, [
+      {
+        id: "AwsSolutions-L1",
+        reason: "the lambda runtime is determined by aws cdk customer resource",
+      },
+    ]);
 
-  public visit(node: IConstruct): void {
-    if (
-      node instanceof CfnResource &&
-      node.cfnResourceType === "Custom::S3BucketNotifications"
-    ) {
-      node.cfnOptions.condition = this.condition;
-    }
-  }
-}
+    const s3NotificationHelperLambdaTrigger = new CustomResource(
+      this,
+      "s3NotificationHelperLambdaTrigger",
+      {
+        serviceToken: s3NotificationHelperProvider.serviceToken,
+      }
+    );
 
-class InjectS3CreateAndDeleteEventConfig implements IAspect {
-  public constructor(private queueConfigurations: any) { }
+    s3NotificationHelperLambdaTrigger.node.addDependency(
+      s3NotificationHelperProvider
+    );
 
-  public visit(node: IConstruct): void {
-    if (
-      node instanceof CfnResource &&
-      node.cfnResourceType === "Custom::S3BucketNotifications"
-    ) {
-      node.addPropertyOverride("NotificationConfiguration.QueueConfigurations", this.queueConfigurations);
-    }
   }
 }

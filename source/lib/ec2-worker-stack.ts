@@ -220,6 +220,7 @@ export class Ec2WorkerStack extends Construct {
             `echo "export SRC_ENDPOINT=${props.env.SRC_ENDPOINT}" >> env.sh`,
             `echo "export SRC_CREDENTIALS=${props.env.SRC_CREDENTIALS}" >> env.sh`,
             `echo "export SRC_IN_CURRENT_ACCOUNT=${props.env.SRC_IN_CURRENT_ACCOUNT}" >> env.sh`,
+            `echo "export PAYER_REQUEST=${props.env.PAYER_REQUEST}" >> env.sh`,
 
             `echo "export DEST_BUCKET=${props.env.DEST_BUCKET}" >> env.sh`,
             `echo "export DEST_PREFIX=${props.env.DEST_PREFIX}" >> env.sh`,

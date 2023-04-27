@@ -30,7 +30,8 @@ import {
     aws_cloudwatch_actions as actions,
     aws_sns as sns,
     aws_sns_subscriptions as sub,
-    aws_kms as kms
+    aws_kms as kms,
+    aws_s3 as s3,
 } from 'aws-cdk-lib';
 import { NagSuppressions } from "cdk-nag";
 
@@ -38,6 +39,7 @@ import { addCfnNagSuppressRules } from "./main-stack";
 
 export interface CommonProps {
     readonly alarmEmail: string,
+    readonly srcIBucket: s3.IBucket
 }
 
 export class CommonStack extends Construct {
@@ -93,6 +95,24 @@ export class CommonStack extends Construct {
             { id: "AwsSolutions-SQS2", reason: "this queue only used by DTH solution" },
             { id: "AwsSolutions-SQS4", reason: "this queue only used by DTH solution" },
         ]);
+
+        this.sqsQueue.addToResourcePolicy(
+            new iam.PolicyStatement({
+                effect: iam.Effect.ALLOW,
+                conditions: {
+                    ArnLike: {
+                        "aws:SourceArn": props.srcIBucket.bucketArn,
+                    },
+                },
+                principals: [new iam.ServicePrincipal("s3.amazonaws.com")],
+                resources: [this.sqsQueue.queueArn],
+                actions: [
+                    "sqs:SendMessage",
+                    "sqs:GetQueueAttributes",
+                    "sqs:GetQueueUrl",
+                ],
+            })
+        );
 
         const cfnSqsQueue = this.sqsQueue.node.defaultChild as sqs.CfnQueue;
         cfnSqsQueue.overrideLogicalId('S3TransferQueue')
@@ -155,7 +175,7 @@ export class CommonStack extends Construct {
                         resources: ["*"],
                         effect: iam.Effect.ALLOW,
                         principals: [
-                            new iam.AccountRootPrincipal()                        
+                            new iam.AccountRootPrincipal()
                         ],
                     }),
                 ],

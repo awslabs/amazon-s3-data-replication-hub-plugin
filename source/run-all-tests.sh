@@ -147,7 +147,8 @@ construct_dir=$source_dir
 run_cdk_project_test $construct_dir
 
 # Test the attached Lambda function
-run_python_test $construct_dir/lambda asg-helper
+run_python_test $construct_dir/lambda/asg-helper asg-helper
+run_python_test $construct_dir/lambda/custom-resource custom-resource
 
 # Return to the source/ level
 cd $source_dir

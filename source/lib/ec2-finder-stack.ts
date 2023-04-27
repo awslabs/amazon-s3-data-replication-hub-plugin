@@ -239,6 +239,7 @@ export class Ec2FinderStack extends Construct {
             `echo "export SRC_ENDPOINT=${props.env.SRC_ENDPOINT}" >> env.sh`,
             `echo "export SRC_CREDENTIALS=${props.env.SRC_CREDENTIALS}" >> env.sh`,
             `echo "export SRC_IN_CURRENT_ACCOUNT=${props.env.SRC_IN_CURRENT_ACCOUNT}" >> env.sh`,
+            `echo "export PAYER_REQUEST=${props.env.PAYER_REQUEST}" >> env.sh`,
 
             `echo "export DEST_BUCKET=${props.env.DEST_BUCKET}" >> env.sh`,
             `echo "export DEST_PREFIX=${props.env.DEST_PREFIX}" >> env.sh`,
@@ -285,7 +286,7 @@ export class Ec2FinderStack extends Construct {
             runtime: lambda.Runtime.PYTHON_3_9,
             handler: "lambda_function.lambda_handler",
             code: lambda.Code.fromAsset(
-                path.join(__dirname, "../lambda")
+                path.join(__dirname, "../lambda/asg-helper")
             ),
             memorySize: 256,
             timeout: Duration.minutes(15),

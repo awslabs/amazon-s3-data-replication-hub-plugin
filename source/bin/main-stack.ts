@@ -43,6 +43,10 @@ stackSuppressions([
 ], [
     { id: 'AwsSolutions-IAM5', reason: 'some policies need to get dynamic resources' },
     { id: 'AwsSolutions-IAM4', reason: 'these policies is used by CDK Customer Resource lambda' },
+    {
+        id: 'AwsSolutions-L1',
+        reason: 'not applicable to use the latest lambda runtime version for aws cdk cr',
+    },
 ]);
 
 Aspects.of(app).add(new AwsSolutionsChecks());
