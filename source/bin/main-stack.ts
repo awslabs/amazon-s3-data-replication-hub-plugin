@@ -28,6 +28,7 @@ import {
 } from "cdk-nag";
 
 const app = new App();
+const stackName = process.env.CUSTOM_STACK_NAME || 'DataTransferS3Stack';
 
 function stackSuppressions(
     stacks: Stack[],
@@ -39,7 +40,7 @@ function stackSuppressions(
 }
 
 stackSuppressions([
-    new DataTransferS3Stack(app, 'DataTransferS3Stack'),
+    new DataTransferS3Stack(app, stackName),
 ], [
     { id: 'AwsSolutions-IAM5', reason: 'some policies need to get dynamic resources' },
     { id: 'AwsSolutions-IAM4', reason: 'these policies is used by CDK Customer Resource lambda' },

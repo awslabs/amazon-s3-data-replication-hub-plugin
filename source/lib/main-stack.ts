@@ -195,6 +195,13 @@ export class DataTransferS3Stack extends Stack {
     })
     this.addToParamLabels('Destination Credentials', destCredentials.logicalId)
 
+    const proxyHost = new CfnParameter(this, 'proxyHost', {
+      description: 'Proxy server to be used by EC2 tasks. Leave blank if not needed.',
+      default: '',
+      type: 'String'
+    })
+    this.addToParamLabels('Proxy Host', proxyHost.logicalId)
+
 
     // 'STANDARD'|'REDUCED_REDUNDANCY'|'STANDARD_IA'|'ONEZONE_IA'|'INTELLIGENT_TIERING'|'GLACIER'|'DEEP_ARCHIVE'|'OUTPOSTS',
     const destStorageClass = new CfnParameter(this, 'destStorageClass', {
@@ -293,6 +300,7 @@ export class DataTransferS3Stack extends Stack {
     this.addToParamGroups('Destination Information', destBucket.logicalId, destPrefix.logicalId, destRegion.logicalId, destInCurrentAccount.logicalId, destCredentials.logicalId, destStorageClass.logicalId, destAcl.logicalId)
     this.addToParamGroups('Notification Information', alarmEmail.logicalId)
     this.addToParamGroups('EC2 Cluster Information', ec2VpcId.logicalId, ec2Subnets.logicalId, finderEc2Memory.logicalId, ec2CronExpression.logicalId)
+    this.addToParamGroups('Network Settings', proxyHost.logicalId)
 
     // let lambdaMemory: CfnParameter | undefined
     let maxCapacity: CfnParameter | undefined
@@ -413,6 +421,7 @@ export class DataTransferS3Stack extends Stack {
       FINDER_DEPTH: finderDepth.valueAsString,
       FINDER_NUMBER: finderNumber.valueAsString,
 
+      PROXY_HOST: proxyHost.valueAsString,
     }
 
     const finderProps: Ec2FinderProps = {
@@ -455,6 +464,7 @@ export class DataTransferS3Stack extends Stack {
       WORKER_NUMBER: workerNumber.valueAsString,
       INCLUDE_METADATA: includeMetadata.valueAsString,
 
+      PROXY_HOST: proxyHost.valueAsString,
     }
 
     let asgName = undefined
