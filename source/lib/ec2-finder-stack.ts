@@ -257,6 +257,10 @@ export class Ec2FinderStack extends Construct {
             `echo "export INCLUDE_METADATA=${props.env.INCLUDE_METADATA}" >> env.sh`,
             `echo "export AWS_DEFAULT_REGION=${Aws.REGION}" >> env.sh`,
 
+            `echo "export HTTP_PROXY=${props.env.PROXY_HOST}" >> env.sh`,
+            `echo "export HTTPS_PROXY=${props.env.PROXY_HOST}" >> env.sh`,
+            `echo "export NO_PROXY=169.254.169.254" >> env.sh`,
+
             // Create the script
             'echo "source /home/ec2-user/env.sh" >> start-finder.sh',
             'echo "nohup ./dthcli run -t Finder |& tee -a /home/ec2-user/finder.log" >> start-finder.sh',
