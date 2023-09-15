@@ -1,6 +1,20 @@
 
 [中文](./README_CN.md)
 
+# Repository Has Been Migrated
+
+This repository has been merged into [Data Transfer Hub](https://github.com/awslabs/data-transfer-hub/blob/main/docs/S3_PLUGIN.md). Subsequent maintenance and updates for this repository will be conducted within repository [Data Transfer Hub](https://github.com/awslabs/data-transfer-hub).
+
+The document of this repository has been migrated to: 
+- MD: https://github.com/awslabs/data-transfer-hub/blob/main/docs/S3_PLUGIN.md
+- Mkdoc: https://awslabs.github.io/data-transfer-hub/en/user-guide/tutorial-s3/
+
+The code of this repository has been migrated to:
+- Infra CDK: https://github.com/awslabs/data-transfer-hub/tree/main/source/constructs/lib/s3-plugin
+- Lambda: https://github.com/awslabs/data-transfer-hub/tree/main/source/constructs/lambda/plugin/s3
+
+This migration will not impact any existing functionalities of the S3 plugin, and the S3 plugin can still be deployed independently.
+
 # Data Transfer Hub - S3 Plugin
 
 ## Table of contents
