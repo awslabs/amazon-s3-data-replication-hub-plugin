@@ -1,6 +1,20 @@
 
 [English](./README.md)
 
+# 仓库已迁移
+
+该仓库已合并到 [Data Transfer Hub](https://github.com/awslabs/data-transfer-hub/blob/main/docs/S3_PLUGIN.md) 中。此后，该仓库的维护和更新将在 [Data Transfer Hub](https://github.com/awslabs/data-transfer-hub) 仓库中进行。
+
+该仓库的文档已迁移到以下位置：
+- MD格式：https://github.com/awslabs/data-transfer-hub/blob/main/docs/S3_PLUGIN.md
+- Mkdoc格式：https://awslabs.github.io/data-transfer-hub/en/user-guide/tutorial-s3/
+
+该仓库的代码已迁移到以下位置：
+- Infra CDK：https://github.com/awslabs/data-transfer-hub/tree/main/source/constructs/lib/s3-plugin
+- Lambda：https://github.com/awslabs/data-transfer-hub/tree/main/source/constructs/lambda/plugin/s3
+
+此迁移不会影响 S3 插件的任何现有功能，并且 S3 插件仍然可以独立部署。
+
 # Data Transfer Hub - S3插件
 
 ## 目录
