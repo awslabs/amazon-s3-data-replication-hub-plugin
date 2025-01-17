@@ -20,7 +20,7 @@
     "@types/jest": "^27.0.2",
     "@types/node": "16.10.3",
     "aws-cdk": "2.74.0",
-    "aws-cdk-lib": "2.74.0",
+    "aws-cdk-lib": "2.176.0",
     "jest": "^27.2.4",
     "path-parse": ">=1.0.7",
     "ts-jest": "^27.0.5",
@@ -30,7 +30,7 @@
   "dependencies": {
     "hosted-git-info": ">=2.8.9",
     "aws-cdk": "2.74.0",
-    "aws-cdk-lib": "2.74.0",
+    "aws-cdk-lib": "2.176.0",
     "cdk-nag": "2.23.5",
     "constructs": "10.1.85",
     "source-map-support": "0.5.20"
